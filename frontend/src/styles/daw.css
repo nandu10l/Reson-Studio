@@ -459,6 +459,62 @@
   border-color: var(--primary-light);
 }
 
+.clip-delete {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid rgba(0,0,0,0.06);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.clip-delete:hover {
+  color: var(--primary);
+  border-color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.add-clip-inline {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.add-clip-inline:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  background: var(--surface-hover);
+}
+
+.drag-clone {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 6px 8px;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.08);
+  z-index: 9999;
+}
+
+.track-row.drop-target {
+  outline: 2px dashed rgba(79,70,229,0.12);
+}
+
 .clip-title {
   padding: 6px 8px;
   font-size: 11px;

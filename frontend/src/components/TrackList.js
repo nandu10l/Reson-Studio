@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Guitar, Drumstick, Piano, Volume2, Volume1, VolumeX, Radio, Plus } from 'lucide-react';
 import TrackClip from './TrackClip';
 
-function Track({ track, onSelect, trackState, onToggleState }) {
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag }) {
   const TrackIcon = track.icon || Piano;
   
   return (
-    <div className="track-row">
+    <div className="track-row" data-track-id={track.id}>
       <div className="track-header">
         <div className="track-controls">
           <button 
@@ -62,7 +62,15 @@ function Track({ track, onSelect, trackState, onToggleState }) {
               width: `${clip.length * 60}px`
             }}
             onClick={() => onSelect(clip)}
+            onPointerDown={(e) => onStartDrag(e, track.id, idx)}
           >
+            <button
+              className="clip-delete"
+              onClick={(e) => { e.stopPropagation(); onRemoveClip(track.id, idx); }}
+              title="Delete clip"
+            >
+              ×
+            </button>
             <div className="clip-title">{clip.title}</div>
             <div className="clip-waveform">
               <svg className="waveform-svg" viewBox="0 0 100 30">
@@ -76,6 +84,8 @@ function Track({ track, onSelect, trackState, onToggleState }) {
             </div>
           </div>
         ))}
+
+        <button className="add-clip-inline" onClick={() => onAddClip(track.id)} title="Add clip">+ Clip</button>
       </div>
     </div>
   );
@@ -143,6 +153,120 @@ export default function TrackList({ onSelectClip }) {
     }));
   };
 
+  const addClip = (trackId) => {
+    setTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+      const nextIndex = t.clips.length + 1;
+      const newClip = { title: `Clip ${nextIndex}`, offset: 0, length: 4 };
+      return { ...t, clips: [...t.clips, newClip] };
+    }));
+  };
+
+  const removeClip = (trackId, clipIndex) => {
+    setTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+      const newClips = t.clips.slice();
+      newClips.splice(clipIndex, 1);
+      return { ...t, clips: newClips };
+    }));
+  };
+
+  // Drag/drop state
+  const dragState = useRef({ dragging: false, trackId: null, clipIndex: null, startX: 0, origOffset: 0 });
+  const dragClone = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      // cleanup any global listeners
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+    // Intentionally run once on mount/unmount; listeners are registered per drag start.
+  }, []);
+
+  const onStartDrag = (e, trackId, clipIndex) => {
+    // only left button
+    if (e.button && e.button !== 0) return;
+    const track = tracks.find(t => t.id === trackId);
+    if (!track) return;
+    const clip = track.clips[clipIndex];
+    if (!clip) return;
+
+    e.preventDefault();
+    dragState.current = {
+      dragging: true,
+      trackId,
+      clipIndex,
+      startX: e.clientX,
+      origOffset: clip.offset
+    };
+
+    // create clone element
+    const clone = document.createElement('div');
+    clone.className = 'drag-clone';
+    clone.style.position = 'fixed';
+    clone.style.left = `${e.clientX}px`;
+    clone.style.top = `${e.clientY}px`;
+    clone.style.pointerEvents = 'none';
+    clone.style.width = `${clip.length * 60}px`;
+    clone.innerHTML = `<div class="clip-title">${clip.title}</div>`;
+    document.body.appendChild(clone);
+    dragClone.current = clone;
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
+
+  const onPointerMove = (e) => {
+    const ds = dragState.current;
+    if (!ds.dragging) return;
+    if (dragClone.current) {
+      dragClone.current.style.left = `${e.clientX + 8}px`;
+      dragClone.current.style.top = `${e.clientY + 8}px`;
+    }
+  };
+
+  const onPointerUp = (e) => {
+    const ds = dragState.current;
+    if (!ds.dragging) return;
+    // determine target track by element under pointer
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    const trackEl = el?.closest?.('[data-track-id]');
+    const targetTrackId = trackEl ? Number(trackEl.getAttribute('data-track-id')) : ds.trackId;
+
+    // compute new offset based on pointer x relative to track clip area
+    const clipArea = trackEl ? trackEl.querySelector('.track-clip-area') : null;
+    let newOffset = ds.origOffset;
+    if (clipArea) {
+      const rect = clipArea.getBoundingClientRect();
+      const relativeX = Math.max(0, e.clientX - rect.left);
+      newOffset = Math.round(relativeX / 60);
+    }
+
+    // move clip in state
+    setTracks(prev => {
+      let movingClip = null;
+      const removed = prev.map(t => {
+        if (t.id !== ds.trackId) return t;
+        const newClips = t.clips.slice();
+        movingClip = newClips.splice(ds.clipIndex, 1)[0];
+        return { ...t, clips: newClips };
+      });
+      if (!movingClip) return prev;
+      movingClip.offset = newOffset;
+      return removed.map(t => {
+        if (t.id !== targetTrackId) return t;
+        return { ...t, clips: [...t.clips, movingClip] };
+      });
+    });
+
+    // cleanup
+    dragState.current = { dragging: false, trackId: null, clipIndex: null };
+    if (dragClone.current) { document.body.removeChild(dragClone.current); dragClone.current = null; }
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+  };
+
   const toggleTrackState = (trackId, state) => {
     setTrackStates(prev => ({
       ...prev,
@@ -163,6 +287,9 @@ export default function TrackList({ onSelectClip }) {
           track={track}
           trackState={trackStates[track.id]}
           onToggleState={(state) => toggleTrackState(track.id, state)}
+          onAddClip={addClip}
+          onRemoveClip={removeClip}
+          onStartDrag={onStartDrag}
           onSelect={handleSelect}
         />
       ))}

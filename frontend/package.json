@@ -22,12 +22,12 @@
     "wavesurfer.js": "^7.11.0"
   },
   "scripts": {
-  "start": "concurrently \"cross-env BROWSER=none npm run start-web\" \"wait-on http://localhost:3000 && electron .\"",
-  "start-web": "react-scripts start",
+    "start": "concurrently \"cross-env BROWSER=none npm run start-web\" \"wait-on http://localhost:3000 && electron .\"",
+    "start-web": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-  "electron-dev": "npm run start",
+    "electron-dev": "npm run start",
     "electron-pack": "npm run build && npm run copy-electron && electron-builder -c.extraMetadata.main=build/electron/main.js",
     "preelectron-pack": "npm run build",
     "copy-electron": "node ./scripts/copy-electron.js"
@@ -57,6 +57,8 @@
   "devDependencies": {
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^7.0.0",
     "react-scripts": "^5.0.1"
   }
 }
