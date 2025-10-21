@@ -1,0 +1,6 @@
+body { margin: 0; font-family: Arial, sans-serif; }
+.navbar { display: flex; align-items: center; padding: 8px 12px; background: #222; color: #fff; }
+.navbar a { color: #fff; margin-right: 12px; text-decoration: none; }
+.sidebar { width: 200px; background: #f4f4f4; padding: 12px; }
+.home-container, .dashboard-container { display: flex; }
+.window-controls button { margin-left: 6px; }
