@@ -4,8 +4,14 @@ function MixerChannel({ name }) {
   return (
     <div className="mixer-channel">
       <div className="channel-name">{name}</div>
-      <div className="pan-control">Pan</div>
-      <input className="fader" type="range" min="0" max="100" defaultValue="75" />
+      <div className="pan-control">
+        <label>Pan</label>
+        <input className="pan-fader" type="range" min="-50" max="50" defaultValue="0" />
+      </div>
+      <div className="volume-control">
+        <label>Vol</label>
+        <input className="fader" type="range" min="0" max="100" defaultValue="75" />
+      </div>
       <div className="channel-controls">
         <button className="btn tiny">S</button>
         <button className="btn tiny">M</button>

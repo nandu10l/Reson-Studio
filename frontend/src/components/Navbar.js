@@ -28,7 +28,15 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
           <button className="btn small primary-btn">
             <Plus size={14} /> New Project
           </button>
-          <button className="btn small">
+          <button className="btn small" onClick={async () => {
+            if (window.electronAPI && window.electronAPI.openFileDialog) {
+              const filePaths = await window.electronAPI.openFileDialog();
+              if (filePaths && filePaths.length > 0) {
+                console.log('Selected file:', filePaths[0]);
+                // Handle the selected file here, e.g., load the project
+              }
+            }
+          }}>
             <FolderOpen size={14} /> Open
           </button>
           <button className="btn small">

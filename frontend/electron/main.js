@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, dialog } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
@@ -70,6 +70,16 @@ ipcMain.handle('window-to-tray', () => {
     if (!mainWindow) return;
     mainWindow.hide();
     createTray();
+});
+
+ipcMain.handle('open-file-dialog', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [
+            { name: 'All Files', extensions: ['*'] }
+        ]
+    });
+    return result.filePaths;
 });
 
 // This method will be called when Electron has finished
