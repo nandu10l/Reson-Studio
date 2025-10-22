@@ -22,6 +22,10 @@ function Dashboard() {
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
   const [inspectorWidth, setInspectorWidth] = useState(300);
+
+  // Timeline scroll state
+  const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
+  const [timelineZoom, setTimelineZoom] = useState(1);
   
   const resizeState = useRef({ resizing: false, startX: 0, startWidth: 0, target: null });
 

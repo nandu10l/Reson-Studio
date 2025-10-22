@@ -444,14 +444,84 @@
   overflow: hidden;
 }
 
-/* Timeline ruler */
+/* Professional Timeline Styles */
 .timeline {
   display: flex;
-  height: 40px;
+  flex-direction: column;
+  height: 60px;
   background: linear-gradient(180deg, #f8faff 0%, var(--surface) 100%);
   border-bottom: 1px solid var(--border);
   position: relative;
   user-select: none;
+  overflow: hidden;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.timeline-btn {
+  width: 24px;
+  height: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.timeline-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.zoom-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+
+.timeline-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bpm-display {
+  color: var(--primary);
+}
+
+.time-signature {
+  color: var(--text);
+}
+
+.timeline-ruler {
+  flex: 1;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
 }
 
 .timeline-grid {
@@ -461,32 +531,142 @@
   right: 0;
   bottom: 0;
   display: flex;
-  align-items: flex-end;
-  padding: 0 0 8px;
 }
 
 .timeline-tick {
-  position: relative;
-  width: 60px; /* 1 bar width */
-  font-size: 11px;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
-  text-align: center;
 }
 
-.timeline-tick::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: 16px;
-  height: 8px;
+.tick-label {
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tick-line {
   width: 1px;
   background: var(--border);
+  flex: 1;
+  max-height: 12px;
 }
 
-.timeline-tick.beat::before {
-  height: 4px;
-  opacity: 0.5;
+.timeline-tick.downbeat .tick-line {
+  background: var(--primary);
+  opacity: 0.6;
+  max-height: 16px;
+}
+
+.timeline-tick.beat .tick-line {
+  opacity: 0.4;
+  max-height: 8px;
+}
+
+/* Playhead */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.playhead-line {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+}
+
+.playhead-head {
+  position: absolute;
+  top: -6px;
+  left: -4px;
+  width: 10px;
+  height: 12px;
+  background: #ef4444;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  filter: drop-shadow(0 1px 2px rgba(239, 68, 68, 0.3));
+}
+
+/* Time markers */
+.time-markers {
+  position: absolute;
+  top: 26px;
+  left: 200px;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.time-marker {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  top: 2px;
+}
+
+/* Hover effects */
+.timeline-ruler:hover .time-marker {
+  opacity: 0.8;
+}
+
+/* Selection and loop regions */
+.timeline-selection {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid var(--primary-light);
+  border-top: none;
+  pointer-events: none;
+}
+
+.timeline-loop {
+  position: absolute;
+  top: 24px;
+  bottom: 0;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid #22c55e;
+  border-top: none;
+  pointer-events: none;
+}
+
+.timeline-loop::before,
+.timeline-loop::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+}
+
+.timeline-loop::before {
+  left: -4px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.timeline-loop::after {
+  right: -4px;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
 }
 
 /* Track list */
