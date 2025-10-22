@@ -14,7 +14,7 @@
 .navbar {
   display: flex;
   align-items: center;
-  padding: 0 24px;
+  padding: 0 16px; /* Adjusted padding */
   height: 64px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -33,23 +33,58 @@
   background: linear-gradient(90deg, var(--primary-light), var(--primary));
 }
 
-.navbar-brand {
-  font-weight: 700;
-  font-size: 18px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-right: 48px;
-  letter-spacing: -0.02em;
-}
+/* REMOVED .navbar-brand */
 
 .navbar-menu {
   display: flex;
   align-items: center;
+  /* Use space-around/space-between for better distribution or flex-grow for view-buttons */
+  flex: 1; /* Allows it to take up space */
   justify-content: space-between;
-  flex: 1;
+  gap: 20px; /* Gap between main sections */
 }
+
+/* New Session Controls for New/Open/Save */
+.session-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn.small:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.btn.small.primary-btn {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.btn.small.primary-btn:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+  color: white;
+}
+
 
 .view-buttons {
   display: flex;
@@ -57,10 +92,12 @@
   background: var(--surface-hover);
   padding: 4px;
   border-radius: 10px;
+  /* Add auto margins to push it to the center-ish area if needed, or remove them */
+  margin: 0 auto; 
 }
 
 .view-buttons button {
-  padding: 8px 20px;
+  padding: 8px 16px; /* Slightly reduced padding */
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -71,13 +108,16 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .view-buttons button:hover {
   background: rgba(255, 255, 255, 0.8);
   color: var(--text);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transform: none; /* Remove translateY for a cleaner navbar look */
+  box-shadow: none;
 }
 
 .view-buttons button.active {
@@ -101,11 +141,11 @@
 .right-controls {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px; /* Reduced gap */
 }
 
 .right-controls button {
-  padding: 8px 16px;
+  padding: 6px 12px; /* Adjusted padding to match session-controls */
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -123,12 +163,44 @@
   background: var(--surface-hover);
   border-color: var(--primary-light);
   color: var(--primary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transform: none; /* Remove translateY for a cleaner navbar look */
+  box-shadow: none;
 }
 
+/* Search Input Styling */
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 6px 12px 6px 30px; /* Left padding for icon */
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
+  font-size: 13px;
+  width: 150px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-secondary);
+}
+
+
 .user-info {
-  padding: 8px 16px;
+  padding: 6px 12px; /* Adjusted padding */
   border-radius: 8px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
@@ -141,12 +213,50 @@
   gap: 8px;
 }
 
+/* Window Controls for Electron */
+.window-controls {
+    display: flex;
+    align-items: center;
+    margin-left: 20px;
+}
+
+.window-controls button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    height: 64px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.window-controls button:hover {
+    background-color: var(--surface-hover);
+    color: var(--text);
+}
+
+.window-controls .close-btn:hover {
+    background-color: #ef4444; /* Red color for close */
+    color: white;
+}
+
+/* REMOVED .navbar-top and related styles */
+.navbar-top, .top-controls, .top-right, .brand, .search {
+    /* These selectors are now redundant/obsolete and should be removed from the original file if possible */
+    display: none !important; 
+}
+
+
 .daw-root { 
   display: flex; 
   flex-direction: column; 
   height: calc(100vh - 64px); 
   background: linear-gradient(180deg, #f8faff 0%, #f1f5fe 100%);
 }
+/* ... (rest of the CSS) ... */
 
 /* View containers and transitions */
 .projects-view,
@@ -193,11 +303,6 @@
   }
 }
 
-.topbar { height:64px; display:flex; align-items:center; padding:0 20px; background:#ffffff; border-bottom:1px solid #e7eef9 }
-.topbar .brand { font-weight:700; margin-right:24px; font-size:18px }
-.topbar .top-controls { display:flex; gap:8px }
-.topbar .top-right { margin-left:auto }
-.topbar .search { padding:6px 10px; border-radius:8px; border:1px solid #e6eef7 }
 
 .transport-bar { display:flex; align-items:center; padding:10px 18px; background:transparent; border-bottom:1px solid rgba(0,0,0,0.04) }
 .transport-left { display:flex; gap:12px; align-items:center }
@@ -551,3 +656,119 @@
 @media (max-width:900px) {
   .inspector, .plugin-panel { display:none }
 }
+
+/* Modern DAW styles with refined aesthetics */
+
+:root {
+  --primary: #4f46e5;
+  --primary-light: #818cf8;
+  --primary-dark: #3730a3;
+  --surface: #ffffff;
+  --surface-hover: #f8fafc;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  
+  /* Initial values for panel widths */
+  --browser-width: 240px; 
+  --inspector-width: 300px;
+}
+
+/* ... (Omitted Navbar/View styles for brevity) ... */
+
+/* --- CORE LAYOUT MODIFICATION for Sideways Resizing --- */
+.daw-main { 
+    display: grid; 
+    padding: 12px; 
+    flex: 1; 
+    gap: 0; 
+    height: 100%; /* Ensure it fills the vertical space */
+    
+    /* Define 5 columns: Left Panel | Left Resizer | Center Canvas | Right Resizer | Right Panel */
+    grid-template-columns: var(--browser-width) 6px 1fr 6px var(--inspector-width);
+}
+
+/* Panel Styles - Use grid-column to place them */
+.session-browser { 
+    grid-column: 1;
+    background:#fff; 
+    border-radius:10px; 
+    padding:12px; 
+    border:1px solid #e9f0f7; 
+    height: calc(100vh - 64px - 44px - 24px); /* Full height minus Navbar, TransportBar, and vertical padding */
+    width: 100%; 
+    overflow-y: auto;
+}
+
+.center-canvas { 
+    grid-column: 3;
+    display:flex; 
+    flex-direction:column; 
+    gap:12px; 
+    margin: 0 12px; /* Visual spacing */
+}
+
+/* Inspector and Plugin Panel share the final column */
+.inspector, .plugin-panel { 
+    grid-column: 5;
+    background:#fff; 
+    border-radius:10px; 
+    padding:16px; 
+    border:1px solid #e9f0f7; 
+    height: calc(100vh - 64px - 44px - 24px); /* Same height calculation */
+    width: 100%;
+    overflow-y: auto;
+}
+
+
+/* --- NEW RESIZER STYLES --- */
+.resizer {
+    background: transparent;
+    cursor: ew-resize; /* East-West resize cursor */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    transition: background-color 0.1s;
+    user-select: none;
+    z-index: 10;
+    height: 100%;
+}
+
+.left-resizer {
+    grid-column: 2; /* Positioned between browser and center-canvas */
+}
+
+.right-resizer {
+    grid-column: 4; /* Positioned between center-canvas and inspector */
+}
+
+.resizer:hover {
+    background: rgba(79, 70, 229, 0.1); /* Light primary hover */
+    color: var(--primary);
+}
+
+
+/* Responsive - Adjustments for panel hiding and grid changes */
+@media (max-width:1100px) {
+  /* Hide the browser panel and its resizer */
+  .session-browser, .left-resizer { display:none }
+  /* Change grid layout to account for hidden panels */
+  .daw-main {
+     grid-template-columns: 1fr 6px var(--inspector-width);
+  }
+  .center-canvas { grid-column: 1; margin-left: 0; }
+  .right-resizer { grid-column: 2; }
+  .inspector, .plugin-panel { grid-column: 3; }
+}
+@media (max-width:900px) {
+  /* Hide the inspector/plugin panel and its resizer */
+  .inspector, .plugin-panel, .right-resizer { display:none }
+  /* Change grid layout to only show center canvas */
+  .daw-main {
+     grid-template-columns: 1fr;
+  }
+  .center-canvas { grid-column: 1; margin: 0; }
+}
+
+/* ... (Rest of original daw.css styles) ... */

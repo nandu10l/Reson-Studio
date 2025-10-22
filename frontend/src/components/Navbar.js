@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Music, FolderOpen, Settings, Home, MinusCircle, User } from 'lucide-react';
+import { Music, FolderOpen, Settings, Home, MinusCircle, User, Plus, Save, Search, Maximize, Minimize2, X } from 'lucide-react';
 
 function Navbar({ onChangeView, currentView = 'arrange' }) {
   const [isElectron, setIsElectron] = useState(false);
@@ -22,8 +22,21 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
 
   return (
     <nav className="navbar">
-      <div className="navbar-brand">Reson Studio</div>
       <div className="navbar-menu">
+        {/* File/Session Controls (New/Open/Save) */}
+        <div className="session-controls">
+          <button className="btn small primary-btn">
+            <Plus size={14} /> New Project
+          </button>
+          <button className="btn small">
+            <FolderOpen size={14} /> Open
+          </button>
+          <button className="btn small">
+            <Save size={14} /> Save
+          </button>
+        </div>
+
+        {/* View Selection Buttons */}
         <div className="view-buttons">
           <button 
             onClick={() => onChangeView?.('arrange')}
@@ -55,11 +68,18 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
           </button>
         </div>
 
+        {/* Search and User/App Controls */}
         <div className="right-controls">
+          <div className="search-input-container">
+            <Search size={16} className="search-icon" />
+            <input placeholder="Search projects..." className="search-input" />
+          </div>
+
           <button onClick={() => window.electronAPI?.toTray?.()}>
             <MinusCircle size={16} />
-            Minimize to Tray
+            Tray
           </button>
+
           <div className="user-info">
             <User size={16} />
             Nandu
@@ -68,10 +88,16 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
       </div>
 
       {isElectron && (
-        <div className="window-controls" style={{ marginLeft: 'auto' }}>
-          <button onClick={minimize}>_</button>
-          <button onClick={toggleMaximize}>{isMaximized ? '🗗' : '🗖'}</button>
-          <button onClick={closeWin}>×</button>
+        <div className="window-controls">
+          <button onClick={minimize}>
+            <Minimize2 size={16} />
+          </button>
+          <button onClick={toggleMaximize}>
+            {isMaximized ? <Minimize2 size={16} style={{ transform: 'rotate(90deg)' }} /> : <Maximize size={16} />}
+          </button>
+          <button onClick={closeWin} className="close-btn">
+            <X size={16} />
+          </button>
         </div>
       )}
     </nav>
