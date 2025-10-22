@@ -37,7 +37,8 @@ function createWindow() {
 
 function createTray() {
     if (tray) return;
-    const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+    // Use a default icon or skip if not available
+    const iconPath = path.join(__dirname, '..', 'public', 'favicon.ico');
     tray = new Tray(iconPath);
     const contextMenu = Menu.buildFromTemplate([
         { label: 'Show', click: () => { if (mainWindow) mainWindow.show(); } },

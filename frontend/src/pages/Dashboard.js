@@ -15,7 +15,10 @@ function Dashboard() {
   const [playing, setPlaying] = useState(false);
   const [selectedClip, setSelectedClip] = useState(null);
   const [view, setView] = useState('arrange'); // arrange | projects | settings | home
-  
+  const [bpm, setBpm] = useState(120);
+  const [projects, setProjects] = useState([]);
+  const [currentProject, setCurrentProject] = useState(null);
+
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
   const [inspectorWidth, setInspectorWidth] = useState(300);
@@ -84,7 +87,7 @@ function Dashboard() {
         return (
           <div className="projects-view">
             <h2>Projects</h2>
-            <SessionBrowser />
+            <SessionBrowser projects={projects} />
           </div>
         );
       case 'settings':
@@ -115,7 +118,7 @@ function Dashboard() {
             >
               {/* 1. Left Panel (Session Browser) */}
               <div className="session-browser">
-                <ProjectSidebar />
+                <ProjectSidebar projects={projects} />
               </div>
               
               {/* 2. Left Resizer */}
@@ -157,8 +160,8 @@ function Dashboard() {
   return (
     <div>
       
-      <Navbar onChangeView={(v) => setView(v)} currentView={view} />
-      <TransportBar playing={playing} onPlayToggle={() => setPlaying((p) => !p)} bpm={120} />
+      <Navbar onChangeView={(v) => setView(v)} currentView={view} onCreateProject={(project) => setProjects(prev => [...prev, project])} onSaveProject={() => console.log('Project saved:', currentProject)} />
+      <TransportBar playing={playing} onPlayToggle={setPlaying} bpm={bpm} onBpmChange={setBpm} />
       {renderView()}
     </div>
   );

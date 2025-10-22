@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Music, FolderOpen, Settings, Home, MinusCircle, User, Plus, Save, Search, Maximize, Minimize2, X } from 'lucide-react';
+import NewProjectModal from './NewProjectModal';
 
-function Navbar({ onChangeView, currentView = 'arrange' }) {
+function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSaveProject }) {
   const [isElectron, setIsElectron] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
   useEffect(() => {
     setIsElectron(!!(window && window.electronAPI));
@@ -25,7 +27,7 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
       <div className="navbar-menu">
         {/* File/Session Controls (New/Open/Save) */}
         <div className="session-controls">
-          <button className="btn small primary-btn">
+          <button className="btn small primary-btn" onClick={() => setShowNewProjectModal(true)}>
             <Plus size={14} /> New Project
           </button>
           <button className="btn small" onClick={async () => {
@@ -39,7 +41,7 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
           }}>
             <FolderOpen size={14} /> Open
           </button>
-          <button className="btn small">
+          <button className="btn small" onClick={onSaveProject}>
             <Save size={14} /> Save
           </button>
         </div>
@@ -108,6 +110,12 @@ function Navbar({ onChangeView, currentView = 'arrange' }) {
           </button>
         </div>
       )}
+
+      <NewProjectModal
+        isOpen={showNewProjectModal}
+        onClose={() => setShowNewProjectModal(false)}
+        onCreateProject={onCreateProject}
+      />
     </nav>
   );
 }
