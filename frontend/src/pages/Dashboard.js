@@ -5,13 +5,34 @@ import TransportBar from '../components/TransportBar';
 import Timeline from '../components/Timeline';
 import TrackList from '../components/TrackList';
 import Mixer from '../components/Mixer';
-import Inspector from '../components/Inspector';
+// import Inspector from '../components/Inspector';
 import PluginPanel from '../components/PluginPanel';
 import SessionBrowser from '../components/SessionBrowser';
 import { GripVertical } from 'lucide-react';
 import '../styles/daw.css';
 
+import DraggableWindow from '../components/DraggableWindow';
+import PianoRoll from '../components/PianoRoll';
+import ChannelRack from '../components/ChannelRack';
+// Mixer is already imported
+
 function Dashboard() {
+  // Window states
+  const [activeWindows, setActiveWindows] = useState({
+    mixer: false,
+    pianoRoll: false,
+    channelRack: false,
+    playlist: true, // Default view
+    browser: true
+  });
+
+  const toggleWindow = (name) => {
+    setActiveWindows(prev => ({
+      ...prev,
+      [name]: !prev[name]
+    }));
+  };
+
   const [playing, setPlaying] = useState(false);
   const [selectedClip, setSelectedClip] = useState(null);
   const [view, setView] = useState('arrange'); // arrange | projects | settings | home
@@ -21,12 +42,12 @@ function Dashboard() {
 
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
-  const [inspectorWidth, setInspectorWidth] = useState(300);
 
   // Timeline scroll state
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
-  const [timelineZoom, setTimelineZoom] = useState(1);
-  
+  const [zoom, setZoom] = useState(1);
+  const [pixelsPerBeat, setPixelsPerBeat] = useState(60);
+
   const resizeState = useRef({ resizing: false, startX: 0, startWidth: 0, target: null });
 
   // Cleanup effect
@@ -43,12 +64,10 @@ function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
 
-    const currentWidth = targetPanel === 'browser' ? browserWidth : inspectorWidth;
-    
     resizeState.current = {
       resizing: true,
       startX: e.clientX,
-      startWidth: currentWidth,
+      startWidth: browserWidth,
       target: targetPanel,
     };
 
@@ -62,7 +81,7 @@ function Dashboard() {
   const onResizeMove = (e) => {
     const rs = resizeState.current;
     if (!rs.resizing) return;
-    
+
     const deltaX = e.clientX - rs.startX;
     let newWidth;
     const minWidth = 100;
@@ -70,10 +89,6 @@ function Dashboard() {
     if (rs.target === 'browser') {
       newWidth = Math.max(minWidth, rs.startWidth + deltaX);
       setBrowserWidth(newWidth);
-    } else if (rs.target === 'inspector') {
-      // Right panel moves opposite direction relative to startX
-      newWidth = Math.max(minWidth, rs.startWidth - deltaX);
-      setInspectorWidth(newWidth);
     }
   };
 
@@ -113,21 +128,21 @@ function Dashboard() {
         return (
           // Apply CSS variables to control grid columns in daw.css
           <div className="daw-root">
-            <div 
-              className="daw-main" 
-              style={{ 
-                '--browser-width': `${browserWidth}px`, 
-                '--inspector-width': `${inspectorWidth}px` 
+            <div
+              className="daw-main"
+              style={{
+                '--browser-width': `${browserWidth}px`,
+                '--inspector-width': '0px'
               }}
             >
               {/* 1. Left Panel (Session Browser) */}
               <div className="session-browser">
                 <ProjectSidebar projects={projects} />
               </div>
-              
+
               {/* 2. Left Resizer */}
-              <div 
-                className="resizer left-resizer" 
+              <div
+                className="resizer left-resizer"
                 onPointerDown={(e) => startResize(e, 'browser')}
               >
                 <GripVertical size={12} />
@@ -136,25 +151,21 @@ function Dashboard() {
               {/* 3. Center Canvas */}
               <div className="center-canvas">
                 <div className="track-area">
-                  <Timeline />
-                  <TrackList onSelectClip={(c) => setSelectedClip(c)} />
+                  <Timeline
+                    measures={64}
+                    zoom={zoom}
+                    onZoomChange={setZoom}
+                    pixelsPerBeat={pixelsPerBeat}
+                    onPixelsPerBeatChange={setPixelsPerBeat}
+                  />
+                  <TrackList
+                    measures={64}
+                    onSelectClip={(c) => setSelectedClip(c)}
+                    pixelsPerBeat={pixelsPerBeat}
+                  />
                 </div>
                 <Mixer />
               </div>
-              
-              {/* 4. Right Resizer */}
-              <div 
-                className="resizer right-resizer" 
-                onPointerDown={(e) => startResize(e, 'inspector')}
-              >
-                <GripVertical size={12} />
-              </div>
-
-              {/* 5. Right Panel (Inspector/PluginPanel) */}
-              <Inspector selected={selectedClip} />
-              {/* The PluginPanel element should likely be integrated/toggled inside Inspector or share its column */}
-              {/* For simplicity in the grid, we'll keep only one main right panel component visible */}
-              {/* <PluginPanel /> */} 
             </div>
           </div>
         );
@@ -163,10 +174,40 @@ function Dashboard() {
 
   return (
     <div>
-      
+
       <Navbar onChangeView={(v) => setView(v)} currentView={view} onCreateProject={(project) => setProjects(prev => [...prev, project])} onSaveProject={() => console.log('Project saved:', currentProject)} />
-      <TransportBar playing={playing} onPlayToggle={setPlaying} bpm={bpm} onBpmChange={setBpm} />
+      <TransportBar
+        playing={playing}
+        onPlayToggle={setPlaying}
+        bpm={bpm}
+        onBpmChange={setBpm}
+        activeWindows={activeWindows}
+        onToggleWindow={toggleWindow}
+      />
       {renderView()}
+
+      {/* Floating Windows */}
+      {activeWindows.pianoRoll && (
+        <DraggableWindow title="Piano Roll" onClose={() => toggleWindow('pianoRoll')} initialPosition={{ x: 100, y: 100 }} width={800} height={400}>
+          <PianoRoll />
+        </DraggableWindow>
+      )}
+
+      {activeWindows.channelRack && (
+        <DraggableWindow title="Channel Rack" onClose={() => toggleWindow('channelRack')} initialPosition={{ x: 150, y: 150 }}>
+          <ChannelRack />
+        </DraggableWindow>
+      )}
+
+      {/* Mixer as a floating window if enabled (overriding the fixed one currently in arrange view?) 
+          For now, I'll just add it as floating and maybe hide the one in renderView if needed, or just let them coexist/user choice.
+          Actually, the user asked for FL style where these pop out.
+      */}
+      {activeWindows.mixer && (
+        <DraggableWindow title="Mixer" onClose={() => toggleWindow('mixer')} initialPosition={{ x: 200, y: 200 }} width={800} height={300}>
+          <Mixer />
+        </DraggableWindow>
+      )}
     </div>
   );
 }

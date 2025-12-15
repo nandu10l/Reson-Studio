@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Music, FolderOpen, Settings, Home, MinusCircle, User, Plus, Save, Search, Maximize, Minimize2, X } from 'lucide-react';
+import { Music, FolderOpen, Settings, Home, MinusCircle, User, Plus, Save, Search, Maximize, Minimize2, X, Sliders, Grid3x3, ListMusic, LayoutGrid, FolderTree } from 'lucide-react';
 import NewProjectModal from './NewProjectModal';
 
 function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSaveProject }) {
@@ -48,28 +48,28 @@ function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSave
 
         {/* View Selection Buttons */}
         <div className="view-buttons">
-          <button 
+          <button
             onClick={() => onChangeView?.('arrange')}
             className={currentView === 'arrange' ? 'active' : ''}
           >
             <Music size={16} />
             Arrange
           </button>
-          <button 
+          <button
             onClick={() => onChangeView?.('projects')}
             className={currentView === 'projects' ? 'active' : ''}
           >
             <FolderOpen size={16} />
             Projects
           </button>
-          <button 
+          <button
             onClick={() => onChangeView?.('settings')}
             className={currentView === 'settings' ? 'active' : ''}
           >
             <Settings size={16} />
             Settings
           </button>
-          <button 
+          <button
             onClick={() => onChangeView?.('home')}
             className={currentView === 'home' ? 'active' : ''}
           >

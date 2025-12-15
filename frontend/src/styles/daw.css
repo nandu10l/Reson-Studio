@@ -122,7 +122,8 @@
 .navbar {
   display: flex;
   align-items: center;
-  padding: 0 16px; /* Adjusted padding */
+  padding: 0 16px;
+  /* Adjusted padding */
   height: 64px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -147,9 +148,11 @@
   display: flex;
   align-items: center;
   /* Use space-around/space-between for better distribution or flex-grow for view-buttons */
-  flex: 1; /* Allows it to take up space */
+  flex: 1;
+  /* Allows it to take up space */
   justify-content: space-between;
-  gap: 20px; /* Gap between main sections */
+  gap: 20px;
+  /* Gap between main sections */
 }
 
 /* New Session Controls for New/Open/Save */
@@ -201,11 +204,12 @@
   padding: 4px;
   border-radius: 10px;
   /* Add auto margins to push it to the center-ish area if needed, or remove them */
-  margin: 0 auto; 
+  margin: 0 auto;
 }
 
 .view-buttons button {
-  padding: 8px 16px; /* Slightly reduced padding */
+  padding: 8px 16px;
+  /* Slightly reduced padding */
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -224,7 +228,8 @@
 .view-buttons button:hover {
   background: rgba(255, 255, 255, 0.8);
   color: var(--text);
-  transform: none; /* Remove translateY for a cleaner navbar look */
+  transform: none;
+  /* Remove translateY for a cleaner navbar look */
   box-shadow: none;
 }
 
@@ -249,11 +254,13 @@
 .right-controls {
   display: flex;
   align-items: center;
-  gap: 16px; /* Reduced gap */
+  gap: 16px;
+  /* Reduced gap */
 }
 
 .right-controls button {
-  padding: 6px 12px; /* Adjusted padding to match session-controls */
+  padding: 6px 12px;
+  /* Adjusted padding to match session-controls */
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -271,7 +278,8 @@
   background: var(--surface-hover);
   border-color: var(--primary-light);
   color: var(--primary);
-  transform: none; /* Remove translateY for a cleaner navbar look */
+  transform: none;
+  /* Remove translateY for a cleaner navbar look */
   box-shadow: none;
 }
 
@@ -283,7 +291,8 @@
 }
 
 .search-input {
-  padding: 6px 12px 6px 30px; /* Left padding for icon */
+  padding: 6px 12px 6px 30px;
+  /* Left padding for icon */
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface-hover);
@@ -308,7 +317,8 @@
 
 
 .user-info {
-  padding: 6px 12px; /* Adjusted padding */
+  padding: 6px 12px;
+  /* Adjusted padding */
   border-radius: 8px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
@@ -323,47 +333,53 @@
 
 /* Window Controls for Electron */
 .window-controls {
-    display: flex;
-    align-items: center;
-    margin-left: 20px;
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
 }
 
 .window-controls button {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    padding: 8px 12px;
-    height: 64px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  height: 64px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .window-controls button:hover {
-    background-color: var(--surface-hover);
-    color: var(--text);
+  background-color: var(--surface-hover);
+  color: var(--text);
 }
 
 .window-controls .close-btn:hover {
-    background-color: #ef4444; /* Red color for close */
-    color: white;
+  background-color: #ef4444;
+  /* Red color for close */
+  color: white;
 }
 
 /* REMOVED .navbar-top and related styles */
-.navbar-top, .top-controls, .top-right, .brand, .search {
-    /* These selectors are now redundant/obsolete and should be removed from the original file if possible */
-    display: none !important; 
+.navbar-top,
+.top-controls,
+.top-right,
+.brand,
+.search {
+  /* These selectors are now redundant/obsolete and should be removed from the original file if possible */
+  display: none !important;
 }
 
 
-.daw-root { 
-  display: flex; 
-  flex-direction: column; 
-  height: calc(100vh - 64px); 
+.daw-root {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px);
   background: linear-gradient(180deg, #f8faff 0%, #f1f5fe 100%);
 }
+
 /* ... (rest of the CSS) ... */
 
 /* View containers and transitions */
@@ -405,6 +421,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -412,11 +429,36 @@
 }
 
 
-.transport-bar { display:flex; align-items:center; padding:10px 18px; background:transparent; border-bottom:1px solid rgba(0,0,0,0.04) }
-.transport-left { display:flex; gap:12px; align-items:center }
-.transport-center { flex:1; text-align:center }
-.transport-right { display:flex; gap:8px }
-.btn.small { padding:6px 10px; border-radius:6px; background:#fff; border:1px solid #e6eef7 }
+.transport-bar {
+  display: flex;
+  align-items: center;
+  padding: 10px 18px;
+  background: transparent;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04)
+}
+
+.transport-left {
+  display: flex;
+  gap: 12px;
+  align-items: center
+}
+
+.transport-center {
+  flex: 1;
+  text-align: center
+}
+
+.transport-right {
+  display: flex;
+  gap: 8px
+}
+
+.btn.small {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #e6eef7
+}
 
 .icon-btn {
   padding: 6px;
@@ -424,24 +466,71 @@
   align-items: center;
   justify-content: center;
 }
-.time-display { font-family: monospace; color:#374151 }
 
-.daw-main { display:flex; gap:12px; padding:12px; flex:1 }
-.session-browser { width:240px; background:#fff; border-radius:10px; padding:12px; border:1px solid #e9f0f7; height: calc(100% - 24px) }
-.session-browser h4 { margin:0 0 10px }
-.session-browser ul { list-style:none; padding:0; margin:0 }
-.session-browser li { padding:10px; border-radius:8px; cursor:pointer; color:#0f1724 }
-.session-browser li:hover { background:#f1f7fb }
+.time-display {
+  font-family: monospace;
+  color: #374151
+}
 
-.center-canvas { flex:1; display:flex; flex-direction:column; gap:12px }
-.track-area { 
+.daw-main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  flex: 1
+}
+
+.session-browser {
+  width: 240px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #e9f0f7;
+  height: calc(100% - 24px)
+}
+
+.session-browser h4 {
+  margin: 0 0 10px
+}
+
+.session-browser ul {
+  list-style: none;
+  padding: 0;
+  margin: 0
+}
+
+.session-browser li {
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #0f1724
+}
+
+.session-browser li:hover {
+  background: #f1f7fb
+}
+
+.center-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  /* Crucial for scrolling inside flex */
+  min-width: 0;
+}
+
+.track-area {
   background: var(--surface);
   border-radius: 12px;
   border: 1px solid var(--border);
-  min-height: 420px;
+  flex: 1;
+  /* Take remaining height */
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
+  /* Enable scrolling for both axes */
+  position: relative;
+  /* Context for sticky */
 }
 
 /* Professional Timeline Styles */
@@ -451,9 +540,15 @@
   height: 60px;
   background: linear-gradient(180deg, #f8faff 0%, var(--surface) 100%);
   border-bottom: 1px solid var(--border);
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-width: 100%;
+  width: max-content;
+  /* Ensure it expands to fit content */
   user-select: none;
-  overflow: hidden;
+  overflow: visible;
+  /* Let content overflow if needed */
 }
 
 .timeline-header {
@@ -464,6 +559,13 @@
   height: 24px;
   background: rgba(255, 255, 255, 0.8);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  width: 200px;
+  min-width: 200px;
+  /* Force width */
+  box-sizing: border-box;
 }
 
 .timeline-controls {
@@ -527,7 +629,8 @@
 .timeline-grid {
   position: absolute;
   top: 0;
-  left: 200px; /* Match track header width */
+  left: 200px;
+  /* Match track header width */
   right: 0;
   bottom: 0;
   display: flex;
@@ -674,8 +777,12 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow-y: auto;
+  overflow: visible;
+  /* Handled by parent */
   position: relative;
+  min-width: 100%;
+  width: max-content;
+  /* Ensure rows expand */
 }
 
 .track-row {
@@ -717,7 +824,9 @@
   gap: 8px;
   position: sticky;
   left: 0;
-  z-index: 2;
+  z-index: 10;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
+  /* Visual separation */
 }
 
 .track-controls {
@@ -818,22 +927,27 @@
 .track-clip-area {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  /* Let content expand parent */
   background: var(--surface-hover);
+  min-width: 100%;
 }
 
 .track-grid {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
   bottom: 0;
   display: flex;
   pointer-events: none;
+  min-width: 100%;
+  width: max-content;
+  /* Force container to be as wide as grid lines */
 }
 
 .grid-line {
-  width: 60px; /* Match timeline tick width */
+  width: 60px;
+  /* Match timeline tick width */
   border-right: 1px solid var(--border);
   opacity: 0.5;
 }
@@ -879,8 +993,8 @@
   position: absolute;
   right: 6px;
   top: 6px;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   width: 20px;
   height: 20px;
   border-radius: 4px;
@@ -920,15 +1034,15 @@
 
 .drag-clone {
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   padding: 6px 8px;
-  box-shadow: 0 6px 18px rgba(2,6,23,0.08);
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.08);
   z-index: 9999;
 }
 
 .track-row.drop-target {
-  outline: 2px dashed rgba(79,70,229,0.12);
+  outline: 2px dashed rgba(79, 70, 229, 0.12);
 }
 
 .clip-title {
@@ -952,25 +1066,122 @@
   height: 100%;
 }
 
-.inspector { width:300px; background:#fff; border-radius:10px; padding:16px; border:1px solid #e9f0f7; height: calc(100% - 24px) }
-.plugin-panel { width:300px; background:#fff; border-radius:10px; padding:16px; border:1px solid #e9f0f7; height: calc(100% - 24px) }
+.inspector {
+  width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e9f0f7;
+  height: calc(100% - 24px)
+}
 
-.mixer { display:flex; gap:12px; padding:12px; background:transparent; border-top:1px solid rgba(0,0,0,0.03); margin-top:12px }
-.mixer-channel { width:120px; background:#fff; border:1px solid #eef2f6; padding:12px; border-radius:10px; display:flex; flex-direction:column; align-items:center; gap:8px }
-.mixer-channel .channel-name { font-weight:600; color:var(--text); font-size:14px; margin-bottom:4px }
-.mixer-channel .pan-control, .mixer-channel .volume-control { display:flex; flex-direction:column; align-items:center; gap:4px; width:100% }
-.mixer-channel .pan-control label, .mixer-channel .volume-control label { font-size:11px; color:var(--text-secondary); font-weight:500 }
-.pan-fader, .fader { width:100%; height:6px; border-radius:3px; background:var(--border); outline:none; -webkit-appearance:none; appearance:none; cursor:pointer }
-.pan-fader::-webkit-slider-thumb, .fader::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background:var(--primary); cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.2) }
-.pan-fader::-moz-range-thumb, .fader::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:var(--primary); cursor:pointer; border:none; box-shadow:0 2px 4px rgba(0,0,0,0.2) }
-.mixer-channel .channel-controls { display:flex; gap:4px; margin-top:8px }
+.plugin-panel {
+  width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e9f0f7;
+  height: calc(100% - 24px)
+}
+
+.mixer {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+  border-top: 1px solid rgba(0, 0, 0, 0.03);
+  margin-top: 12px
+}
+
+.mixer-channel {
+  width: 120px;
+  background: #fff;
+  border: 1px solid #eef2f6;
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px
+}
+
+.mixer-channel .channel-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 4px
+}
+
+.mixer-channel .pan-control,
+.mixer-channel .volume-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%
+}
+
+.mixer-channel .pan-control label,
+.mixer-channel .volume-control label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500
+}
+
+.pan-fader,
+.fader {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer
+}
+
+.pan-fader::-webkit-slider-thumb,
+.fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2)
+}
+
+.pan-fader::-moz-range-thumb,
+.fader::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2)
+}
+
+.mixer-channel .channel-controls {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px
+}
 
 /* Responsive */
 @media (max-width:1100px) {
-  .session-browser { display:none }
+  .session-browser {
+    display: none
+  }
 }
+
 @media (max-width:900px) {
-  .inspector, .plugin-panel { display:none }
+
+  .inspector,
+  .plugin-panel {
+    display: none
+  }
 }
 
 /* Modern DAW styles with refined aesthetics */
@@ -984,107 +1195,201 @@
   --text: #1e293b;
   --text-secondary: #64748b;
   --border: #e2e8f0;
-  
+
   /* Initial values for panel widths */
-  --browser-width: 240px; 
+  --browser-width: 240px;
   --inspector-width: 300px;
 }
 
 /* ... (Omitted Navbar/View styles for brevity) ... */
 
 /* --- CORE LAYOUT MODIFICATION for Sideways Resizing --- */
-.daw-main { 
-    display: grid; 
-    padding: 12px; 
-    flex: 1; 
-    gap: 0; 
-    height: 100%; /* Ensure it fills the vertical space */
-    
-    /* Define 5 columns: Left Panel | Left Resizer | Center Canvas | Right Resizer | Right Panel */
-    grid-template-columns: var(--browser-width) 6px 1fr 6px var(--inspector-width);
+.daw-main {
+  display: grid;
+  padding: 12px;
+  flex: 1;
+  gap: 0;
+  height: 100%;
+  /* Ensure it fills the vertical space */
+
+  /* Define 5 columns: Left Panel | Left Resizer | Center Canvas | Right Resizer | Right Panel */
+  grid-template-columns: var(--browser-width) 6px 1fr 6px var(--inspector-width);
 }
 
 /* Panel Styles - Use grid-column to place them */
-.session-browser { 
-    grid-column: 1;
-    background:#fff; 
-    border-radius:10px; 
-    padding:12px; 
-    border:1px solid #e9f0f7; 
-    height: calc(100vh - 64px - 44px - 24px); /* Full height minus Navbar, TransportBar, and vertical padding */
-    width: 100%; 
-    overflow-y: auto;
+.session-browser {
+  grid-column: 1;
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #e9f0f7;
+  height: calc(100vh - 64px - 44px - 24px);
+  /* Full height minus Navbar, TransportBar, and vertical padding */
+  width: 100%;
+  overflow-y: auto;
 }
 
-.center-canvas { 
-    grid-column: 3;
-    display:flex; 
-    flex-direction:column; 
-    gap:12px; 
-    margin: 0 12px; /* Visual spacing */
+.center-canvas {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 12px;
+  /* Visual spacing */
 }
 
 /* Inspector and Plugin Panel share the final column */
-.inspector, .plugin-panel { 
-    grid-column: 5;
-    background:#fff; 
-    border-radius:10px; 
-    padding:16px; 
-    border:1px solid #e9f0f7; 
-    height: calc(100vh - 64px - 44px - 24px); /* Same height calculation */
-    width: 100%;
-    overflow-y: auto;
+.inspector,
+.plugin-panel {
+  grid-column: 5;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e9f0f7;
+  height: calc(100vh - 64px - 44px - 24px);
+  /* Same height calculation */
+  width: 100%;
+  overflow-y: auto;
 }
 
 
 /* --- NEW RESIZER STYLES --- */
 .resizer {
-    background: transparent;
-    cursor: ew-resize; /* East-West resize cursor */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-secondary);
-    transition: background-color 0.1s;
-    user-select: none;
-    z-index: 10;
-    height: 100%;
+  background: transparent;
+  cursor: ew-resize;
+  /* East-West resize cursor */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background-color 0.1s;
+  user-select: none;
+  z-index: 10;
+  height: 100%;
 }
 
 .left-resizer {
-    grid-column: 2; /* Positioned between browser and center-canvas */
+  grid-column: 2;
+  /* Positioned between browser and center-canvas */
 }
 
 .right-resizer {
-    grid-column: 4; /* Positioned between center-canvas and inspector */
+  grid-column: 4;
+  /* Positioned between center-canvas and inspector */
 }
 
 .resizer:hover {
-    background: rgba(79, 70, 229, 0.1); /* Light primary hover */
-    color: var(--primary);
+  background: rgba(79, 70, 229, 0.1);
+  /* Light primary hover */
+  color: var(--primary);
 }
 
 
 /* Responsive - Adjustments for panel hiding and grid changes */
 @media (max-width:1100px) {
+
   /* Hide the browser panel and its resizer */
-  .session-browser, .left-resizer { display:none }
+  .session-browser,
+  .left-resizer {
+    display: none
+  }
+
   /* Change grid layout to account for hidden panels */
   .daw-main {
-     grid-template-columns: 1fr 6px var(--inspector-width);
+    grid-template-columns: 1fr 6px var(--inspector-width);
   }
-  .center-canvas { grid-column: 1; margin-left: 0; }
-  .right-resizer { grid-column: 2; }
-  .inspector, .plugin-panel { grid-column: 3; }
+
+  .center-canvas {
+    grid-column: 1;
+    margin-left: 0;
+  }
+
+  .right-resizer {
+    grid-column: 2;
+  }
+
+  .inspector,
+  .plugin-panel {
+    grid-column: 3;
+  }
 }
+
 @media (max-width:900px) {
+
   /* Hide the inspector/plugin panel and its resizer */
-  .inspector, .plugin-panel, .right-resizer { display:none }
+  .inspector,
+  .plugin-panel,
+  .right-resizer {
+    display: none
+  }
+
   /* Change grid layout to only show center canvas */
   .daw-main {
-     grid-template-columns: 1fr;
+    grid-template-columns: 1fr;
   }
-  .center-canvas { grid-column: 1; margin: 0; }
+
+  .center-canvas {
+    grid-column: 1;
+    margin: 0;
+  }
+}
+
+/* Draggable Window Styles */
+.draggable-window {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.window-header {
+  background: #f1f5f9;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+
+.window-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.window-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.window-close-btn:hover {
+  background: #e2e8f0;
+  color: #ef4444;
+}
+
+.window-content {
+  flex: 1;
+  overflow: auto;
+  background: #222;
+  /* Darker background for "internal" content */
+  position: relative;
+  min-height: 200px;
+}
+
+/* Specific component styles */
+.piano-keys {
+  margin-top: 10px;
 }
 
 /* ... (Rest of original daw.css styles) ... */

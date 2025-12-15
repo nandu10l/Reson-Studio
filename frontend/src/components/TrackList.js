@@ -2,28 +2,28 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Guitar, Drumstick, Piano, Volume2, Volume1, VolumeX, Radio, Plus } from 'lucide-react';
 import TrackClip from './TrackClip';
 
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag }) {
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, pixelsPerBeat, measures, beatsPerBar }) {
   const TrackIcon = track.icon || Piano;
-  
+
   return (
     <div className="track-row" data-track-id={track.id}>
       <div className="track-header">
         <div className="track-controls">
-          <button 
+          <button
             className={'track-button' + (trackState.muted ? ' active' : '')}
             onClick={() => onToggleState('muted')}
             title="Mute"
           >
             {trackState.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
-          <button 
+          <button
             className={'track-button' + (trackState.soloed ? ' active' : '')}
             onClick={() => onToggleState('soloed')}
             title="Solo"
           >
             <Volume1 size={14} />
           </button>
-          <button 
+          <button
             className={'track-button' + (trackState.armed ? ' active' : '')}
             onClick={() => onToggleState('armed')}
             title="Record Arm"
@@ -47,22 +47,44 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
         </div>
       </div>
 
-      <div className="track-clip-area">
+      <div
+        className="track-clip-area"
+        style={{ minWidth: `${measures * beatsPerBar * pixelsPerBeat}px` }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // Paint clip at position
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const offset = Math.floor(x / pixelsPerBeat);
+          onAddClip(track.id, offset);
+        }}
+      >
         <div className="track-grid">
-          {[...Array(16)].map((_, i) => (
-            <div key={i} className="grid-line" />
+          {[...Array(measures * beatsPerBar)].map((_, i) => (
+            <div key={i} className="grid-line" style={{ width: `${pixelsPerBeat}px` }} />
           ))}
         </div>
         {track.clips.map((clip, idx) => (
           <div
             key={idx}
             className="track-clip"
-            style={{ 
-              left: `${clip.offset * 60}px`,
-              width: `${clip.length * 60}px`
+            style={{
+              left: `${clip.offset * pixelsPerBeat}px`,
+              width: `${clip.length * pixelsPerBeat}px`
             }}
-            onClick={() => onSelect(clip)}
-            onPointerDown={(e) => onStartDrag(e, track.id, idx)}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent parent adding new clip
+              onSelect(clip);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemoveClip(track.id, idx);
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onStartDrag(e, track.id, idx);
+            }}
           >
             <button
               className="clip-delete"
@@ -85,17 +107,17 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
           </div>
         ))}
 
-        <button className="add-clip-inline" onClick={() => onAddClip(track.id)} title="Add clip">+ Clip</button>
+        <button className="add-clip-inline" onClick={(e) => { e.stopPropagation(); onAddClip(track.id, 0); }} title="Add clip start">+ Clip</button>
       </div>
     </div>
   );
 }
 
-export default function TrackList({ onSelectClip }) {
+export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4 }) {
   const [selected, setSelected] = useState(null);
-  
+
   const defaultTracks = [
-    { 
+    {
       id: 1,
       name: 'Drums',
       icon: Drumstick,
@@ -104,7 +126,7 @@ export default function TrackList({ onSelectClip }) {
         { title: 'Fill', offset: 6, length: 2 }
       ]
     },
-    { 
+    {
       id: 2,
       name: 'Bass',
       icon: Guitar,
@@ -112,7 +134,7 @@ export default function TrackList({ onSelectClip }) {
         { title: 'Bassline', offset: 0, length: 8 }
       ]
     },
-    { 
+    {
       id: 3,
       name: 'Keys',
       icon: Piano,
@@ -120,7 +142,7 @@ export default function TrackList({ onSelectClip }) {
         { title: 'Chords', offset: 2, length: 8 }
       ]
     },
-    { 
+    {
       id: 4,
       name: 'Vocals',
       icon: Mic,
@@ -131,7 +153,7 @@ export default function TrackList({ onSelectClip }) {
   ];
 
   const [tracks, setTracks] = useState(defaultTracks);
-  
+
   const [trackStates, setTrackStates] = useState(
     defaultTracks.reduce((acc, track) => ({
       ...acc,
@@ -153,11 +175,11 @@ export default function TrackList({ onSelectClip }) {
     }));
   };
 
-  const addClip = (trackId) => {
+  const addClip = (trackId, offset) => {
     setTracks(prev => prev.map(t => {
       if (t.id !== trackId) return t;
       const nextIndex = t.clips.length + 1;
-      const newClip = { title: `Clip ${nextIndex}`, offset: 0, length: 4 };
+      const newClip = { title: `Clip ${nextIndex}`, offset: offset ?? 0, length: 4 };
       return { ...t, clips: [...t.clips, newClip] };
     }));
   };
@@ -208,7 +230,7 @@ export default function TrackList({ onSelectClip }) {
     clone.style.left = `${e.clientX}px`;
     clone.style.top = `${e.clientY}px`;
     clone.style.pointerEvents = 'none';
-    clone.style.width = `${clip.length * 60}px`;
+    clone.style.width = `${clip.length * pixelsPerBeat}px`;
     clone.innerHTML = `<div class="clip-title">${clip.title}</div>`;
     document.body.appendChild(clone);
     dragClone.current = clone;
@@ -240,7 +262,7 @@ export default function TrackList({ onSelectClip }) {
     if (clipArea) {
       const rect = clipArea.getBoundingClientRect();
       const relativeX = Math.max(0, e.clientX - rect.left);
-      newOffset = Math.round(relativeX / 60);
+      newOffset = Math.round(relativeX / pixelsPerBeat);
     }
 
     // move clip in state
@@ -291,10 +313,13 @@ export default function TrackList({ onSelectClip }) {
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
           onSelect={handleSelect}
+          pixelsPerBeat={pixelsPerBeat}
+          measures={measures}
+          beatsPerBar={beatsPerBar}
         />
       ))}
-      <button 
-        className="add-track-button" 
+      <button
+        className="add-track-button"
         onClick={addNewTrack}
         title="Add New Track"
       >

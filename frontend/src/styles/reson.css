@@ -1,0 +1,111 @@
+:root {
+  /* Stargate-inspired color palette */
+  --rs-bg: #071018; /* main background */
+  --rs-panel: #0b1418; /* panel background */
+  --rs-accent: #4fd1c5; /* accent / teal */
+  --rs-primary: #5eead4;
+  --rs-text: #e6eef3; /* primary text */
+  --rs-muted: #8b98a4; /* secondary text */
+  --rs-border: rgba(255,255,255,0.04);
+  --rs-dim: rgba(255,255,255,0.02);
+}
+
+.reson-navbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, var(--rs-panel), #041017);
+  color: var(--rs-text);
+  font-family: Inter, system-ui, sans-serif;
+  height: 56px;
+  border-bottom: 1px solid var(--rs-border);
+}
+
+/* Generic small button used across the top bar */
+.btn.small {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--rs-dim);
+  color: var(--rs-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn.small:hover { background: rgba(255,255,255,0.02); border-color: var(--rs-border); }
+.btn.small.primary-btn { background: var(--rs-accent); color: #042624; border-color: var(--rs-accent); }
+.btn.small.primary-btn:hover { filter: brightness(0.95); }
+
+.session-controls { display:flex; gap:8px; align-items:center }
+.view-buttons { display:flex; gap:6px; align-items:center }
+
+/* Transport layout refinements */
+.reson-transport { display:flex; align-items:center; gap:12px }
+.reson-transport .transport-left { display:flex; gap:8px; align-items:center }
+.reson-transport .transport-center { flex:1; display:flex; justify-content:center }
+.reson-transport .transport-right { display:flex; gap:8px; align-items:center }
+.transport-clock { font-family: monospace; color: var(--rs-text); background: transparent; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--rs-dim) }
+.transport-compact { font-size: 13px; color: var(--rs-muted) }
+.reson-left, .reson-center, .reson-center-right, .reson-right, .reson-far-right, .reson-user {
+  display: flex;
+  align-items: center;
+}
+.reson-left { flex: 0 0 auto; }
+.reson-center { flex: 1 1 auto; justify-content: center; }
+.reson-center-right { flex: 0 0 160px; justify-content: center; }
+.reson-right { flex: 0 0 auto; gap: 6px; }
+.reson-far-right { margin-left: 8px; }
+.reson-user { margin-left: 12px; gap:6px }
+
+.transport-btn { margin-right: 6px; }
+
+.reson-transport { display:flex; align-items:center; gap:8px }
+.reson-timeline { overflow-x: auto; background: linear-gradient(180deg,#071018,#061218); padding: 0; border-bottom: 1px solid var(--rs-border); }
+.reson-timeline-ruler { position: relative; height: 48px; min-width: 1200px; }
+.reson-tick { position: absolute; top: 8px; color: var(--rs-muted); font-size: 12px; padding-left: 6px }
+
+.reson-timeline .reson-tick::after{
+  content: '';
+  display:block;
+  width:1px;
+  height:18px;
+  background: var(--rs-dim);
+  margin-top:6px;
+}
+
+.reson-tracklist {
+  background: var(--rs-bg);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto; /* Fill available vertical space inside .track-area */
+  min-height: 0; /* Allow it to shrink inside flex/grid containers */
+  overflow-y: auto; /* Only scroll vertically for tracks */
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  border-radius: 10px;
+  padding: 8px 0;
+}
+.reson-track-row { display:flex; align-items:center; border-bottom: 1px solid var(--rs-dim); min-height:72px; padding: 6px 0; }
+.reson-track-header { width: 200px; padding: 8px 12px; color: var(--rs-muted); font-weight:600 }
+.reson-track-clips { position: relative; height: 72px; flex: 1 1 auto; min-width: 800px; }
+.reson-clip { position: absolute; top: 10px; height: 52px; background: rgba(20,60,64,0.6); border: 1px solid rgba(79,209,197,0.18); color: var(--rs-text); padding: 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(2,6,11,0.6); }
+
+.reson-clip:active, .reson-clip.selected { box-shadow: 0 6px 18px rgba(0,0,0,0.6); border-color: var(--rs-accent); }
+
+.reson-mixer { padding: 12px; background: linear-gradient(180deg,#061018,#041013); color: var(--rs-text); border-top: 1px solid var(--rs-border); position: sticky; bottom: 0; z-index: 5 }
+.mixer-title { margin: 0 0 8px 0; font-size: 14px; }
+.mixer-channels { display:flex; gap:8px; }
+.mixer-channel { width: 80px; background: rgba(255,255,255,0.02); padding:6px; border-radius:4px; text-align:center }
+.mixer-name { font-size:12px; color:var(--rs-muted); margin-bottom:6px }
+
+.mixer-channel.selected { outline: 2px solid rgba(79,209,197,0.12); box-shadow: 0 6px 12px rgba(2,6,11,0.5); }
+
+.reson-inspector { width: var(--inspector-width, 300px); padding: 14px; background: linear-gradient(180deg,#071018,#061118); color: var(--rs-text); border-left: 1px solid var(--rs-border); }
+.inspector-title { margin:0 0 8px 0; font-size:14px }
+.inspector-empty { color: var(--rs-muted); }
+
+
+
+/* Basic responsiveness */
+@media (max-width: 800px) {
+  .reson-center-right { display:none }
+}

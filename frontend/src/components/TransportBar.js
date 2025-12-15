@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack } from 'lucide-react';
+import { Play, Pause, SkipBack, ListMusic, Grid3x3, LayoutGrid, Sliders } from 'lucide-react';
 
-function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime }) {
+function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, activeWindows, onToggleWindow }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [loopOn, setLoopOn] = useState(false);
@@ -77,6 +77,38 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime }) 
         </div>
       </div>
       <div className="transport-right">
+        {/* Window Toggles */}
+        <button
+          className={`btn small ${activeWindows?.playlist ? 'active' : ''}`}
+          onClick={() => onToggleWindow && onToggleWindow('playlist')}
+          title="Playlist"
+        >
+          <ListMusic size={16} />
+        </button>
+        <button
+          className={`btn small ${activeWindows?.pianoRoll ? 'active' : ''}`}
+          onClick={() => onToggleWindow && onToggleWindow('pianoRoll')}
+          title="Piano Roll"
+        >
+          <Grid3x3 size={16} />
+        </button>
+        <button
+          className={`btn small ${activeWindows?.channelRack ? 'active' : ''}`}
+          onClick={() => onToggleWindow && onToggleWindow('channelRack')}
+          title="Channel Rack"
+        >
+          <LayoutGrid size={16} />
+        </button>
+        <button
+          className={`btn small ${activeWindows?.mixer ? 'active' : ''}`}
+          onClick={() => onToggleWindow && onToggleWindow('mixer')}
+          title="Mixer"
+        >
+          <Sliders size={16} />
+        </button>
+
+        <div className="divider" style={{ width: 1, height: 20, background: '#ccc', margin: '0 8px' }}></div>
+
         <button className={`btn small ${metronomeOn ? 'active' : ''}`} onClick={toggleMetronome}>
           Metronome {metronomeOn ? 'On' : 'Off'}
         </button>

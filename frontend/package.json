@@ -1,9 +1,10 @@
 {
   "name": "reson-studio",
   "version": "1.0.0",
-  "description": "Reson Studio - Audio Processing Application",
+  "description": "Reson Studio - Desktop Audio Processing Application",
+  "homepage": "./",
   "main": "electron/main.js",
-  "author": "Your Name",
+  "author": "Reson Studio Team",
   "license": "MIT",
   "private": true,
   "dependencies": {
@@ -11,8 +12,6 @@
     "@babel/preset-react": "^7.27.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron": "^38.3.0",
-    "electron-builder": "^26.0.12",
     "electron-is-dev": "^3.0.1",
     "lucide-react": "^0.546.0",
     "react": "^19.2.0",
@@ -44,9 +43,7 @@
   },
   "browserslist": {
     "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
+      "last 1 chrome version"
     ],
     "development": [
       "last 1 chrome version",
@@ -58,6 +55,8 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "eslint": "^8.57.1",
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12",
     "eslint-plugin-react-hooks": "^7.0.0",
     "react-scripts": "^5.0.1"
   }

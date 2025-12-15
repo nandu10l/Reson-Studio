@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut, Play, Square } from 'lucide-react';
 
-function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, isPlaying = false }) {
-  const [zoom, setZoom] = useState(1);
-  const [pixelsPerBeat, setPixelsPerBeat] = useState(60);
+function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, isPlaying = false, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange }) {
   const timelineRef = useRef(null);
 
   // Calculate time position for playhead
@@ -20,13 +18,13 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
   };
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev * 1.5, 4));
-    setPixelsPerBeat(prev => Math.min(prev * 1.5, 120));
+    onZoomChange(prev => Math.min(prev * 1.5, 4));
+    onPixelsPerBeatChange(prev => Math.min(prev * 1.5, 120));
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev / 1.5, 0.25));
-    setPixelsPerBeat(prev => Math.max(prev / 1.5, 15));
+    onZoomChange(prev => Math.max(prev / 1.5, 0.25));
+    onPixelsPerBeatChange(prev => Math.max(prev / 1.5, 15));
   };
 
   const handleTimelineClick = (e) => {
@@ -90,6 +88,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
         className="timeline-ruler"
         ref={timelineRef}
         onClick={handleTimelineClick}
+        style={{ minWidth: `${measures * beatsPerBar * pixelsPerBeat}px` }}
       >
         <div className="timeline-grid">
           {renderTicks()}

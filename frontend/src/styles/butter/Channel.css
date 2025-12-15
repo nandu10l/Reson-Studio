@@ -1,0 +1,4 @@
+/* trimmed Channel.css essentials */
+.channel_toggle { width:18px; height:18px; border-radius:20px; background:#646a6d; margin:6px auto 8px auto; display:flex; justify-content:center; align-items:center; cursor:pointer; }
+.channel_toggle_green { width:10px; height:10px; border-radius:20px; background:#5cff5c; box-shadow: inset 0 -1px 2px 2px #ffffffaa; }
+.channel_pan { width:20px; height:20px; border-radius:30px; margin-bottom:-10px; background:#374045; }

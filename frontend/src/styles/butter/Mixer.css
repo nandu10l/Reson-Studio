@@ -1,0 +1,5 @@
+/* trimmed Mixer.css essentials */
+.mixer_wrapper { height:inherit; background-color:#434c51; display:flex; }
+.mixer_channels_wrapper { height:100%; display:flex; overflow:hidden; border:solid 1px #293237; }
+.mixer_seperator { width:9px; background-color:var(--bg-dark); display:flex; justify-content:center; align-items:center; color:var(--bg-medium); }
+.mixer_channel { width:72px; background:#30393e; display:flex; flex-direction:column; align-items:center; padding:6px; }
