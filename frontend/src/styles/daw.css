@@ -2,13 +2,17 @@
 
 :root {
   --primary: #4f46e5;
-  --primary-light: #818cf8;
-  --primary-dark: #3730a3;
-  --surface: #ffffff;
-  --surface-hover: #f8fafc;
-  --text: #1e293b;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
+  /* Keep specific primary or change to orange/green? usage suggests keeping it distinct or matching accent. Let's keep it but maybe desaturate or shift if needed, but for now just dark mode bases. */
+  --primary-light: #6366f1;
+  --primary-dark: #4338ca;
+
+  /* Dark Theme Styling */
+  --surface: #363d43;
+  --surface-hover: #404850;
+  --text: #d4d8dd;
+  --text-secondary: #9aa;
+  --border: #1e2226;
+  --bg-app: #2f363c;
 }
 
 /* Modal Styles */
@@ -377,7 +381,9 @@
   display: flex;
   flex-direction: column;
   height: calc(100vh - 64px);
-  background: linear-gradient(180deg, #f8faff 0%, #f1f5fe 100%);
+  background-color: var(--bg-app);
+  background: linear-gradient(180deg, #2f363c 0%, #252a2e 100%);
+  color: var(--text);
 }
 
 /* ... (rest of the CSS) ... */
@@ -434,7 +440,7 @@
   align-items: center;
   padding: 10px 18px;
   background: transparent;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04)
+  border-bottom: 1px solid var(--border);
 }
 
 .transport-left {
@@ -456,8 +462,9 @@
 .btn.small {
   padding: 6px 10px;
   border-radius: 6px;
-  background: #fff;
-  border: 1px solid #e6eef7
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
 }
 
 .icon-btn {
@@ -469,7 +476,7 @@
 
 .time-display {
   font-family: monospace;
-  color: #374151
+  color: var(--primary)
 }
 
 .daw-main {
@@ -481,10 +488,10 @@
 
 .session-browser {
   width: 240px;
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 12px;
-  border: 1px solid #e9f0f7;
+  border: 1px solid var(--border);
   height: calc(100% - 24px)
 }
 
@@ -502,11 +509,11 @@
   padding: 10px;
   border-radius: 8px;
   cursor: pointer;
-  color: #0f1724
+  color: var(--text)
 }
 
 .session-browser li:hover {
-  background: #f1f7fb
+  background: var(--surface-hover)
 }
 
 .center-canvas {
@@ -538,7 +545,7 @@
   display: flex;
   flex-direction: column;
   height: 60px;
-  background: linear-gradient(180deg, #f8faff 0%, var(--surface) 100%);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -557,7 +564,7 @@
   justify-content: space-between;
   padding: 4px 12px;
   height: 24px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
   left: 0;
@@ -716,7 +723,7 @@
   font-size: 9px;
   font-weight: 600;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-hover);
   padding: 1px 4px;
   border-radius: 3px;
   border: 1px solid var(--border);
@@ -817,7 +824,7 @@
 .track-header {
   width: 200px;
   padding: 12px;
-  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-hover) 100%);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -825,7 +832,6 @@
   position: sticky;
   left: 0;
   z-index: 10;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05);
   /* Visual separation */
 }
 
@@ -929,7 +935,7 @@
   position: relative;
   overflow: visible;
   /* Let content expand parent */
-  background: var(--surface-hover);
+  background: var(--bg-app);
   min-width: 100%;
 }
 
@@ -993,8 +999,8 @@
   position: absolute;
   right: 6px;
   top: 6px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--surface);
+  border: 1px solid var(--border);
   width: 20px;
   height: 20px;
   border-radius: 4px;
@@ -1095,8 +1101,8 @@
 
 .mixer-channel {
   width: 120px;
-  background: #fff;
-  border: 1px solid #eef2f6;
+  background: var(--surface);
+  border: 1px solid var(--border);
   padding: 12px;
   border-radius: 10px;
   display: flex;
@@ -1219,10 +1225,10 @@
 /* Panel Styles - Use grid-column to place them */
 .session-browser {
   grid-column: 1;
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 12px;
-  border: 1px solid #e9f0f7;
+  border: 1px solid var(--border);
   height: calc(100vh - 64px - 44px - 24px);
   /* Full height minus Navbar, TransportBar, and vertical padding */
   width: 100%;
@@ -1242,10 +1248,10 @@
 .inspector,
 .plugin-panel {
   grid-column: 5;
-  background: #fff;
+  background: var(--surface);
   border-radius: 10px;
   padding: 16px;
-  border: 1px solid #e9f0f7;
+  border: 1px solid var(--border);
   height: calc(100vh - 64px - 44px - 24px);
   /* Same height calculation */
   width: 100%;
@@ -1346,7 +1352,7 @@
 }
 
 .window-header {
-  background: #f1f5f9;
+  background: var(--surface);
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -1361,7 +1367,19 @@
   color: var(--text);
 }
 
-.window-close-btn {
+/* Window Controls & Maximize Styles */
+.draggable-window.maximized {
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.window-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.window-control-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -1373,8 +1391,13 @@
   justify-content: center;
 }
 
-.window-close-btn:hover {
-  background: #e2e8f0;
+.window-control-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.window-control-btn[title="Close"]:hover {
+  background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
 

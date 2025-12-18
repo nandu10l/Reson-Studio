@@ -7,7 +7,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 
   return (
     <div className="track-row" data-track-id={track.id}>
-      <div className="track-header">
+      <div className="track-header" style={{ borderLeft: `3px solid ${track.color || 'var(--primary)'}` }}>
         <div className="track-controls">
           <button
             className={'track-button' + (trackState.muted ? ' active' : '')}
@@ -70,7 +70,9 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
             className="track-clip"
             style={{
               left: `${clip.offset * pixelsPerBeat}px`,
-              width: `${clip.length * pixelsPerBeat}px`
+              width: `${clip.length * pixelsPerBeat}px`,
+              background: track.color ? `${track.color}40` : undefined, // 25% opacity
+              borderColor: track.color || undefined,
             }}
             onClick={(e) => {
               e.stopPropagation(); // Prevent parent adding new clip
@@ -121,6 +123,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       id: 1,
       name: 'Drums',
       icon: Drumstick,
+      color: '#f97316', // Orange
       clips: [
         { title: 'Loop A', offset: 0, length: 4 },
         { title: 'Fill', offset: 6, length: 2 }
@@ -130,6 +133,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       id: 2,
       name: 'Bass',
       icon: Guitar,
+      color: '#0ea5e9', // Sky Blue
       clips: [
         { title: 'Bassline', offset: 0, length: 8 }
       ]
@@ -138,6 +142,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       id: 3,
       name: 'Keys',
       icon: Piano,
+      color: '#22c55e', // Green
       clips: [
         { title: 'Chords', offset: 2, length: 8 }
       ]
@@ -146,6 +151,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       id: 4,
       name: 'Vocals',
       icon: Mic,
+      color: '#a855f7', // Purple
       clips: [
         { title: 'Lead', offset: 2, length: 6 }
       ]
@@ -166,6 +172,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       id: tracks.length + 1,
       name: `Track ${tracks.length + 1}`,
       icon: Piano,
+      color: '#64748b',
       clips: []
     };
     setTracks([...tracks, newTrack]);
@@ -322,6 +329,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
         className="add-track-button"
         onClick={addNewTrack}
         title="Add New Track"
+        style={{ color: 'var(--text-secondary)', background: 'var(--surface)', borderColor: 'var(--border)' }}
       >
         <Plus size={20} />
         Add Track
