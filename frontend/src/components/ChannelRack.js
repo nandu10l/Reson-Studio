@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './ChannelRack.css';
-import { Plus, MoreHorizontal, RotateCcw, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { Plus, MoreHorizontal, RotateCcw, ChevronRight, Settings } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
 
-const Channel = ({ name, color = '#545b62', steps = Array(16).fill(false) }) => {
-    const [stepState, setStepState] = useState(steps);
-    const [vol, setVol] = useState(78); // 0-100
-    const [pan, setPan] = useState(50); // 0-100 (50 is center)
+const Channel = ({ id, name, vol, pan, steps = [] }) => {
+    const { toggleStepInActivePattern, activePatternId } = useProject();
 
-    const toggleStep = (index) => {
-        const newSteps = [...stepState];
-        newSteps[index] = !newSteps[index];
-        setStepState(newSteps);
+    const handleToggleStep = (index) => {
+        toggleStepInActivePattern(id, index);
     };
 
     return (
@@ -64,14 +61,14 @@ const Channel = ({ name, color = '#545b62', steps = Array(16).fill(false) }) => 
 
             {/* Step Sequencer Grid */}
             <div className="step-sequencer">
-                {stepState.map((active, i) => {
+                {steps.map((active, i) => {
                     // Groups of 4
                     const isEvenGroup = Math.floor(i / 4) % 2 === 1; // 0-3 odd(0), 4-7 even(1), ...
                     return (
                         <button
                             key={i}
                             className={`step-btn ${isEvenGroup ? 'group-even' : ''} ${active ? 'active' : ''}`}
-                            onClick={() => toggleStep(i)}
+                            onClick={() => handleToggleStep(i)}
                         />
                     );
                 })}
@@ -81,13 +78,10 @@ const Channel = ({ name, color = '#545b62', steps = Array(16).fill(false) }) => 
 };
 
 const ChannelRack = () => {
-    const [channels, setChannels] = useState([
-        { id: 1, name: '808 Kick', steps: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0].map(Boolean) },
-        { id: 2, name: '808 Clap', steps: [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0].map(Boolean) },
-        { id: 3, name: '808 HiHat', steps: [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0].map(Boolean) },
-        { id: 4, name: '808 Snare', steps: [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0].map(Boolean) },
-        { id: 5, name: 'FLEX Bass', steps: [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0].map(Boolean) },
-    ]);
+    const { channels, activePattern } = useProject();
+
+    // activePattern.data.steps is an object keyed by channelId
+    // e.g. { 1: [true, false...], 2: [...] }
 
     return (
         <div className="channel-rack-window">
@@ -110,7 +104,14 @@ const ChannelRack = () => {
             {/* Channels */}
             <div className="rack-content">
                 {channels.map(ch => (
-                    <Channel key={ch.id} name={ch.name} steps={ch.steps} />
+                    <Channel
+                        key={ch.id}
+                        id={ch.id}
+                        name={ch.name}
+                        vol={ch.vol}
+                        pan={ch.pan}
+                        steps={activePattern.data.steps[ch.id] || Array(activePattern.length).fill(false)}
+                    />
                 ))}
             </div>
 

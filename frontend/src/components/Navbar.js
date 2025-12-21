@@ -90,10 +90,7 @@ function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSave
             Tray
           </button>
 
-          <div className="user-info">
-            <User size={16} />
-            Nandu
-          </div>
+
         </div>
       </div>
 

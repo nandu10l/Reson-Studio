@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, ListMusic, Grid3x3, LayoutGrid, Sliders } from 'lucide-react';
+import PatternSelector from './PatternSelector';
 
 function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, activeWindows, onToggleWindow }) {
   const [currentTime, setCurrentTime] = useState(0);
@@ -65,16 +66,17 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
         <div className="time-display">{formatTime(currentTime)}</div>
       </div>
       <div className="transport-center">
-        <div className="bpm">
+        <div className="bpm" style={{ marginRight: '16px' }}>
           BPM: <input
             type="number"
             value={bpm}
             onChange={handleBpmChange}
             min="60"
             max="200"
-            style={{ width: '50px', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 'bold' }}
+            style={{ width: '50px', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 'bold', color: '#fff' }}
           />
         </div>
+        <PatternSelector />
       </div>
       <div className="transport-right">
         {/* Window Toggles */}
