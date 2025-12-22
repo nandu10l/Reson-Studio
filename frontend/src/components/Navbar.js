@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Music, FolderOpen, Settings, Home, MinusCircle, User, Plus, Save, Search, Maximize, Minimize2, X, Sliders, Grid3x3, ListMusic, LayoutGrid, FolderTree } from 'lucide-react';
+import GuideBox from './GuideBox';
 import NewProjectModal from './NewProjectModal';
+import { useGuide } from '../contexts/GuideContext';
 
 function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSaveProject }) {
   const [isElectron, setIsElectron] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const { useGuideHandlers } = useGuide();
 
   useEffect(() => {
     setIsElectron(!!(window && window.electronAPI));
@@ -27,7 +30,8 @@ function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSave
       <div className="navbar-menu">
         {/* File/Session Controls (New/Open/Save) */}
         <div className="session-controls">
-          <button className="btn small primary-btn" onClick={() => setShowNewProjectModal(true)}>
+          <GuideBox />
+          <button className="btn small primary-btn" onClick={() => setShowNewProjectModal(true)} {...useGuideHandlers('Create New Project')}>
             <Plus size={14} /> New Project
           </button>
           <button className="btn small" onClick={async () => {
@@ -38,10 +42,10 @@ function Navbar({ onChangeView, currentView = 'arrange', onCreateProject, onSave
                 // Handle the selected file here, e.g., load the project
               }
             }
-          }}>
+          }} {...useGuideHandlers('Open Project')}>
             <FolderOpen size={14} /> Open
           </button>
-          <button className="btn small" onClick={onSaveProject}>
+          <button className="btn small" onClick={onSaveProject} {...useGuideHandlers('Save Project')}>
             <Save size={14} /> Save
           </button>
         </div>

@@ -164,10 +164,9 @@ function Dashboard() {
                     pixelsPerBeat={pixelsPerBeat}
                   />
                 </div>
-                <Mixer />
               </div>
             </div>
-          </div>
+          </div >
         );
     }
   }
@@ -204,7 +203,7 @@ function Dashboard() {
           Actually, the user asked for FL style where these pop out.
       */}
       {activeWindows.mixer && (
-        <DraggableWindow title="Mixer" onClose={() => toggleWindow('mixer')} initialPosition={{ x: 200, y: 200 }} width={800} height={300}>
+        <DraggableWindow title="Mixer" onClose={() => toggleWindow('mixer')} initialPosition={{ x: 100, y: 150 }} width={1120} height={400}>
           <Mixer />
         </DraggableWindow>
       )}

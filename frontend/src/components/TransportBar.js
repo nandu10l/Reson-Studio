@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, ListMusic, Grid3x3, LayoutGrid, Sliders } from 'lucide-react';
 import PatternSelector from './PatternSelector';
+import { useGuide } from '../contexts/GuideContext';
 
 function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, activeWindows, onToggleWindow }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [loopOn, setLoopOn] = useState(false);
   const intervalRef = useRef(null);
+  const { useGuideHandlers } = useGuide();
 
   useEffect(() => {
     if (playing) {
@@ -54,19 +56,19 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
   return (
     <div className="transport-bar">
       <div className="transport-left">
-        <button className="btn small icon-btn" onClick={handleResetTime}>
+        <button className="btn small icon-btn" onClick={handleResetTime} {...useGuideHandlers('Stop / Reset')}>
           <SkipBack size={16} />
         </button>
-        <button className="btn small icon-btn" onClick={() => onPlayToggle(true)}>
+        <button className="btn small icon-btn" onClick={() => onPlayToggle(true)} {...useGuideHandlers('Play')}>
           <Play size={16} />
         </button>
-        <button className="btn small icon-btn" onClick={() => onPlayToggle(false)}>
+        <button className="btn small icon-btn" onClick={() => onPlayToggle(false)} {...useGuideHandlers('Pause')}>
           <Pause size={16} />
         </button>
-        <div className="time-display">{formatTime(currentTime)}</div>
+        <div className="time-display" {...useGuideHandlers('Song Position')}>{formatTime(currentTime)}</div>
       </div>
       <div className="transport-center">
-        <div className="bpm" style={{ marginRight: '16px' }}>
+        <div className="bpm" style={{ marginRight: '16px' }} {...useGuideHandlers('Tempo (BPM)')}>
           BPM: <input
             type="number"
             value={bpm}
@@ -76,7 +78,9 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
             style={{ width: '50px', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 'bold', color: '#fff' }}
           />
         </div>
-        <PatternSelector />
+        <div {...useGuideHandlers('Pattern Selector')}>
+          <PatternSelector />
+        </div>
       </div>
       <div className="transport-right">
         {/* Window Toggles */}
@@ -84,6 +88,7 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
           className={`btn small ${activeWindows?.playlist ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('playlist')}
           title="Playlist"
+          {...useGuideHandlers('View Playlist')}
         >
           <ListMusic size={16} />
         </button>
@@ -91,6 +96,7 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
           className={`btn small ${activeWindows?.pianoRoll ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('pianoRoll')}
           title="Piano Roll"
+          {...useGuideHandlers('View Piano Roll')}
         >
           <Grid3x3 size={16} />
         </button>
@@ -98,6 +104,7 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
           className={`btn small ${activeWindows?.channelRack ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('channelRack')}
           title="Channel Rack"
+          {...useGuideHandlers('View Channel Rack')}
         >
           <LayoutGrid size={16} />
         </button>
@@ -105,16 +112,17 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
           className={`btn small ${activeWindows?.mixer ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('mixer')}
           title="Mixer"
+          {...useGuideHandlers('View Mixer')}
         >
           <Sliders size={16} />
         </button>
 
         <div className="divider" style={{ width: 1, height: 20, background: '#ccc', margin: '0 8px' }}></div>
 
-        <button className={`btn small ${metronomeOn ? 'active' : ''}`} onClick={toggleMetronome}>
+        <button className={`btn small ${metronomeOn ? 'active' : ''}`} onClick={toggleMetronome} {...useGuideHandlers('Metronome')}>
           Metronome {metronomeOn ? 'On' : 'Off'}
         </button>
-        <button className={`btn small ${loopOn ? 'active' : ''}`} onClick={toggleLoop}>
+        <button className={`btn small ${loopOn ? 'active' : ''}`} onClick={toggleLoop} {...useGuideHandlers('Loop Mode')}>
           Loop {loopOn ? 'On' : 'Off'}
         </button>
       </div>

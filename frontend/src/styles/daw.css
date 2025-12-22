@@ -1415,4 +1415,87 @@
   margin-top: 10px;
 }
 
+/* Clip Context Menu */
+.clip-menu {
+  position: fixed;
+  background: #3e3e3e;
+  /* FL menu bg */
+  border: 1px solid #111;
+  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+  min-width: 160px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 11px;
+  color: #d0d0d0;
+  border-radius: 2px;
+}
+
+.clip-menu-header {
+  padding: 4px 8px;
+  background: #505050;
+  color: #cca;
+  /* Pinkish/tan for header */
+  font-weight: bold;
+  border-bottom: 1px solid #222;
+  margin-bottom: 2px;
+}
+
+.clip-menu-item {
+  padding: 4px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clip-menu-item:hover {
+  background: #2d4f68;
+  /* Selection highlight */
+  color: #fff;
+}
+
+.clip-menu-separator {
+  height: 1px;
+  background: #555;
+  margin: 3px 6px;
+  border-bottom: 1px solid #222;
+}
+
+.clip-menu-arrow {
+  margin-left: auto;
+  font-size: 9px;
+  color: #888;
+}
+
+/* Updated Clip Header for Menu Button */
+.clip-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.clip-menu-btn {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  margin-left: 4px;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.clip-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
 /* ... (Rest of original daw.css styles) ... */
