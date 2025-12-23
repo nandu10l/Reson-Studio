@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import '../styles/butter/Mixer.css';
 import { useGuide } from '../contexts/GuideContext';
+import { useProject } from '../contexts/ProjectContext';
 
-function MixerChannel({ id, name, isMaster = false }) {
-  const [vol, setVol] = useState(80);
-  const [pan, setPan] = useState(0); // -50 to 50
+function MixerChannel({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false }) {
   const [muted, setMuted] = useState(false);
   const [soloed, setSoloed] = useState(false);
   const { useGuideHandlers } = useGuide();
@@ -27,13 +26,13 @@ function MixerChannel({ id, name, isMaster = false }) {
         <div className="pan-knob" title={`Pan: ${pan}`}>
           <div className="pan-indicator" style={panStyle}></div>
         </div>
-        {/* Invisible range for interaction could go here, for now just static Knob graphic, or implement full interaction */}
+        {/* Invisible range for interaction */}
         <input
           type="range"
           min="-50"
           max="50"
           value={pan}
-          onChange={(e) => setPan(parseInt(e.target.value))}
+          onChange={(e) => onPanChange(parseInt(e.target.value))}
           style={{ position: 'absolute', width: '100%', height: '100%', opacity: 0, cursor: 'ew-resize' }}
         />
       </div>
@@ -59,13 +58,13 @@ function MixerChannel({ id, name, isMaster = false }) {
       {/* Fader */}
       <div className="fader-section" {...useGuideHandlers(`Volume: ${vol}%`)}>
         <div className="meter-bg"></div>
-        {/* Vertical Range Input: standard HTML5 range but rotated or styled */}
+        {/* Vertical Range Input */}
         <input
           type="range"
           min="0"
           max="100"
           value={vol}
-          onChange={(e) => setVol(e.target.value)}
+          onChange={(e) => onVolChange(parseInt(e.target.value))}
           className="vertical-fader"
           style={{
             writingMode: 'bt-lr', /* IE/Edge */
@@ -85,18 +84,30 @@ function MixerChannel({ id, name, isMaster = false }) {
 }
 
 export default function Mixer() {
-  const inserts = Array.from({ length: 15 }, (_, i) => ({ id: i + 1, name: `Insert ${i + 1}` }));
+  const { channels, updateChannelVolume, updateChannelPan } = useProject();
+
+  // For now, we mix "Channels" (instruments) and "Inserts" (Mixer tracks). 
+  // In FL Studio, Channels are routed to Mixer Tracks. 
+  // To keep it simple for this step, we will display the Instruments as Mixer Tracks directly.
 
   return (
     <div className="mixer">
-      {/* Master Channel (Left) */}
-      <MixerChannel name="Master" isMaster={true} />
+      {/* Master Channel (Left) - Placeholder for now until we add global master state */}
+      <MixerChannel name="Master" isMaster={true} vol={80} pan={0} onVolChange={() => { }} onPanChange={() => { }} />
 
       <div className="mixer-divider"></div>
 
-      {/* Inserts */}
-      {inserts.map((insert) => (
-        <MixerChannel key={insert.id} id={insert.id} name={insert.name} />
+      {/* Instrument Channels as Mixer Tracks */}
+      {channels.map((ch) => (
+        <MixerChannel
+          key={ch.id}
+          id={ch.id}
+          name={ch.name}
+          vol={ch.vol}
+          pan={ch.pan}
+          onVolChange={(v) => updateChannelVolume(ch.id, v)}
+          onPanChange={(p) => updateChannelPan(ch.id, p)}
+        />
       ))}
 
       {/* Spacer */}

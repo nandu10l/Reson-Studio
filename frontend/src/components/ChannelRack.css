@@ -127,21 +127,7 @@
     box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.rack-knob::before {
-    /* Indicator Line */
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2px;
-    height: 8px;
-    background: #ccc;
-    transform-origin: 50% 0;
-    /* Rotate from center */
-    transform: translate(-50%, -50%) rotate(-135deg);
-    /* Default start pos */
-    /* We will rotate this via inline styles */
-}
+
 
 /* Channel Button */
 .channel-btn {

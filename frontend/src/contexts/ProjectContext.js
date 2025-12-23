@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { audioEngine } from '../audio/AudioEngine';
 
 const ProjectContext = createContext();
 
@@ -30,15 +31,6 @@ export const ProjectProvider = ({ children }) => {
     // --- State ---
 
     // 1. Patterns
-    // Each pattern has a name, color, and its own data (steps, notes)
-    // Structure: 
-    // { 
-    //   id: 1, name: 'Pattern 1', color: '#B04C4C', length: 16, 
-    //   data: { 
-    //      steps: { [channelId]: [bool, bool...] },
-    //      notes: [{ id, noteName, startStep, length }] 
-    //   } 
-    // }
     const [patterns, setPatterns] = useState([
         {
             id: 1,
@@ -54,12 +46,10 @@ export const ProjectProvider = ({ children }) => {
 
     const [activePatternId, setActivePatternId] = useState(1);
 
-    // 2. Channels (Instruments) - Global for now, but patterns reference them
+    // 2. Channels (Instruments)
     const [channels, setChannels] = useState(INITIAL_CHANNELS);
 
     // 3. Playlist / Arrangement
-    // Tracks contain clips.
-    // Clip: { id, type: 'pattern', patternId, startStep, length }
     const [playlistTracks, setPlaylistTracks] = useState(
         Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [] }))
     );
@@ -79,29 +69,11 @@ export const ProjectProvider = ({ children }) => {
                     notes: []
                 }
             };
-            // Select the new pattern immediately
             setActivePatternId(nextId);
             return [...prev, newPattern];
         });
     }, []);
 
-    const updateActivePattern = useCallback((newDataPartial) => {
-        setPatterns(prev => prev.map(p => {
-            if (p.id === activePatternId) {
-                // deep merge data if needed, or just replace keys
-                return {
-                    ...p,
-                    data: {
-                        ...p.data,
-                        ...newDataPartial
-                    }
-                };
-            }
-            return p;
-        }));
-    }, [activePatternId]);
-
-    // Helper to update specific channel steps in active pattern
     const toggleStepInActivePattern = useCallback((channelId, stepIndex) => {
         setPatterns(prev => prev.map(p => {
             if (p.id === activePatternId) {
@@ -154,11 +126,55 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
+    // Initialize Audio Engine
+    React.useEffect(() => {
+        const initAudio = async () => {
+            // Initialize engine (user interaction might be needed for full start, 
+            // but we can prepare channels)
+            INITIAL_CHANNELS.forEach(ch => {
+                audioEngine.createChannel(ch.id, ch.name);
+                // Sync initial values
+                audioEngine.updateChannelVolume(ch.id, ch.vol);
+                audioEngine.updateChannelPan(ch.id, ch.pan);
+            });
+        };
+        initAudio();
+    }, []);
+
+
+    // ... (patterns logic)
+
+    // Mixer Actions
+    const updateChannelVolume = useCallback((channelId, volume) => {
+        // Update Audio Engine
+        audioEngine.updateChannelVolume(channelId, volume);
+
+        // Update UI State
+        setChannels(prev => prev.map(ch =>
+            ch.id === channelId ? { ...ch, vol: volume } : ch
+        ));
+    }, []);
+
+    const updateChannelPan = useCallback((channelId, pan) => {
+        // Update Audio Engine
+        audioEngine.updateChannelPan(channelId, pan);
+
+        // Update UI State
+        setChannels(prev => prev.map(ch =>
+            ch.id === channelId ? { ...ch, pan: pan } : ch
+        ));
+    }, []);
+
+    // Preview Note Action
+    const previewChannelSound = useCallback(async (channelId) => {
+        await audioEngine.init(); // Ensure context is started
+        audioEngine.previewSound(channelId);
+    }, []);
+
     // --- Selectors (Derived State) ---
     const activePattern = useMemo(() =>
         patterns.find(p => p.id === activePatternId) || patterns[0]
         , [patterns, activePatternId]);
-
 
     const value = {
         patterns,
@@ -173,7 +189,10 @@ export const ProjectProvider = ({ children }) => {
         toggleStepInActivePattern,
         addNoteToActivePattern,
         removeNoteFromActivePattern,
-        setPlaylistTracks // For dragging later
+        setPlaylistTracks,
+        updateChannelVolume,
+        updateChannelPan,
+        previewChannelSound
     };
 
     return (

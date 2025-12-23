@@ -17,6 +17,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.4",
+    "tone": "^15.1.22",
     "wait-on": "^9.0.1",
     "wavesurfer.js": "^7.11.0"
   },
@@ -54,9 +55,9 @@
   "devDependencies": {
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "eslint": "^8.57.1",
     "electron": "^38.3.0",
     "electron-builder": "^26.0.12",
+    "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^7.0.0",
     "react-scripts": "^5.0.1"
   }

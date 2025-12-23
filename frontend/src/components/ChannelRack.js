@@ -1,28 +1,107 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './ChannelRack.css';
 import { Plus, MoreHorizontal, RotateCcw, ChevronRight, Settings } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
+import { useGuide } from '../contexts/GuideContext';
+
+// Helper component for FL-style vertical drag knobs
+const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, title, style, ...props }) => {
+    const [isDragging, setIsDragging] = useState(false);
+    const startY = useRef(0);
+    const startValue = useRef(0);
+
+    useEffect(() => {
+        const handlePointerMove = (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            const deltaY = startY.current - e.clientY;
+            // Sensitivity: 1px = 1 unit change roughly, adjusted by factor
+            const range = max - min;
+            const sensitivity = 0.5; // Drag 2px for 1 unit change
+
+            let newValue = startValue.current + (deltaY * sensitivity);
+            newValue = Math.max(min, Math.min(max, newValue));
+
+            onChange(Math.round(newValue));
+        };
+
+        const handlePointerUp = () => {
+            setIsDragging(false);
+            document.body.style.cursor = 'default';
+        };
+
+        if (isDragging) {
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+            document.body.style.cursor = 'ns-resize'; // FL style cursor
+        }
+
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [isDragging, min, max, onChange]);
+
+    const handlePointerDown = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+        startY.current = e.clientY;
+        startValue.current = value;
+    };
+
+    return (
+        <div
+            className={className}
+            title={title}
+            style={style}
+            onPointerDown={handlePointerDown}
+            {...props}
+        >
+            {/* Visual content handled by parent via chidren or built-in visuals if we moved them here */}
+        </div>
+    );
+};
 
 const Channel = ({ id, name, vol, pan, steps = [] }) => {
-    const { toggleStepInActivePattern, activePatternId } = useProject();
+    const { toggleStepInActivePattern, activePatternId, updateChannelVolume, updateChannelPan, previewChannelSound } = useProject();
+    const { useGuideHandlers } = useGuide();
 
     const handleToggleStep = (index) => {
         toggleStepInActivePattern(id, index);
+    };
+
+    const getPanText = (val) => {
+        if (val === 50) return 'Channel panning: centered';
+        const percent = Math.abs(val - 50) * 2;
+        const side = val < 50 ? 'left' : 'right';
+        return `Channel panning: ${percent}% ${side}`;
+    };
+
+    const getVolText = (val) => {
+        return `Channel volume: ${Math.round(val)}%`; // Simple % for now, could be dB later
     };
 
     return (
         <div className="channel-row">
             <div className="channel-controls-left">
                 {/* LED */}
-                <div className="status-led active" title="Mute/Solo"></div>
+                <div
+                    className="status-led active"
+                    title="Mute/Solo"
+                    {...useGuideHandlers(`${name} - Mute/Solo`)}
+                ></div>
 
                 {/* Pan Knob */}
-                <div className="rack-knob" title={`Pan: ${pan}%`}>
-                    <style>{`
-            .rack-knob-pan-${name.replace(/\s/g, '')}::before {
-              transform: translate(-50%, -50%) rotate(${(pan - 50) * 2.7}deg);
-            }
-          `}</style>
+                <VerticalDragKnob
+                    className="rack-knob"
+                    title={`Pan: ${pan}%`}
+                    value={pan}
+                    min={0}
+                    max={100}
+                    onChange={(v) => updateChannelPan(id, v)}
+                    {...useGuideHandlers(getPanText(pan))}
+                >
                     <div
                         className={`rack-knob-indicator rack-knob-pan-${name.replace(/\s/g, '')}`}
                         style={{
@@ -31,13 +110,22 @@ const Channel = ({ id, name, vol, pan, steps = [] }) => {
                             width: '2px', height: '8px',
                             background: '#ccc',
                             transformOrigin: '50% 0',
-                            transform: `translate(-50%, -50%) rotate(${(pan - 50) * 2.7}deg)`
+                            transform: `translate(-50%, -50%) rotate(${(pan - 50) * 2.7}deg)`,
+                            pointerEvents: 'none'
                         }}
                     />
-                </div>
+                </VerticalDragKnob>
 
                 {/* Volume Knob */}
-                <div className="rack-knob" title={`Vol: ${vol}%`}>
+                <VerticalDragKnob
+                    className="rack-knob"
+                    title={`Vol: ${vol}%`}
+                    value={vol}
+                    min={0}
+                    max={100}
+                    onChange={(v) => updateChannelVolume(id, v)}
+                    {...useGuideHandlers(getVolText(vol))}
+                >
                     <div
                         style={{
                             position: 'absolute',
@@ -45,14 +133,19 @@ const Channel = ({ id, name, vol, pan, steps = [] }) => {
                             width: '2px', height: '8px',
                             background: '#ccc',
                             transformOrigin: '50% 0',
-                            transform: `translate(-50%, -50%) rotate(${(vol - 50) * 2.7}deg)`
+                            transform: `translate(-50%, -50%) rotate(${(vol - 50) * 2.7}deg)`,
+                            pointerEvents: 'none'
                         }}
                     />
-                </div>
+                </VerticalDragKnob>
             </div>
 
             {/* Channel Button */}
-            <div className="channel-btn">
+            <div
+                className="channel-btn"
+                onPointerDown={() => previewChannelSound(id)}
+                {...useGuideHandlers(`${name} - Channel Settings`)}
+            >
                 {name}
             </div>
 
@@ -69,6 +162,7 @@ const Channel = ({ id, name, vol, pan, steps = [] }) => {
                             key={i}
                             className={`step-btn ${isEvenGroup ? 'group-even' : ''} ${active ? 'active' : ''}`}
                             onClick={() => handleToggleStep(i)}
+                            {...useGuideHandlers(`Step ${i + 1}`)}
                         />
                     );
                 })}
