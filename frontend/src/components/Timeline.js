@@ -78,10 +78,6 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
             <ZoomIn size={16} />
           </button>
         </div>
-        <div className="timeline-info">
-          <span className="bpm-display">{bpm} BPM</span>
-          <span className="time-signature">{beatsPerBar}/4</span>
-        </div>
       </div>
 
       <div

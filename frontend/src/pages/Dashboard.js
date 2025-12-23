@@ -46,7 +46,7 @@ function Dashboard() {
   // Timeline scroll state
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [pixelsPerBeat, setPixelsPerBeat] = useState(60);
+  const [pixelsPerBeat, setPixelsPerBeat] = useState(40);
 
   const resizeState = useRef({ resizing: false, startX: 0, startWidth: 0, target: null });
 
@@ -172,7 +172,7 @@ function Dashboard() {
   }
 
   return (
-    <div>
+    <div className="app-container">
 
       <Navbar onChangeView={(v) => setView(v)} currentView={view} onCreateProject={(project) => setProjects(prev => [...prev, project])} onSaveProject={() => console.log('Project saved:', currentProject)} />
       <TransportBar
@@ -183,7 +183,9 @@ function Dashboard() {
         activeWindows={activeWindows}
         onToggleWindow={toggleWindow}
       />
-      {renderView()}
+      <div className="view-container">
+        {renderView()}
+      </div>
 
       {/* Floating Windows */}
       {activeWindows.pianoRoll && (

@@ -377,13 +377,33 @@
 }
 
 
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+.view-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
 .daw-root {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 64px);
+  height: 100%;
+  flex: 1;
   background-color: var(--bg-app);
   background: linear-gradient(180deg, #2f363c 0%, #252a2e 100%);
   color: var(--text);
+  overflow: hidden;
 }
 
 /* ... (rest of the CSS) ... */
@@ -397,6 +417,9 @@
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .projects-view h2,
@@ -487,12 +510,14 @@
 }
 
 .session-browser {
-  width: 240px;
-  background: var(--surface);
-  border-radius: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  height: calc(100% - 24px)
+  width: 200px;
+  /* Adjust if needed, FL Picker is usually sizable */
+  background: #363d43;
+  /* Base color */
+  border-right: 1px solid #1e2226;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
 }
 
 .session-browser h4 {
@@ -528,8 +553,9 @@
 
 .track-area {
   background: var(--surface);
-  border-radius: 12px;
-  border: 1px solid var(--border);
+  /* border-radius: 12px; REMOVED */
+  border: none;
+  /* Handled by inner borders */
   flex: 1;
   /* Take remaining height */
   display: flex;
@@ -543,8 +569,9 @@
 /* Professional Timeline Styles */
 .timeline {
   display: flex;
-  flex-direction: column;
-  height: 60px;
+  flex-direction: row;
+  /* Fixed: Row layout for Header | Ruler */
+  height: 32px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -552,25 +579,24 @@
   z-index: 20;
   min-width: 100%;
   width: max-content;
-  /* Ensure it expands to fit content */
   user-select: none;
   overflow: visible;
-  /* Let content overflow if needed */
 }
 
 .timeline-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 12px;
-  height: 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  height: 100%;
+  background: #363d43;
+  /* Match track header */
+  border-bottom: 1px solid #1e2226;
   position: sticky;
   left: 0;
   z-index: 25;
-  width: 200px;
-  min-width: 200px;
+  width: 120px;
+  min-width: 120px;
   /* Force width */
   box-sizing: border-box;
 }
@@ -636,8 +662,8 @@
 .timeline-grid {
   position: absolute;
   top: 0;
-  left: 200px;
-  /* Match track header width */
+  left: 0;
+  /* Fixed: Relative to ruler now */
   right: 0;
   bottom: 0;
   display: flex;
@@ -664,7 +690,8 @@
 
 .tick-line {
   width: 1px;
-  background: var(--border);
+  background: #6b7280;
+  /* Lighter gray for visibility */
   flex: 1;
   max-height: 12px;
 }
@@ -711,8 +738,9 @@
 /* Time markers */
 .time-markers {
   position: absolute;
-  top: 26px;
-  left: 200px;
+  top: 14px;
+  left: 0;
+  /* Fixed: Relative to ruler */
   right: 0;
   bottom: 0;
   pointer-events: none;
@@ -740,7 +768,7 @@
 /* Selection and loop regions */
 .timeline-selection {
   position: absolute;
-  top: 24px;
+  top: 0;
   bottom: 0;
   background: rgba(79, 70, 229, 0.1);
   border: 1px solid var(--primary-light);
@@ -750,7 +778,7 @@
 
 .timeline-loop {
   position: absolute;
-  top: 24px;
+  top: 0;
   bottom: 0;
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid #22c55e;
@@ -795,7 +823,7 @@
 .track-row {
   display: flex;
   border-bottom: 1px solid var(--border);
-  min-height: 100px;
+  min-height: 48px;
   position: relative;
 }
 
@@ -821,31 +849,31 @@
   color: var(--primary);
 }
 
+
 .track-header {
-  width: 200px;
-  padding: 12px;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
+  width: 120px;
+  /* Reduced width */
+  padding: 0;
+  /* Padding handled by inner elements */
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  /* styles removed to allow inline override */
   position: sticky;
   left: 0;
   z-index: 10;
-  /* Visual separation */
 }
 
 .track-controls {
   display: flex;
-  gap: 8px;
+  gap: 2px;
   align-items: center;
-  margin-bottom: 4px;
+  flex-shrink: 0;
 }
 
 .track-button {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-secondary);
@@ -872,21 +900,27 @@
 .track-name {
   font-weight: 600;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .track-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
   background: var(--primary-light);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .track-fader {
@@ -935,7 +969,8 @@
   position: relative;
   overflow: visible;
   /* Let content expand parent */
-  background: var(--bg-app);
+  background: #212529;
+  /* Dark grid background */
   min-width: 100%;
 }
 
@@ -954,24 +989,25 @@
 .grid-line {
   width: 60px;
   /* Match timeline tick width */
-  border-right: 1px solid var(--border);
-  opacity: 0.5;
+  border-right: 1px solid #32383e;
+  opacity: 1;
 }
 
 .track-clip {
   position: absolute;
-  height: 60px;
+  height: 40px;
   top: 50%;
   transform: translateY(-50%);
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   cursor: grab;
   user-select: none;
   transition: box-shadow 0.2s;
+  font-size: 11px;
 }
 
 .resize-handle {

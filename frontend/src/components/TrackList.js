@@ -5,42 +5,39 @@ import { useProject } from '../contexts/ProjectContext';
 
 import PatternClipPreview from './PatternClipPreview';
 
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, pixelsPerBeat, measures, beatsPerBar, patterns, onOpenMenu }) {
+// Update Track signature to include onResizeStart
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, onOpenMenu }) {
   const TrackIcon = track.icon || Grid3x3;
+
 
   return (
     <div className="track-row" data-track-id={track.id}>
-      <div className="track-header" style={{ borderLeft: `3px solid ${track.color || '#444'}` }}>
-        <div className="track-controls">
-          <button
-            className={'track-button' + (trackState.muted ? ' active' : '')}
-            onClick={() => onToggleState('muted')}
-            title="Mute"
-          >
-            {trackState.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-          </button>
-          <button
-            className={'track-button' + (trackState.soloed ? ' active' : '')}
-            onClick={() => onToggleState('soloed')}
-            title="Solo"
-          >
-            <Volume1 size={14} />
-          </button>
-          <button
-            className={'track-button' + (trackState.armed ? ' active' : '')}
-            onClick={() => onToggleState('armed')}
-            title="Record Arm"
-          >
-            <Radio size={14} />
-          </button>
-        </div>
-
-        <div className="track-name">
-          <div className="track-icon">
-            <TrackIcon size={14} />
-          </div>
+      <div className="track-header" style={{
+        background: '#363d43', // Base dark color
+        borderBottom: '1px solid #282c31', // Subtle separator
+        borderRight: '1px solid #1e2226'
+      }}>
+        {/* Track Name (Left Aligned) */}
+        <div className="track-name" style={{ flex: 1, paddingLeft: '8px', color: '#9ca3af', fontWeight: 500 }}>
           {track.name}
         </div>
+
+        {/* Status LED (Right Aligned) */}
+        <div
+          className={`track-status-led ${!trackState.muted ? 'active' : ''}`}
+          onClick={() => onToggleState('muted')}
+          title="Toggle Mute"
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: !trackState.muted ? '#4ade80' : '#4b5563',
+            boxShadow: !trackState.muted ? '0 0 4px #4ade80' : 'none',
+            marginRight: '8px',
+            cursor: 'pointer',
+            border: '1px solid #282c31'
+          }}
+        />
       </div>
 
       <div
@@ -114,7 +111,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 onStartDrag(e, track.id, idx);
               }}
             >
-              <div className="clip-header" style={{ background: clipColor, padding: '2px 4px', fontSize: '10px', color: '#fff', fontWeight: 600, height: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div className="clip-header" style={{ background: clipColor, padding: '0 4px', fontSize: '10px', color: '#fff', fontWeight: 600, height: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center' }}>
                 <div className="clip-header-row">
                   <span>{clipName}</span>
                   <button
@@ -144,6 +141,12 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
               <div className="clip-content" style={{ flex: 1, position: 'relative', opacity: 0.8 }}>
                 {pattern && <PatternClipPreview pattern={pattern} />}
               </div>
+
+              {/* Resize Handle */}
+              <div
+                className="resize-handle"
+                onPointerDown={(e) => onResizeStart(e, track.id, idx)}
+              />
 
               <button
                 className="clip-delete"
@@ -325,7 +328,54 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
     window.addEventListener('pointerup', onPointerUp);
   };
 
+
+  // Resize state
+  const resizeState = useRef({ resizing: false, trackId: null, clipIndex: null, startX: 0, startLength: 0 });
+
+  const onResizeStart = (e, trackId, clipIndex) => {
+    if (e.button && e.button !== 0) return;
+    const track = playlistTracks.find(t => t.id === trackId);
+    if (!track) return;
+    const clip = track.clips[clipIndex];
+    if (!clip) return;
+
+    e.preventDefault();
+    e.stopPropagation(); // Prevent drag start
+
+    resizeState.current = {
+      resizing: true,
+      trackId,
+      clipIndex,
+      startX: e.clientX,
+      startLength: clip.length
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    document.body.style.cursor = 'ew-resize';
+  };
+
   const onPointerMove = (e) => {
+    const rs = resizeState.current;
+    if (rs.resizing) {
+      const deltaX = e.clientX - rs.startX;
+      const deltaBeats = deltaX / pixelsPerBeat;
+      const newLength = Math.max(0.25, rs.startLength + deltaBeats); // Min length 1/4 beat
+
+      // Snap to grid (optional, maybe 1/4 beat?)
+      const snappedLength = Math.round(newLength * 4) / 4;
+
+      setPlaylistTracks(prev => prev.map(t => {
+        if (t.id !== rs.trackId) return t;
+        const newClips = [...t.clips];
+        if (newClips[rs.clipIndex]) {
+          newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
+        }
+        return { ...t, clips: newClips };
+      }));
+      return;
+    }
+
     const ds = dragState.current;
     if (!ds.dragging) return;
     if (dragClone.current) {
@@ -335,6 +385,15 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
   };
 
   const onPointerUp = (e) => {
+    const rs = resizeState.current;
+    if (rs.resizing) {
+      resizeState.current = { resizing: false, trackId: null, clipIndex: null };
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      document.body.style.cursor = '';
+      return;
+    }
+
     const ds = dragState.current;
     if (!ds.dragging) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -396,6 +455,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           onAddClip={addClip}
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
+          onResizeStart={onResizeStart}
           onSelect={setSelected}
           pixelsPerBeat={pixelsPerBeat}
           measures={measures}
