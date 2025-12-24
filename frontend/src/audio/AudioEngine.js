@@ -11,7 +11,75 @@ class AudioEngine {
         if (this.isInitialized) return;
         await Tone.start();
         console.log('Audio Engine Started');
+
+        // Setup Transport
+        Tone.Transport.bpm.value = 120;
         this.isInitialized = true;
+    }
+
+    // --- Transport Controls ---
+    start() {
+        if (Tone.Transport.state !== 'started') {
+            Tone.Transport.start();
+        }
+    }
+
+    pause() {
+        Tone.Transport.pause();
+    }
+
+    stop() {
+        Tone.Transport.stop();
+    }
+
+    setBpm(bpm) {
+        Tone.Transport.bpm.value = bpm;
+    }
+
+    // --- Scheduler ---
+    schedulePattern(pattern) {
+        // Clear previous schedule
+        Tone.Transport.cancel();
+
+        const loopLength = "1m"; // Assuming 16 steps = 1 measure
+        Tone.Transport.loop = true;
+        Tone.Transport.loopEnd = loopLength;
+
+        // Schedule Drums (Steps)
+        Object.entries(pattern.data.steps).forEach(([channelId, steps]) => {
+            const id = parseInt(channelId);
+            steps.forEach((isActive, index) => {
+                if (isActive) {
+                    const time = `0:0:${index}`; // bars:quarters:sixteenths
+                    Tone.Transport.schedule((t) => {
+                        this.previewSound(id);
+                    }, time);
+                }
+            });
+        });
+
+        // Schedule Melody (Piano Roll)
+        pattern.data.notes.forEach(note => {
+            // note: { id, noteName: "C5", startStep, length }
+            const time = `0:0:${note.startStep}`;
+            const duration = `0:0:${note.length}`;
+
+            // Map "C5" to "C5" (direct) or parse if needed
+            // Our piano roll uses "C5", "F#4" etc which Tone.js understands
+
+            // Need a melodic source. For now, we don't have per-track instruments in Piano Roll
+            // We'll use a default PolySynth for preview, or map to a specific channel if we add that metadata
+
+            Tone.Transport.schedule((t) => {
+                // Use a default synth for now
+                const synth = this.sources.get(5) || this.sources.get(1); // Fallback
+                if (synth && synth.triggerAttackRelease) {
+                    synth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                }
+            }, time);
+        });
+
+        console.log('Scheduled pattern:', pattern.id);
     }
 
     // Create a channel strip (Volume + Pan)
@@ -60,10 +128,6 @@ class AudioEngine {
         const channel = this.channels.get(id);
         if (channel) {
             // Map 0-100 to -60dB to +6dB (approx)
-            // 80 is nominal (0dB logic in our UI, but let's say 0 is mute)
-            // Simple mapping: Volume in dB = 20 * log10(amplitude)
-            // Let's use Tone's gain conversion or just simple logic
-            // If vol is 0, mute
             if (volume0to100 === 0) {
                 channel.mute = true;
             } else {
@@ -87,11 +151,9 @@ class AudioEngine {
     previewSound(id) {
         const source = this.sources.get(id);
         if (source) {
-            // NoiseSynth does not accept a pitch argument
             if (source.name === 'NoiseSynth') {
                 source.triggerAttackRelease("8n");
             } else {
-                // Play a test note for melodic/tuned instruments
                 source.triggerAttackRelease("C2", "8n");
             }
         }

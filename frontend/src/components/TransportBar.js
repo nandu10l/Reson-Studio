@@ -2,16 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, SkipBack, ListMusic, Grid3x3, LayoutGrid, Sliders } from 'lucide-react';
 import PatternSelector from './PatternSelector';
 import { useGuide } from '../contexts/GuideContext';
+import { useProject } from '../contexts/ProjectContext';
 
-function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, activeWindows, onToggleWindow }) {
+// Transport Controls Component
+function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
+  const { isPlaying, togglePlayback, bpm, updateBpm, stopPlayback } = useProject();
+
+  // Local UI state
   const [currentTime, setCurrentTime] = useState(0);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [loopOn, setLoopOn] = useState(false);
   const intervalRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
+  // Sync internal timer with isPlaying context
   useEffect(() => {
-    if (playing) {
+    if (isPlaying) {
       intervalRef.current = setInterval(() => {
         setCurrentTime(prev => prev + 0.1);
       }, 100);
@@ -21,11 +27,9 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
       }
     }
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [playing]);
+  }, [isPlaying]);
 
   const formatTime = (time) => {
     const minutes = Math.floor(time / 60);
@@ -36,7 +40,7 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
   const handleBpmChange = (e) => {
     const newBpm = parseInt(e.target.value, 10);
     if (!isNaN(newBpm) && newBpm > 0) {
-      onBpmChange(newBpm);
+      updateBpm(newBpm);
     }
   };
 
@@ -50,6 +54,7 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
 
   const handleResetTime = () => {
     setCurrentTime(0);
+    stopPlayback(); // Reset often stops
     if (onResetTime) onResetTime();
   };
 
@@ -59,10 +64,10 @@ function TransportBar({ playing, onPlayToggle, bpm, onBpmChange, onResetTime, ac
         <button className="btn small icon-btn" onClick={handleResetTime} {...useGuideHandlers('Stop / Reset')}>
           <SkipBack size={16} />
         </button>
-        <button className="btn small icon-btn" onClick={() => onPlayToggle(true)} {...useGuideHandlers('Play')}>
-          <Play size={16} />
+        <button className="btn small icon-btn" onClick={() => togglePlayback()} {...useGuideHandlers('Play')}>
+          <Play size={16} color={isPlaying ? '#0f0' : '#fff'} />
         </button>
-        <button className="btn small icon-btn" onClick={() => onPlayToggle(false)} {...useGuideHandlers('Pause')}>
+        <button className="btn small icon-btn" onClick={() => togglePlayback()} {...useGuideHandlers('Pause')}>
           <Pause size={16} />
         </button>
         <div className="time-display" {...useGuideHandlers('Song Position')}>{formatTime(currentTime)}</div>

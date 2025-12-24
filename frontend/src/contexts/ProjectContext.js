@@ -141,6 +141,68 @@ export const ProjectProvider = ({ children }) => {
         initAudio();
     }, []);
 
+    // --- Transport State ---
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [bpm, setBpm] = useState(120);
+
+    // --- Actions ---
+
+    // Note Actions
+    const updateNote = useCallback((noteId, changes) => {
+        setPatterns(prev => prev.map(p => {
+            if (p.id === activePatternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: p.data.notes.map(n =>
+                            n.id === noteId ? { ...n, ...changes } : n
+                        )
+                    }
+                };
+            }
+            return p;
+        }));
+    }, [activePatternId]);
+
+    const deleteNotes = useCallback((noteIds) => {
+        setPatterns(prev => prev.map(p => {
+            if (p.id === activePatternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: p.data.notes.filter(n => !noteIds.includes(n.id))
+                    }
+                };
+            }
+            return p;
+        }));
+    }, [activePatternId]);
+
+    // Transport Actions
+    const togglePlayback = useCallback(async () => {
+        await audioEngine.init();
+        if (isPlaying) {
+            audioEngine.pause();
+            setIsPlaying(false);
+        } else {
+            audioEngine.start();
+            setIsPlaying(true);
+        }
+    }, [isPlaying]);
+
+    const stopPlayback = useCallback(() => {
+        audioEngine.stop();
+        setIsPlaying(false);
+    }, []);
+
+    const updateBpm = useCallback((newBpm) => {
+        setBpm(newBpm);
+        audioEngine.setBpm(newBpm);
+    }, []);
+
+
 
     // ... (patterns logic)
 
@@ -192,7 +254,16 @@ export const ProjectProvider = ({ children }) => {
         setPlaylistTracks,
         updateChannelVolume,
         updateChannelPan,
-        previewChannelSound
+        previewChannelSound,
+
+        // New Actions
+        updateNote,
+        deleteNotes,
+        isPlaying,
+        bpm,
+        togglePlayback,
+        stopPlayback,
+        updateBpm
     };
 
     return (

@@ -176,10 +176,6 @@ function Dashboard() {
 
       <Navbar onChangeView={(v) => setView(v)} currentView={view} onCreateProject={(project) => setProjects(prev => [...prev, project])} onSaveProject={() => console.log('Project saved:', currentProject)} />
       <TransportBar
-        playing={playing}
-        onPlayToggle={setPlaying}
-        bpm={bpm}
-        onBpmChange={setBpm}
         activeWindows={activeWindows}
         onToggleWindow={toggleWindow}
       />
