@@ -7,7 +7,9 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
     const [size, setSize] = useState({ width, height }); // Track size for restore
     const [isDragging, setIsDragging] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
+    const [isResizing, setIsResizing] = useState(false);
     const dragStartInfo = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+    const resizeStartInfo = useRef({ x: 0, y: 0, startWidth: 0, startHeight: 0, startX: 0, startY: 0, edge: '' });
 
     const handleMouseDown = (e) => {
         if (isMaximized) return; // Disable drag when maximized
@@ -21,22 +23,97 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
         e.stopPropagation(); // Prevent event bubbling
     };
 
+
+    const toggleMaximize = () => {
+        setIsMaximized(!isMaximized);
+    };
+
+    const handleResizeStart = (e, edge) => {
+        if (isMaximized) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setIsResizing(true);
+        resizeStartInfo.current = {
+            x: e.clientX,
+            y: e.clientY,
+            startWidth: size.width,
+            startHeight: size.height,
+            startX: position.x,
+            startY: position.y,
+            edge: edge // 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'
+        };
+    };
+
     useEffect(() => {
         const handleMouseMove = (e) => {
-            if (!isDragging) return;
-            const dx = e.clientX - dragStartInfo.current.x;
-            const dy = e.clientY - dragStartInfo.current.y;
-            setPosition({
-                x: dragStartInfo.current.startX + dx,
-                y: dragStartInfo.current.startY + dy
-            });
+            if (isResizing) {
+                const dx = e.clientX - resizeStartInfo.current.x;
+                const dy = e.clientY - resizeStartInfo.current.y;
+                const { edge, startWidth, startHeight, startX, startY } = resizeStartInfo.current;
+                
+                let newWidth = startWidth;
+                let newHeight = startHeight;
+                let newX = startX;
+                let newY = startY;
+
+                const minWidth = 300;
+                const minHeight = 200;
+
+                // Handle horizontal resizing
+                if (edge.includes('e')) {
+                    // Resize from right
+                    newWidth = Math.max(minWidth, startWidth + dx);
+                } else if (edge.includes('w')) {
+                    // Resize from left
+                    newWidth = Math.max(minWidth, startWidth - dx);
+                    newX = startX + (startWidth - newWidth);
+                }
+
+                // Handle vertical resizing
+                if (edge.includes('s')) {
+                    // Resize from bottom
+                    newHeight = Math.max(minHeight, startHeight + dy);
+                } else if (edge.includes('n')) {
+                    // Resize from top
+                    newHeight = Math.max(minHeight, startHeight - dy);
+                    newY = startY + (startHeight - newHeight);
+                }
+
+                setSize({ width: newWidth, height: newHeight });
+                setPosition({ x: newX, y: newY });
+            } else if (isDragging) {
+                const dx = e.clientX - dragStartInfo.current.x;
+                const dy = e.clientY - dragStartInfo.current.y;
+                setPosition({
+                    x: dragStartInfo.current.startX + dx,
+                    y: dragStartInfo.current.startY + dy
+                });
+            }
         };
 
         const handleMouseUp = () => {
             setIsDragging(false);
+            setIsResizing(false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
         };
 
-        if (isDragging) {
+        if (isDragging || isResizing) {
+            if (isResizing) {
+                const edge = resizeStartInfo.current.edge;
+                let cursor = 'default';
+                if (edge === 'n' || edge === 's') {
+                    cursor = 'ns-resize';
+                } else if (edge === 'e' || edge === 'w') {
+                    cursor = 'ew-resize';
+                } else if (edge === 'ne' || edge === 'sw') {
+                    cursor = 'nesw-resize';
+                } else if (edge === 'nw' || edge === 'se') {
+                    cursor = 'nwse-resize';
+                }
+                document.body.style.cursor = cursor;
+                document.body.style.userSelect = 'none';
+            }
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
         }
@@ -45,19 +122,16 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDragging]);
-
-    const toggleMaximize = () => {
-        setIsMaximized(!isMaximized);
-    };
+    }, [isDragging, isResizing]);
 
     const windowStyle = isMaximized ? {
         position: 'fixed',
-        top: 48, // Below Transport/Navbar
+        top: 96, // Below Navbar (64px) + TransportBar (32px) = 96px
         left: 0,
         width: '100vw',
-        height: 'calc(100vh - 48px)',
-        zIndex: 1001 // Higher than regular windows
+        height: 'calc(100vh - 96px)',
+        zIndex: 1001, // Higher than regular windows
+        overflow: 'visible' // Ensure header is visible
     } : {
         position: 'absolute',
         left: position.x,
@@ -88,9 +162,25 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
                     </button>
                 </div>
             </div>
-            <div className="window-content" style={{ height: 'calc(100% - 30px)' }}> {/* Adjust for header height */}
+            <div className="window-content" style={{ height: 'calc(100% - 24px)', overflow: 'hidden' }}> {/* Adjust for header height */}
                 {children}
             </div>
+            
+            {/* Resize Handles */}
+            {!isMaximized && (
+                <>
+                    {/* Edges */}
+                    <div className="resize-handle resize-handle-n" onMouseDown={(e) => handleResizeStart(e, 'n')} />
+                    <div className="resize-handle resize-handle-s" onMouseDown={(e) => handleResizeStart(e, 's')} />
+                    <div className="resize-handle resize-handle-e" onMouseDown={(e) => handleResizeStart(e, 'e')} />
+                    <div className="resize-handle resize-handle-w" onMouseDown={(e) => handleResizeStart(e, 'w')} />
+                    {/* Corners */}
+                    <div className="resize-handle resize-handle-ne" onMouseDown={(e) => handleResizeStart(e, 'ne')} />
+                    <div className="resize-handle resize-handle-nw" onMouseDown={(e) => handleResizeStart(e, 'nw')} />
+                    <div className="resize-handle resize-handle-se" onMouseDown={(e) => handleResizeStart(e, 'se')} />
+                    <div className="resize-handle resize-handle-sw" onMouseDown={(e) => handleResizeStart(e, 'sw')} />
+                </>
+            )}
         </div>
     );
 };

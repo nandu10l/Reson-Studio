@@ -1,25 +1,162 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Guitar, Drumstick, Piano, Volume2, Volume1, VolumeX, Radio, Plus, Grid3x3, ChevronDown, Trash2, Edit2, Copy, Palette } from 'lucide-react';
+import { Plus, Grid, ChevronDown, Trash, Edit, Copy, Palette } from './icons/BlenderIcons';
+import '../styles/blender-icons.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 
 import PatternClipPreview from './PatternClipPreview';
+import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, onOpenMenu }) {
-  const TrackIcon = track.icon || Grid3x3;
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack }) {
+  const TrackIcon = track.icon || Grid;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(track.name);
+  const [hoveredClipIndex, setHoveredClipIndex] = useState(null);
+  const [showActions, setShowActions] = useState(false);
+  const inputRef = useRef(null);
 
+  const handleRename = () => {
+    setIsEditing(true);
+    setEditName(track.name);
+  };
+
+  const handleSaveRename = () => {
+    if (editName.trim() && editName !== track.name) {
+      onRenameTrack(track.id, editName.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelRename = () => {
+    setEditName(track.name);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSaveRename();
+    } else if (e.key === 'Escape') {
+      handleCancelRename();
+    }
+  };
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
 
   return (
     <div className="track-row" data-track-id={track.id}>
       <div className="track-header" style={{
         background: '#363d43', // Base dark color
         borderBottom: '1px solid #282c31', // Subtle separator
-        borderRight: '1px solid #1e2226'
-      }}>
-        {/* Track Name (Left Aligned) */}
-        <div className="track-name" style={{ flex: 1, paddingLeft: '8px', color: '#9ca3af', fontWeight: 500 }}>
-          {track.name}
+        borderRight: '1px solid #1e2226',
+        padding: '0 12px',
+        minHeight: '64px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        boxSizing: 'border-box',
+        position: 'relative'
+      }}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => !isEditing && setShowActions(false)}
+      >
+        {/* Track Name and Actions */}
+        <div className="track-name-container" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleSaveRename}
+              onKeyDown={handleKeyDown}
+              style={{
+                flex: 1,
+                background: '#4b5563',
+                border: '1px solid #60a5fa',
+                borderRadius: '3px',
+                padding: '2px 6px',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 500,
+                outline: 'none',
+                minWidth: 0
+              }}
+            />
+          ) : (
+            <>
+              <div className="track-name" style={{ flex: 1, color: '#9ca3af', fontWeight: 500, fontSize: '13px', letterSpacing: '0.01em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {track.name}
+              </div>
+              {showActions && (
+                <div className="track-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRename();
+                    }}
+                    title="Rename Track"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '3px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                      e.currentTarget.style.color = '#60a5fa';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#9ca3af';
+                    }}
+                  >
+                    <Edit size={14} color="#9ca3af" className="blender-icon" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`Delete "${track.name}"?`)) {
+                        onDeleteTrack(track.id);
+                      }
+                    }}
+                    title="Delete Track"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '3px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.currentTarget.style.color = '#ef4444';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#9ca3af';
+                    }}
+                  >
+                    <Trash size={14} color="#9ca3af" className="blender-icon" />
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Status LED (Right Aligned) */}
@@ -28,14 +165,16 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
           onClick={() => onToggleState('muted')}
           title="Toggle Mute"
           style={{
-            width: '8px',
-            height: '8px',
+            width: '10px',
+            height: '10px',
             borderRadius: '50%',
             background: !trackState.muted ? '#4ade80' : '#4b5563',
-            boxShadow: !trackState.muted ? '0 0 4px #4ade80' : 'none',
-            marginRight: '8px',
+            boxShadow: !trackState.muted ? '0 0 6px #4ade80' : 'none',
             cursor: 'pointer',
-            border: '1px solid #282c31'
+            border: '1px solid #282c31',
+            flexShrink: 0,
+            transition: 'all 0.2s ease',
+            marginLeft: '8px'
           }}
         />
       </div>
@@ -58,6 +197,11 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
               const x = e.clientX - rect.left;
               const offset = Math.floor(x / pixelsPerBeat);
               onAddClip(track.id, offset, data.patternId);
+            } else if (data.type === 'audio') {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const offset = Math.floor(x / pixelsPerBeat);
+              onAddAudioClip(track.id, offset, data.audioClipId);
             }
           } catch (err) {
             console.error("Drop failed", err);
@@ -72,30 +216,90 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
         }}
       >
         <div className="track-grid">
-          {[...Array(measures * beatsPerBar)].map((_, i) => (
-            <div key={i} className="grid-line" style={{ width: `${pixelsPerBeat}px` }} />
-          ))}
+          {[...Array(measures * beatsPerBar * 4)].map((_, i) => {
+            const sixteenth = i;
+            const beat = Math.floor(sixteenth / 4);
+            const sixteenthInBeat = sixteenth % 4;
+            const isBeat = sixteenthInBeat === 0;
+            const isDownbeat = isBeat && (beat % beatsPerBar === 0);
+            
+            return (
+              <div 
+                key={i} 
+                className={`grid-line ${isDownbeat ? 'downbeat' : isBeat ? 'beat' : 'sixteenth'}`}
+                style={{ 
+                  width: `${pixelsPerBeat / 4}px`,
+                  left: `${(sixteenth / 4) * pixelsPerBeat}px`
+                }} 
+              />
+            );
+          })}
         </div>
         {track.clips.map((clip, idx) => {
+          // Handle audio clips
+          if (clip.type === 'audio') {
+            const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+            if (!audioClip) return null;
+
+            // Merge clip data with audioClip data for rendering
+            const mergedClip = {
+              ...audioClip,
+              ...clip,
+              trackId: track.id,
+              clipIndex: idx
+            };
+
+            return (
+              <AudioClip
+                key={clip.id || idx}
+                clip={mergedClip}
+                pixelsPerBeat={pixelsPerBeat}
+                onSelect={(c) => onSelect({ ...c, trackId: track.id, clipIndex: idx })}
+                onRemove={(c) => onRemoveClip(track.id, idx)}
+                onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
+                onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
+                onOpenMenu={(menuData) => setMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
+                isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
+              />
+            );
+          }
+
+          // Handle pattern clips (existing code)
           const pattern = patterns.find(p => p.id === clip.patternId);
           const clipName = pattern ? pattern.name : `Pattern ${clip.patternId}`;
           const clipColor = pattern ? pattern.color : '#ccc';
+          const isClipSelected = selected?.trackId === track.id && selected?.clipIndex === idx;
+          const isClipHovered = hoveredClipIndex === idx;
 
           return (
             <div
               key={idx}
               className="track-clip"
+              onMouseEnter={() => setHoveredClipIndex(idx)}
+              onMouseLeave={() => setHoveredClipIndex(null)}
               style={{
                 left: `${clip.offset * pixelsPerBeat}px`,
                 width: `${clip.length * pixelsPerBeat}px`,
-                background: `${clipColor}80`,
-                borderColor: clipColor,
-                borderWidth: '1px',
+                background: isClipSelected 
+                  ? `linear-gradient(180deg, ${clipColor}E6 0%, ${clipColor}CC 100%)` 
+                  : `linear-gradient(180deg, ${clipColor}80 0%, ${clipColor}60 100%)`,
+                borderColor: isClipSelected ? clipColor : `${clipColor}80`,
+                borderWidth: isClipSelected ? '2px' : '1px',
                 borderStyle: 'solid',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 overflow: 'hidden',
                 display: 'flex',
-                flexDirection: 'column'
+                flexDirection: 'column',
+                boxShadow: isClipSelected 
+                  ? `inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 16px ${clipColor}80, 0 4px 8px rgba(0, 0, 0, 0.4)` 
+                  : isClipHovered
+                  ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3)`
+                  : `inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2)`,
+                minHeight: '52px',
+                opacity: isClipSelected ? 1 : isClipHovered ? 0.95 : 0.85,
+                transition: 'all 0.2s ease',
+                filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
+                position: 'relative'
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -111,9 +315,23 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 onStartDrag(e, track.id, idx);
               }}
             >
-              <div className="clip-header" style={{ background: clipColor, padding: '0 4px', fontSize: '10px', color: '#fff', fontWeight: 600, height: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center' }}>
-                <div className="clip-header-row">
-                  <span>{clipName}</span>
+              <div className="clip-header" style={{ 
+                background: isClipSelected ? clipColor : `${clipColor}CC`, 
+                padding: '0 8px', 
+                fontSize: '10px', 
+                color: '#fff', 
+                fontWeight: 600, 
+                height: '18px', 
+                whiteSpace: 'nowrap', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                display: 'flex', 
+                alignItems: 'center', 
+                letterSpacing: '0.01em',
+                opacity: isClipSelected ? 1 : 0.9
+              }}>
+                <div className="clip-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>{clipName}</span>
                   <button
                     className="clip-menu-btn"
                     onPointerDown={(e) => {
@@ -131,14 +349,26 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                       // I'll emit an event "onOpenMenu"
                       // See update below for Track Props.
                     }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: 'none',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      borderRadius: '2px',
+                      transition: 'background 0.15s ease',
+                      flexShrink: 0
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                   >
-                    <ChevronDown size={10} />
+                    <ChevronDown size={10} color="#fff" className="blender-icon" />
                   </button>
                 </div>
               </div>
 
               {/* Pattern Preview Area */}
-              <div className="clip-content" style={{ flex: 1, position: 'relative', opacity: 0.8 }}>
+              <div className="clip-content" style={{ flex: 1, position: 'relative', opacity: 0.8, padding: '4px' }}>
                 {pattern && <PatternClipPreview pattern={pattern} />}
               </div>
 
@@ -161,7 +391,31 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 className="clip-delete"
                 onClick={(e) => { e.stopPropagation(); onRemoveClip(track.id, idx); }}
                 title="Delete clip"
-                style={{ position: 'absolute', top: '2px', right: '2px', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', zIndex: 10, padding: 0, lineHeight: 1 }}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  padding: '3px 6px',
+                  borderRadius: '3px',
+                  fontSize: '12px',
+                  lineHeight: 1,
+                  fontWeight: 600,
+                  transition: 'all 0.15s ease',
+                  opacity: 0.8
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.8';
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                }}
               >
                 ×
               </button>
@@ -174,7 +428,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 }
 
 export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4 }) {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Local UI state for mute/solo/arm
@@ -271,9 +525,29 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
 
       const newClip = {
         id: Date.now(),
+        type: 'pattern',
         patternId: patId,
         offset: offset,
         length: lengthBeats
+      };
+      return { ...t, clips: [...t.clips, newClip] };
+    }));
+  };
+
+  const onAddAudioClip = (trackId, offset, audioClipId) => {
+    const audioClip = audioClips.find(ac => ac.id === audioClipId);
+    if (!audioClip) return;
+
+    setPlaylistTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+
+      const newClip = {
+        id: Date.now(),
+        type: 'audio',
+        audioClipId: audioClipId,
+        offset: offset,
+        length: audioClip.durationBeats,
+        name: audioClip.name
       };
       return { ...t, clips: [...t.clips, newClip] };
     }));
@@ -286,6 +560,17 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       newClips.splice(clipIndex, 1);
       return { ...t, clips: newClips };
     }));
+  };
+
+  const renameTrack = (trackId, newName) => {
+    setPlaylistTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+      return { ...t, name: newName };
+    }));
+  };
+
+  const deleteTrack = (trackId) => {
+    setPlaylistTracks(prev => prev.filter(t => t.id !== trackId));
   };
 
   // Drag/drop state
@@ -328,7 +613,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
     clone.style.padding = '4px';
     clone.style.background = '#444';
     clone.style.color = '#fff';
-    clone.style.borderRadius = '4px';
+    clone.style.borderRadius = '6px';
     clone.innerHTML = clipName;
     document.body.appendChild(clone);
     dragClone.current = clone;
@@ -339,9 +624,9 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
 
 
   // Resize state
-  const resizeState = useRef({ resizing: false, trackId: null, clipIndex: null, startX: 0, startLength: 0 });
+  const resizeState = useRef({ resizing: false, trackId: null, clipIndex: null, startX: 0, startLength: 0, startOffset: 0, side: 'right' });
 
-  const onResizeStart = (e, trackId, clipIndex) => {
+  const onResizeStart = (e, trackId, clipIndex, side = 'right') => {
     if (e.button && e.button !== 0) return;
     const track = playlistTracks.find(t => t.id === trackId);
     if (!track) return;
@@ -356,7 +641,9 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       trackId,
       clipIndex,
       startX: e.clientX,
-      startLength: clip.length
+      startLength: clip.length,
+      startOffset: clip.offset,
+      side: side // 'left' or 'right'
     };
 
     window.addEventListener('pointermove', onPointerMove);
@@ -369,19 +656,40 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
     if (rs.resizing) {
       const deltaX = e.clientX - rs.startX;
       const deltaBeats = deltaX / pixelsPerBeat;
-      const newLength = Math.max(0.25, rs.startLength + deltaBeats); // Min length 1/4 beat
 
-      // Snap to grid (optional, maybe 1/4 beat?)
-      const snappedLength = Math.round(newLength * 4) / 4;
+      if (rs.side === 'left') {
+        // Resizing from left - adjust offset and length
+        const newOffset = Math.max(0, rs.startOffset + deltaBeats);
+        const newLength = Math.max(0.25, rs.startLength - deltaBeats);
+        const snappedOffset = Math.round(newOffset * 4) / 4;
+        const snappedLength = Math.round(newLength * 4) / 4;
 
-      setPlaylistTracks(prev => prev.map(t => {
-        if (t.id !== rs.trackId) return t;
-        const newClips = [...t.clips];
-        if (newClips[rs.clipIndex]) {
-          newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
-        }
-        return { ...t, clips: newClips };
-      }));
+        setPlaylistTracks(prev => prev.map(t => {
+          if (t.id !== rs.trackId) return t;
+          const newClips = [...t.clips];
+          if (newClips[rs.clipIndex]) {
+            newClips[rs.clipIndex] = {
+              ...newClips[rs.clipIndex],
+              offset: snappedOffset,
+              length: snappedLength
+            };
+          }
+          return { ...t, clips: newClips };
+        }));
+      } else {
+        // Resizing from right - adjust length only
+        const newLength = Math.max(0.25, rs.startLength + deltaBeats);
+        const snappedLength = Math.round(newLength * 4) / 4;
+
+        setPlaylistTracks(prev => prev.map(t => {
+          if (t.id !== rs.trackId) return t;
+          const newClips = [...t.clips];
+          if (newClips[rs.clipIndex]) {
+            newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
+          }
+          return { ...t, clips: newClips };
+        }));
+      }
       return;
     }
 
@@ -470,7 +778,11 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           measures={measures}
           beatsPerBar={beatsPerBar}
           patterns={patterns}
+          audioClips={audioClips}
+          selected={selected}
           onOpenMenu={setMenu}
+          onRenameTrack={renameTrack}
+          onDeleteTrack={deleteTrack}
         />
       ))}
 
@@ -484,36 +796,91 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
         >
           <div className="clip-menu-header">Pattern Clip</div>
           <div className="clip-menu-item" onClick={() => handleMenuAction('edit')}>
-            <Edit2 size={12} /> Edit pattern
+            <Edit size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Edit pattern
           </div>
           <div className="clip-menu-separator"></div>
           <div className="clip-menu-item" onClick={() => handleMenuAction('rename')}>
-            <Palette size={12} /> Rename and color...
+            <Palette size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Rename and color...
           </div>
           <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')}>
-            <Copy size={12} /> Make unique
+            <Copy size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Make unique
           </div>
           <div className="clip-menu-separator"></div>
           <div className="clip-menu-item" onClick={() => handleMenuAction('delete')}>
-            <Trash2 size={12} /> Delete
+            <Trash size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Delete
           </div>
         </div>
       )}
 
-      <button
-        className="add-track-button"
-        onClick={() => {
-          setPlaylistTracks(prev => [
-            ...prev,
-            { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
-          ]);
-        }}
-        title="Add New Track"
-        style={{ color: 'var(--text-secondary)', background: 'var(--surface)', borderColor: 'var(--border)' }}
+      {/* Add Track Row */}
+      <div className="track-row add-track-row" style={{
+        display: 'flex',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+        minHeight: '64px',
+        position: 'relative',
+        cursor: 'pointer',
+        transition: 'background 0.15s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+      }}
+      onClick={() => {
+        setPlaylistTracks(prev => [
+          ...prev,
+          { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
+        ]);
+      }}
       >
-        <Plus size={20} />
-        Add Track
-      </button>
+        <div className="track-header" style={{
+          background: 'transparent',
+          borderBottom: 'none',
+          borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '0 12px',
+          minHeight: '64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxSizing: 'border-box',
+          width: '140px',
+          flexShrink: 0
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#9ca3af',
+            fontSize: '13px',
+            fontWeight: 500,
+            letterSpacing: '0.01em'
+          }}>
+            <Plus size={18} color="#9ca3af" className="blender-icon" />
+            <span>Add Track</span>
+          </div>
+        </div>
+        <div className="track-clip-area" style={{
+          flex: 1,
+          position: 'relative',
+          overflow: 'visible',
+          background: '#14181C',
+          minWidth: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderLeft: '1px solid rgba(255, 255, 255, 0.05)'
+        }}>
+          <div style={{
+            color: '#6b7280',
+            fontSize: '12px',
+            letterSpacing: '0.01em',
+            userSelect: 'none'
+          }}>
+            Click to add a new track
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

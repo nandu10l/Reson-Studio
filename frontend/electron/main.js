@@ -11,12 +11,16 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
+        autoHideMenuBar: true, // Hide the menu bar
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false
         }
     });
+
+    // Remove the application menu completely
+    Menu.setApplicationMenu(null);
 
     // Load the index.html from a url in development
     // or the local file in production.

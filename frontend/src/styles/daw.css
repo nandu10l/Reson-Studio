@@ -1,5 +1,9 @@
 /* Modern DAW styles with refined aesthetics */
 
+* {
+  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
 :root {
   --primary: #4f46e5;
   /* Keep specific primary or change to orange/green? usage suggests keeping it distinct or matching accent. Let's keep it but maybe desaturate or shift if needed, but for now just dark mode bases. */
@@ -43,7 +47,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 24px 28px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -70,32 +74,34 @@
 }
 
 .modal-body {
-  padding: 24px;
+  padding: 28px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-weight: 500;
   color: var(--text);
   font-size: 14px;
+  letter-spacing: '0.01em';
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   background: var(--surface);
   color: var(--text);
   transition: all 0.2s;
+  font-family: 'DM Sans', system-ui, sans-serif;
 }
 
 .form-group input:focus,
@@ -108,7 +114,7 @@
 
 .form-row {
   display: flex;
-  gap: 16px;
+  gap: 18px;
 }
 
 .form-row .form-group {
@@ -118,8 +124,8 @@
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: 10px;
+  padding: 20px 28px;
   border-top: 1px solid var(--border);
 }
 
@@ -133,7 +139,7 @@
   border-bottom: 1px solid var(--border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   position: relative;
-  z-index: 10;
+  z-index: 1000;
 }
 
 .navbar::before {
@@ -461,9 +467,11 @@
 .transport-bar {
   display: flex;
   align-items: center;
-  padding: 10px 18px;
-  background: transparent;
-  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  background: #1e1e1e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 32px;
+  height: 32px;
 }
 
 .transport-left {
@@ -479,7 +487,9 @@
 
 .transport-right {
   display: flex;
-  gap: 8px
+  gap: 6px;
+  align-items: center;
+  padding-right: 14px;
 }
 
 .btn.small {
@@ -518,6 +528,9 @@
   height: 100%;
   padding: 0;
   overflow: hidden;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .session-browser h4 {
@@ -532,7 +545,7 @@
 
 .session-browser li {
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 0;
   cursor: pointer;
   color: var(--text)
 }
@@ -552,7 +565,7 @@
 }
 
 .track-area {
-  background: var(--surface);
+  background: #14181C;
   /* border-radius: 12px; REMOVED */
   border: none;
   /* Handled by inner borders */
@@ -571,9 +584,10 @@
   display: flex;
   flex-direction: row;
   /* Fixed: Row layout for Header | Ruler */
-  height: 32px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  height: 40px;
+  min-height: 40px;
+  background: #14181C;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -581,22 +595,24 @@
   width: max-content;
   user-select: none;
   overflow: visible;
+  flex-shrink: 0;
 }
 
 .timeline-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 8px;
+  justify-content: flex-start;
+  padding: 0;
   height: 100%;
   background: #363d43;
   /* Match track header */
   border-bottom: 1px solid #1e2226;
+  border-right: 1px solid #1e2226;
   position: sticky;
   left: 0;
   z-index: 25;
-  width: 120px;
-  min-width: 120px;
+  width: 140px;
+  min-width: 140px;
   /* Force width */
   box-sizing: border-box;
 }
@@ -604,21 +620,22 @@
 .timeline-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .timeline-btn {
-  width: 24px;
-  height: 20px;
+  width: 28px;
+  height: 24px;
   border: 1px solid var(--border);
   background: var(--surface);
-  border-radius: 4px;
+  border-radius: 5px;
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  padding: 4px;
 }
 
 .timeline-btn:hover {
@@ -628,20 +645,22 @@
 }
 
 .zoom-level {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  min-width: 40px;
+  min-width: 50px;
   text-align: center;
+  letter-spacing: 0.01em;
 }
 
 .timeline-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
+  letter-spacing: 0.01em;
 }
 
 .bpm-display {
@@ -656,7 +675,10 @@
   flex: 1;
   position: relative;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
+  height: 100%;
+  min-height: 40px;
+  background: #14181C;
 }
 
 .timeline-grid {
@@ -667,25 +689,30 @@
   right: 0;
   bottom: 0;
   display: flex;
+  height: 100%;
+  width: 100%;
 }
 
 .timeline-tick {
   position: absolute;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
   height: 100%;
+  min-height: 40px;
   font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
+  pointer-events: none;
 }
 
 .tick-label {
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   font-size: 11px;
   font-weight: 700;
   color: var(--text);
+  letter-spacing: 0.01em;
 }
 
 .tick-line {
@@ -694,17 +721,28 @@
   /* Lighter gray for visibility */
   flex: 1;
   max-height: 12px;
+  min-height: 8px;
 }
 
 .timeline-tick.downbeat .tick-line {
-  background: var(--primary);
-  opacity: 0.6;
-  max-height: 16px;
+  background: rgba(96, 165, 250, 0.5);
+  width: 1px;
+  max-height: 20px;
+  opacity: 0.8;
 }
 
 .timeline-tick.beat .tick-line {
+  background: rgba(255, 255, 255, 0.15);
+  width: 1px;
+  max-height: 12px;
+  opacity: 0.6;
+}
+
+.timeline-tick.sixteenth .tick-line {
+  background: rgba(255, 255, 255, 0.06);
+  width: 1px;
+  max-height: 6px;
   opacity: 0.4;
-  max-height: 8px;
 }
 
 /* Playhead */
@@ -738,12 +776,13 @@
 /* Time markers */
 .time-markers {
   position: absolute;
-  top: 14px;
+  top: 0;
   left: 0;
   /* Fixed: Relative to ruler */
   right: 0;
   bottom: 0;
   pointer-events: none;
+  height: 100%;
 }
 
 .time-marker {
@@ -752,12 +791,13 @@
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--surface-hover);
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 3px;
   border: 1px solid var(--border);
   white-space: nowrap;
   transform: translateX(-50%);
-  top: 2px;
+  top: 4px;
+  z-index: 5;
 }
 
 /* Hover effects */
@@ -822,16 +862,20 @@
 
 .track-row {
   display: flex;
-  border-bottom: 1px solid var(--border);
-  min-height: 48px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 64px;
   position: relative;
+}
+
+.track-row:not(:hover) {
+  opacity: 0.7;
 }
 
 .add-track-button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
+  gap: 10px;
+  padding: 14px 16px;
   background: var(--surface);
   border: 1px dashed var(--border);
   color: var(--text-secondary);
@@ -840,7 +884,10 @@
   transition: all 0.2s;
   width: 100%;
   justify-content: center;
-  margin-top: 8px;
+  margin-top: 12px;
+  border-radius: 6px;
+  font-size: '13px';
+  letter-spacing: '0.01em';
 }
 
 .add-track-button:hover {
@@ -851,7 +898,7 @@
 
 
 .track-header {
-  width: 120px;
+  width: 140px;
   /* Reduced width */
   padding: 0;
   /* Padding handled by inner elements */
@@ -861,6 +908,13 @@
   position: sticky;
   left: 0;
   z-index: 10;
+  box-sizing: border-box;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.track-row:hover .track-header {
+  opacity: 1;
 }
 
 .track-controls {
@@ -898,17 +952,18 @@
 }
 
 .track-name {
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
 }
 
 .track-icon {
@@ -969,7 +1024,7 @@
   position: relative;
   overflow: visible;
   /* Let content expand parent */
-  background: #212529;
+  background: #14181C;
   /* Dark grid background */
   min-width: 100%;
 }
@@ -979,7 +1034,7 @@
   top: 0;
   left: 0;
   bottom: 0;
-  display: flex;
+  right: 0;
   pointer-events: none;
   min-width: 100%;
   width: max-content;
@@ -987,20 +1042,37 @@
 }
 
 .grid-line {
-  width: 60px;
-  /* Match timeline tick width */
-  border-right: 1px solid #32383e;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
   opacity: 1;
+  pointer-events: none;
+}
+
+.grid-line.downbeat {
+  border-right: 1px solid rgba(96, 165, 250, 0.2);
+  opacity: 0.6;
+}
+
+.grid-line.beat {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0.4;
+}
+
+.grid-line.sixteenth {
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  opacity: 0.3;
 }
 
 .track-clip {
   position: absolute;
-  height: 40px;
+  height: 52px;
   top: 50%;
   transform: translateY(-50%);
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1008,6 +1080,7 @@
   user-select: none;
   transition: box-shadow 0.2s;
   font-size: 11px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .resize-handle {
@@ -1088,12 +1161,13 @@
 }
 
 .clip-title {
-  padding: 6px 8px;
+  padding: 8px 10px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
+  letter-spacing: 0.01em;
 }
 
 .clip-waveform {
@@ -1261,10 +1335,11 @@
 /* Panel Styles - Use grid-column to place them */
 .session-browser {
   grid-column: 1;
-  background: var(--surface);
-  border-radius: 10px;
-  padding: 12px;
-  border: 1px solid var(--border);
+  background: #363d43;
+  border-radius: 0;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #1e2226;
   height: calc(100vh - 64px - 44px - 24px);
   /* Full height minus Navbar, TransportBar, and vertical padding */
   width: 100%;
@@ -1388,19 +1463,21 @@
 }
 
 .window-header {
-  background: var(--surface);
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
+  background: #1e1e1e;
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   justify-content: space-between;
   align-items: center;
   user-select: none;
+  min-height: 24px;
+  height: 24px;
 }
 
 .window-title {
   font-weight: 600;
-  font-size: 13px;
-  color: var(--text);
+  font-size: 12px;
+  color: #d0d0d0;
 }
 
 /* Window Controls & Maximize Styles */
@@ -1408,6 +1485,13 @@
   border-radius: 0;
   border: none;
   border-top: 1px solid var(--border);
+  overflow: visible;
+}
+
+.draggable-window.maximized .window-header {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
 }
 
 .window-controls {
@@ -1421,15 +1505,16 @@
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
-  color: var(--text-secondary);
+  color: #9ca3af;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .window-control-btn:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d0d0d0;
 }
 
 .window-control-btn[title="Close"]:hover {
@@ -1439,11 +1524,105 @@
 
 .window-content {
   flex: 1;
-  overflow: auto;
-  background: #222;
+  overflow: hidden;
+  background: #1e1e1e;
   /* Darker background for "internal" content */
   position: relative;
   min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Piano roll specific - ensure dark header and window */
+.draggable-window .piano-roll-window {
+  background-color: #1e1e1e !important;
+}
+
+.draggable-window .piano-roll-window .piano-header {
+  background-color: #1e1e1e !important;
+}
+
+.window-content .piano-roll-window .piano-header {
+  background-color: #1e1e1e !important;
+}
+
+/* Resize Handles */
+.draggable-window {
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle-n,
+.resize-handle-s {
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  cursor: ns-resize;
+}
+
+.resize-handle-n {
+  top: 0;
+}
+
+.resize-handle-s {
+  bottom: 0;
+}
+
+.resize-handle-e,
+.resize-handle-w {
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.resize-handle-e {
+  right: 0;
+}
+
+.resize-handle-w {
+  left: 0;
+}
+
+.resize-handle-ne,
+.resize-handle-nw,
+.resize-handle-se,
+.resize-handle-sw {
+  width: 8px;
+  height: 8px;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 222, 128, 0.3);
 }
 
 /* Specific component styles */
@@ -1457,34 +1636,37 @@
   background: #3e3e3e;
   /* FL menu bg */
   border: 1px solid #111;
-  box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
-  min-width: 160px;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+  min-width: 180px;
   z-index: 99999;
   display: flex;
   flex-direction: column;
-  padding: 2px;
-  font-family: 'Segoe UI', sans-serif;
+  padding: 4px;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
   font-size: 11px;
   color: #d0d0d0;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
 .clip-menu-header {
-  padding: 4px 8px;
+  padding: 6px 10px;
   background: #505050;
   color: #cca;
   /* Pinkish/tan for header */
   font-weight: bold;
   border-bottom: 1px solid #222;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
 }
 
 .clip-menu-item {
-  padding: 4px 12px;
+  padding: 6px 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  transition: all 0.15s ease;
+  border-radius: 2px;
 }
 
 .clip-menu-item:hover {
@@ -1496,7 +1678,7 @@
 .clip-menu-separator {
   height: 1px;
   background: #555;
-  margin: 3px 6px;
+  margin: 4px 8px;
   border-bottom: 1px solid #222;
 }
 

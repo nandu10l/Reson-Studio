@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, SkipBack, ListMusic, Grid3x3, LayoutGrid, Sliders } from 'lucide-react';
+import { ListMusic, Grid, LayoutGrid, Sliders } from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
+import '../styles/blender-icons.css';
 
 // Transport Controls Component
 function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
@@ -59,47 +60,155 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
   };
 
   return (
-    <div className="transport-bar">
-      {/* Pattern Selector */}
-      <div className="transport-center" style={{ paddingLeft: 10 }}>
+    <div className="transport-bar" style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      height: '32px',
+      background: '#1e1e1e',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+      padding: '0 12px',
+      gap: '12px'
+    }}>
+      {/* Left: Pattern Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
         <div {...useGuideHandlers('Pattern Selector')}>
           <PatternSelector />
         </div>
       </div>
 
-      <div className="transport-right">
-        {/* Window Toggles */}
+      {/* Center: Empty space for hierarchy */}
+      <div style={{ flex: 1 }} />
+
+      {/* Right: View Controls */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexShrink: 0
+      }}>
         <button
-          className={`btn small ${activeWindows?.playlist ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('playlist')}
           title="Playlist"
           {...useGuideHandlers('View Playlist')}
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: activeWindows?.playlist ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
+            border: 'none',
+            borderRadius: '2px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (!activeWindows?.playlist) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!activeWindows?.playlist) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
         >
-          <ListMusic size={16} />
+          <ListMusic size={18} color={activeWindows?.playlist ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
         </button>
+
         <button
-          className={`btn small ${activeWindows?.pianoRoll ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('pianoRoll')}
           title="Piano Roll"
           {...useGuideHandlers('View Piano Roll')}
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: activeWindows?.pianoRoll ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
+            border: 'none',
+            borderRadius: '2px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (!activeWindows?.pianoRoll) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!activeWindows?.pianoRoll) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
         >
-          <Grid3x3 size={16} />
+          <Grid size={18} color={activeWindows?.pianoRoll ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
         </button>
+
         <button
-          className={`btn small ${activeWindows?.channelRack ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('channelRack')}
           title="Channel Rack"
           {...useGuideHandlers('View Channel Rack')}
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: activeWindows?.channelRack ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
+            border: 'none',
+            borderRadius: '2px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (!activeWindows?.channelRack) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!activeWindows?.channelRack) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
         >
-          <LayoutGrid size={16} />
+          <LayoutGrid size={18} color={activeWindows?.channelRack ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
         </button>
+
         <button
-          className={`btn small ${activeWindows?.mixer ? 'active' : ''}`}
           onClick={() => onToggleWindow && onToggleWindow('mixer')}
           title="Mixer"
           {...useGuideHandlers('View Mixer')}
+          style={{
+            width: '24px',
+            height: '24px',
+            padding: '0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: activeWindows?.mixer ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
+            border: 'none',
+            borderRadius: '2px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            if (!activeWindows?.mixer) {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!activeWindows?.mixer) {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
         >
-          <Sliders size={16} />
+          <Sliders size={18} color={activeWindows?.mixer ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
         </button>
       </div>
     </div>

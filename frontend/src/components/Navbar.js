@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Home, MinusCircle, User, Plus, Save, Maximize, Minimize2, X, Sliders, Grid3x3, ListMusic, LayoutGrid, FolderTree, Play, Square, Circle } from 'lucide-react';
+import { Play, Stop, Pause } from './icons/BlenderIcons';
 import GuideBox from './GuideBox';
 import NewProjectModal from './NewProjectModal';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
-import '../styles/butter/Header.css'; // Ensure we have the menu styles
+import '../styles/butter/Header.css';
+import '../styles/blender-icons.css';
 
 function Navbar({
   onChangeView,
@@ -27,7 +28,8 @@ function Navbar({
     playbackMode,
     setPlaybackMode,
     isRecording,
-    setIsRecording
+    setIsRecording,
+    importAudioFile
   } = useProject();
   const [isElectron, setIsElectron] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -162,7 +164,7 @@ function Navbar({
     setActiveMenu(activeMenu === menuName ? null : menuName);
   };
 
-  const handleOptionClick = (action) => {
+  const handleOptionClick = async (action) => {
     console.log("Menu action:", action);
     setActiveMenu(null);
     if (action === 'new') setShowNewProjectModal(true);
@@ -174,11 +176,17 @@ function Navbar({
         if (paths && paths.length > 0) console.log('Selected:', paths[0]);
       });
     }
+    if (action === 'add_audio_file') {
+      // Import audio file - handled by ProjectContext
+      if (importAudioFile) {
+        await importAudioFile();
+      }
+    }
     if (action === 'exit') closeWin();
   };
 
   const MENU_ITEMS = {
-    FILE: [
+    File: [
       { label: "New (Basic 808 with limiter)", action: "new" },
       { label: "New from template", action: "new_template", right: ">" },
       { label: "Open...", action: "open", shortcut: "Ctrl+O" },
@@ -196,7 +204,7 @@ function Navbar({
       { type: "divider" },
       { label: "Exit", action: "exit" },
     ],
-    EDIT: [
+    Edit: [
       { label: "Undo", action: "undo" },
       { label: "Redo", action: "redo" },
       { type: "divider" },
@@ -204,52 +212,76 @@ function Navbar({
       { label: "Copy", action: "copy" },
       { label: "Paste", action: "paste" },
     ],
-    ADD: [
+    Add: [
       { label: "Channel", action: "add_channel" },
       { label: "Pattern", action: "add_pattern" },
+      { type: "divider" },
+      { label: "Add Audio File (MP3/WAV)", action: "add_audio_file" },
     ],
-    PATTERNS: [
+    Patterns: [
       { label: "Find first empty", action: "find_empty" },
       { label: "Clone", action: "clone_pattern" },
     ],
-    VIEW: [
+    View: [
       { label: "Playlist", action: "view_playlist" },
       { label: "Piano roll", action: "view_pianoroll" },
       { label: "Channel rack", action: "view_channelrack" },
       { label: "Mixer", action: "view_mixer" },
       { label: "Browser", action: "view_browser" },
     ],
-    OPTIONS: [
+    Options: [
       { label: "MIDI settings", action: "opt_midi" },
       { label: "Audio settings", action: "opt_audio" },
       { label: "General settings", action: "opt_general" },
     ],
-    TOOLS: [
+    Tools: [
       { label: "Macros", action: "tools_macros" },
     ],
-    HELP: [
+    Help: [
       { label: "Help index", action: "help_index" },
       { label: "About", action: "about" },
     ],
   };
 
   return (
-    <nav className="navbar" style={{ justifyContent: 'space-between', padding: '0' }}>
+    <nav className="navbar" style={{ justifyContent: 'space-between', padding: '0', position: 'relative', zIndex: 999999 }}>
       <div className="navbar-left" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
 
         {/* MENU BAR */}
-        <div className="menu-container" ref={menuRef} style={{ height: '100%', alignItems: 'center', backgroundColor: '#363d42', padding: '0 10px', marginRight: 2 }}>
+        <div className="menu-container" ref={menuRef} style={{ height: '100%', alignItems: 'center', backgroundColor: '#1e1e1e', padding: '0 12px', marginRight: 4, borderRight: '1px solid rgba(255, 255, 255, 0.08)', position: 'relative', zIndex: 999999 }}>
           {Object.entries(MENU_ITEMS).map(([menuName, items]) => (
-            <div key={menuName} className="menu-wrapper">
+            <div key={menuName} className="menu-wrapper" style={{ position: 'relative', zIndex: 999999 }}>
               <button
                 className={`menu-button ${activeMenu === menuName ? "active" : ""}`}
                 onClick={() => handleMenuClick(menuName)}
-                style={{ fontSize: '11px', fontWeight: 'bold', letterSpacing: '0.5px', color: '#a0aeb6', padding: '4px 8px' }}
+                style={{ 
+                  fontSize: '12px', 
+                  fontWeight: 500, 
+                  letterSpacing: '0.01em', 
+                  color: '#b3b3b3', 
+                  padding: '6px 12px', 
+                  marginRight: '2px', 
+                  textTransform: 'none',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (activeMenu !== menuName) {
+                    e.currentTarget.style.color = '#d0d0d0';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (activeMenu !== menuName) {
+                    e.currentTarget.style.color = '#b3b3b3';
+                  }
+                }}
               >
                 {menuName}
               </button>
               {activeMenu === menuName && (
-                <div className="dropdown-menu">
+                <div className="dropdown-menu" style={{ zIndex: 999999 }}>
                   {items.map((item, index) => {
                     if (item.type === "divider") {
                       return <div key={index} className="dropdown-divider" />;
@@ -276,16 +308,16 @@ function Navbar({
         </div>
 
         {/* TRANSPORT PANEL */}
-        <div className="transport-panel" style={{ display: 'flex', alignItems: 'center', backgroundColor: '#3e464b', height: '100%', padding: '0 10px', borderLeft: '1px solid #2d3336' }}>
+        <div className="transport-panel" style={{ display: 'flex', alignItems: 'center', backgroundColor: '#1e1e1e', height: '100%', padding: '0 14px', borderLeft: '1px solid rgba(255, 255, 255, 0.08)' }}>
           {/* Pat/Song Mode */}
-          <div className="mode-switch" style={{ display: 'flex', flexDirection: 'column', marginRight: 10, gap: 0 }}>
+          <div className="mode-switch" style={{ display: 'flex', flexDirection: 'column', marginRight: 12, gap: 0 }}>
             <button
               className={`mode-btn ${playbackMode === 'PAT' ? 'active' : ''}`}
               onClick={() => setPlaybackMode('PAT')}
               style={{
-                background: playbackMode === 'PAT' ? '#ff9d5c' : '#363d42',
-                color: playbackMode === 'PAT' ? '#000' : '#888',
-                fontSize: '9px', fontWeight: 'bold', border: '1px solid #222', borderRadius: '2px 2px 0 0', padding: '1px 4px', cursor: 'pointer', lineHeight: 1
+                background: playbackMode === 'PAT' ? '#4ade80' : '#2a2a2a',
+                color: playbackMode === 'PAT' ? '#000' : '#9ca3af',
+                fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '2px 2px 0 0', padding: '2px 6px', cursor: 'pointer', lineHeight: 1.2, transition: 'all 0.15s ease'
               }}
             >
               PAT
@@ -294,9 +326,9 @@ function Navbar({
               className={`mode-btn ${playbackMode === 'SONG' ? 'active' : ''}`}
               onClick={() => setPlaybackMode('SONG')}
               style={{
-                background: playbackMode === 'SONG' ? '#ff9d5c' : '#363d42',
-                color: playbackMode === 'SONG' ? '#000' : '#888',
-                fontSize: '9px', fontWeight: 'bold', border: '1px solid #222', borderRadius: '0 0 2px 2px', borderTop: 'none', padding: '1px 4px', cursor: 'pointer', lineHeight: 1
+                background: playbackMode === 'SONG' ? '#4ade80' : '#2a2a2a',
+                color: playbackMode === 'SONG' ? '#000' : '#9ca3af',
+                fontSize: '9px', fontWeight: 'bold', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '0 0 2px 2px', borderTop: 'none', padding: '2px 6px', cursor: 'pointer', lineHeight: 1.2, transition: 'all 0.15s ease'
               }}
             >
               SONG
@@ -304,44 +336,63 @@ function Navbar({
           </div>
 
           {/* Play/Stop/Rec */}
-          <div className="transport-controls" style={{ display: 'flex', gap: 4, marginRight: 15 }}>
+          <div className="transport-controls" style={{ display: 'flex', gap: 6, marginRight: 18 }}>
             <button
               onClick={togglePlayback}
+              title={isPlaying ? "Pause" : "Play"}
               style={{
-                background: isPlaying ? '#ff9d5c' : '#363d42',
-                color: isPlaying ? '#000' : '#b1b1b1',
-                border: '1px solid #222', borderRadius: 3, width: 28, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                background: isPlaying ? '#4ade80' : '#2a2a2a',
+                color: isPlaying ? '#000' : '#b3b3b3',
+                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '3px', width: '28px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s ease'
               }}
             >
-              <Play size={12} fill={isPlaying ? '#000' : 'currentColor'} />
+              {isPlaying ? (
+                <Pause size={14} color={isPlaying ? '#000' : '#b3b3b3'} className="blender-icon" active={isPlaying} />
+              ) : (
+                <Play size={14} color="#b3b3b3" className="blender-icon" />
+              )}
             </button>
             <button
               onClick={() => { stopPlayback(); setCurrentTime(0); }}
               title="Stop"
               style={{
-                background: '#363d42',
-                color: '#b1b1b1',
-                border: '1px solid #222', borderRadius: 3, width: 28, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                background: '#2a2a2a',
+                color: '#b3b3b3',
+                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '3px', width: '28px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#363636';
+                e.currentTarget.style.color = '#d0d0d0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#2a2a2a';
+                e.currentTarget.style.color = '#b3b3b3';
               }}
             >
-              <Square size={10} fill="currentColor" />
+              <Stop size={14} color="#b3b3b3" className="blender-icon" />
             </button>
             <button
               onClick={() => setIsRecording(prev => !prev)}
               title="Record"
               style={{
-                background: '#363d42',
-                color: isRecording ? '#ff4d4d' : '#b1b1b1',
-                border: '1px solid #222', borderRadius: 12, width: 28, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 4
+                background: isRecording ? '#ef4444' : '#2a2a2a',
+                color: isRecording ? '#fff' : '#b3b3b3',
+                border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '12px', width: '28px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginLeft: 4, transition: 'all 0.15s ease'
               }}
             >
-              <Circle size={10} fill={isRecording ? '#ff4d4d' : 'transparent'} />
+              <div style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: isRecording ? '#fff' : 'transparent',
+                border: isRecording ? 'none' : '2px solid #b3b3b3'
+              }} />
             </button>
           </div>
 
           {/* BPM */}
           <div className="bpm-display" style={{
-            background: '#2d3336', border: '1px solid #555', borderRadius: 4, padding: '0 6px', display: 'flex', alignItems: 'center', marginRight: 10, height: 26
+            background: '#2a2a2a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', padding: '0 8px', display: 'flex', alignItems: 'center', marginRight: 12, height: 28
           }}>
             <input
               type="number"
@@ -350,7 +401,7 @@ function Navbar({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#fff',
+                color: '#b3b3b3',
                 fontSize: '16px',
                 fontFamily: 'monospace',
                 fontWeight: 'bold',
@@ -361,16 +412,16 @@ function Navbar({
                 margin: 0
               }}
             />
-            <span style={{ fontSize: '10px', color: '#888', marginLeft: 2, paddingTop: 4 }}>.000</span>
+            <span style={{ fontSize: '10px', color: '#9ca3af', marginLeft: 2, paddingTop: 4 }}>.000</span>
           </div>
 
           {/* Time */}
           <div className="time-display" style={{
-            background: '#2d3336', border: '1px solid #555', borderRadius: 4, padding: '2px 8px', display: 'flex', alignItems: 'center', height: 26, minWidth: 80, justifyContent: 'center'
+            background: '#2a2a2a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', padding: '4px 10px', display: 'flex', alignItems: 'center', height: 28, minWidth: 90, justifyContent: 'center'
           }}>
-            <span style={{ color: '#ff9d5c', fontSize: '16px', fontFamily: 'monospace', fontWeight: 'bold' }}>
+            <span style={{ color: '#4ade80', fontSize: '16px', fontFamily: 'monospace', fontWeight: 'bold' }}>
               {formatTime(currentTime).m}:{formatTime(currentTime).s}
-              <span style={{ fontSize: '10px', color: '#888' }}>:{formatTime(currentTime).ms}</span>
+              <span style={{ fontSize: '10px', color: '#9ca3af' }}>:{formatTime(currentTime).ms}</span>
             </span>
           </div>
         </div>
@@ -388,13 +439,7 @@ function Navbar({
         </div>
       </div>
 
-      {isElectron && (
-        <div className="window-controls">
-          <button onClick={minimize}><Minimize2 size={16} /></button>
-          <button onClick={toggleMaximize}>{isMaximized ? <Minimize2 size={16} style={{ transform: 'rotate(90deg)' }} /> : <Maximize size={16} />}</button>
-          <button onClick={closeWin} className="close-btn"><X size={16} /></button>
-        </div>
-      )}
+      {/* Window controls removed - using Electron's autoHideMenuBar */}
 
       <NewProjectModal
         isOpen={showNewProjectModal}

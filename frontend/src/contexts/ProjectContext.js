@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
+import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats } from '../utils/audioImport';
 
 const ProjectContext = createContext();
 
@@ -54,6 +55,15 @@ export const ProjectProvider = ({ children }) => {
         Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [] }))
     );
 
+    // 4. Audio Clips (imported audio files)
+    const [audioClips, setAudioClips] = useState([]);
+
+    // 5. Picker Tab State (PAT/AUDIO/AUTO)
+    const [pickerTab, setPickerTab] = useState('PAT');
+
+    // 6. Loading State
+    const [isImportingAudio, setIsImportingAudio] = useState(false);
+
     // --- Actions ---
 
     const createPattern = useCallback(() => {
@@ -72,6 +82,12 @@ export const ProjectProvider = ({ children }) => {
             setActivePatternId(nextId);
             return [...prev, newPattern];
         });
+    }, []);
+
+    const updatePattern = useCallback((patternId, updates) => {
+        setPatterns(prev => prev.map(p => 
+            p.id === patternId ? { ...p, ...updates } : p
+        ));
     }, []);
 
     const toggleStepInActivePattern = useCallback((channelId, stepIndex) => {
@@ -238,6 +254,80 @@ export const ProjectProvider = ({ children }) => {
         audioEngine.previewSound(channelId);
     }, []);
 
+    // Audio Import Action
+    const importAudioFile = useCallback(async () => {
+        try {
+            setIsImportingAudio(true);
+            const file = await pickAudioFile();
+            if (!file) {
+                setIsImportingAudio(false);
+                return;
+            }
+
+            // Show loading indicator
+            console.log('Importing audio file:', file.name);
+
+            // Decode audio
+            const audioBuffer = await decodeAudioFile(file);
+            
+            // Generate waveform
+            const waveform = generateWaveform(audioBuffer, 1000); // 1000 samples for waveform
+            
+            // Calculate duration in beats
+            const durationBeats = audioDurationToBeats(audioBuffer, bpm);
+
+            // Create audio clip object
+            const audioClip = {
+                id: Date.now(),
+                fileName: file.name,
+                name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+                file: file,
+                audioBuffer: audioBuffer,
+                waveform: waveform,
+                duration: audioBuffer.duration,
+                durationBeats: durationBeats,
+                sampleRate: audioBuffer.sampleRate,
+                // Create blob URL for playback
+                url: URL.createObjectURL(file)
+            };
+
+            // Add to audio clips list
+            setAudioClips(prev => [...prev, audioClip]);
+
+            // Switch to AUDIO tab
+            setPickerTab('AUDIO');
+
+            // Add to timeline at current playhead position (or first empty track)
+            // Find first track or selected track
+            const targetTrack = playlistTracks.find(t => t.clips.length === 0) || playlistTracks[0];
+            if (targetTrack) {
+                const currentPlayhead = 0; // TODO: Get actual playhead position
+                const newClip = {
+                    id: Date.now(), // Unique ID for the clip instance
+                    type: 'audio',
+                    audioClipId: audioClip.id,
+                    offset: currentPlayhead,
+                    length: durationBeats,
+                    name: audioClip.name
+                };
+
+                setPlaylistTracks(prev => prev.map(t => 
+                    t.id === targetTrack.id 
+                        ? { ...t, clips: [...t.clips, newClip] }
+                        : t
+                ));
+            }
+
+            // Auto-adjust zoom to fit waveform (could be implemented in Timeline component)
+            console.log('Audio imported successfully:', audioClip.name);
+            setIsImportingAudio(false);
+        } catch (error) {
+            console.error('Error importing audio file:', error);
+            alert('Failed to import audio file: ' + error.message);
+            setIsImportingAudio(false);
+        }
+    }, [bpm, playlistTracks]);
+
     // --- Selectors (Derived State) ---
     const activePattern = useMemo(() =>
         patterns.find(p => p.id === activePatternId) || patterns[0]
@@ -251,9 +341,9 @@ export const ProjectProvider = ({ children }) => {
             }
         } else {
             // SONG mode
-            audioEngine.schedulePlaylist(playlistTracks, patterns);
+            audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips);
         }
-    }, [activePattern, playbackMode, patterns, playlistTracks]);
+    }, [activePattern, playbackMode, patterns, playlistTracks, audioClips]);
 
     const value = {
         patterns,
@@ -265,6 +355,7 @@ export const ProjectProvider = ({ children }) => {
 
         // Actions
         createPattern,
+        updatePattern,
         toggleStepInActivePattern,
         addNoteToActivePattern,
         removeNoteFromActivePattern,
@@ -286,7 +377,19 @@ export const ProjectProvider = ({ children }) => {
         playbackMode,
         setPlaybackMode,
         isRecording,
-        setIsRecording
+        setIsRecording,
+
+        // Audio Clips
+        audioClips,
+        setAudioClips,
+        importAudioFile,
+
+        // Picker Tab
+        pickerTab,
+        setPickerTab,
+
+        // Loading State
+        isImportingAudio
     };
 
     return (

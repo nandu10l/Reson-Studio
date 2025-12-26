@@ -22,7 +22,7 @@
   padding: 10px 14px;
   background: linear-gradient(180deg, var(--rs-panel), #041017);
   color: var(--rs-text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   height: 56px;
   border-bottom: 1px solid var(--rs-border);
 }

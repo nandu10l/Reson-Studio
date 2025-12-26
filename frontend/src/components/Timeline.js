@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Play, Square } from 'lucide-react';
+import { ZoomIn, ZoomOut } from './icons/BlenderIcons';
+import '../styles/blender-icons.css';
 
 function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, isPlaying = false, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange }) {
   const timelineRef = useRef(null);
@@ -39,19 +40,28 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
   const renderTicks = () => {
     const ticks = [];
     const totalBeats = measures * beatsPerBar;
+    const sixteenthsPerBeat = 4; // 4 sixteenth notes per beat
+    const totalSixteenths = totalBeats * sixteenthsPerBeat;
 
-    for (let beat = 0; beat < totalBeats; beat++) {
-      const bar = Math.floor(beat / beatsPerBar) + 1;
-      const beatInBar = (beat % beatsPerBar) + 1;
-      const isDownbeat = beatInBar === 1;
+    for (let sixteenth = 0; sixteenth < totalSixteenths; sixteenth++) {
+      const beat = Math.floor(sixteenth / sixteenthsPerBeat);
+      const sixteenthInBeat = sixteenth % sixteenthsPerBeat;
+      const bar = Math.floor(beat / beatsPerBar);
+      const beatInBar = (beat % beatsPerBar);
+      
+      const isDownbeat = beatInBar === 0 && sixteenthInBeat === 0;
+      const isBeat = sixteenthInBeat === 0 && !isDownbeat;
+      const isSixteenth = !isBeat && !isDownbeat;
+
+      const position = (sixteenth / sixteenthsPerBeat) * pixelsPerBeat;
 
       ticks.push(
         <div
-          key={`beat-${beat}`}
-          className={`timeline-tick ${isDownbeat ? 'downbeat' : 'beat'}`}
+          key={`tick-${sixteenth}`}
+          className={`timeline-tick ${isDownbeat ? 'downbeat' : isBeat ? 'beat' : 'sixteenth'}`}
           style={{
-            left: `${beat * pixelsPerBeat}px`,
-            width: `${pixelsPerBeat}px`
+            left: `${position}px`,
+            width: `${pixelsPerBeat / sixteenthsPerBeat}px`
           }}
         >
           {isDownbeat && (
@@ -68,14 +78,85 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
 
   return (
     <div className="timeline">
-      <div className="timeline-header">
-        <div className="timeline-controls">
-          <button className="timeline-btn" onClick={handleZoomOut}>
-            <ZoomOut size={16} />
+      <div className="timeline-header" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        padding: '0 8px',
+        height: '100%',
+        borderRight: '1px solid rgba(255, 255, 255, 0.08)'
+      }}>
+        <div className="timeline-controls" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '4px',
+          height: '100%'
+        }}>
+          <button 
+            className="timeline-btn" 
+            onClick={handleZoomOut}
+            title="Zoom Out"
+            style={{ 
+              width: '24px',
+              height: '24px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <ZoomOut size={18} color="#b3b3b3" className="blender-icon" />
           </button>
-          <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-          <button className="timeline-btn" onClick={handleZoomIn}>
-            <ZoomIn size={16} />
+          
+          <span className="zoom-level" style={{ 
+            padding: '0 8px', 
+            minWidth: '48px', 
+            textAlign: 'center',
+            fontSize: '12px',
+            color: '#b3b3b3',
+            fontWeight: 500,
+            letterSpacing: '0.01em',
+            userSelect: 'none'
+          }}>
+            {Math.round(zoom * 100)}%
+          </span>
+          
+          <button 
+            className="timeline-btn" 
+            onClick={handleZoomIn}
+            title="Zoom In"
+            style={{ 
+              width: '24px',
+              height: '24px',
+              padding: '0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '2px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <ZoomIn size={18} color="#b3b3b3" className="blender-icon" />
           </button>
         </div>
       </div>
@@ -84,7 +165,11 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
         className="timeline-ruler"
         ref={timelineRef}
         onClick={handleTimelineClick}
-        style={{ minWidth: `${measures * beatsPerBar * pixelsPerBeat}px` }}
+        style={{
+          minWidth: `${measures * beatsPerBar * pixelsPerBeat}px`,
+          height: '100%',
+          minHeight: '40px'
+        }}
       >
         <div className="timeline-grid">
           {renderTicks()}
@@ -106,11 +191,11 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
         <div className="time-markers">
           {Array.from({ length: measures }, (_, i) => (
             <div
-              key={`marker-${i + 1}`}
+              key={`marker-${i}`}
               className="time-marker"
               style={{ left: `${i * beatsPerBar * pixelsPerBeat}px` }}
             >
-              {i + 1}:00
+              {i}:00
             </div>
           ))}
         </div>

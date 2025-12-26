@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './PianoRoll.css';
-import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2 } from 'lucide-react';
+import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit } from './icons/BlenderIcons';
+import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
 
 const KEYS = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'];
@@ -14,7 +15,10 @@ const PianoRoll = () => {
         updateNote,
         deleteNotes,
         isPlaying,
-        togglePlayback
+        togglePlayback,
+        bpm,
+        updatePattern,
+        activePatternId
     } = useProject();
 
     // Local State
@@ -22,14 +26,25 @@ const PianoRoll = () => {
     const pixelsPerStep = zoom;
     const [selectedTool, setSelectedTool] = useState('pencil'); // pencil, eraser, select
     const [selection, setSelection] = useState([]); // Array of note IDs
+    const [hoveredKey, setHoveredKey] = useState(null); // Currently hovered key fullName
+    const [currentStep, setCurrentStep] = useState(0); // Current playback step for pulse animation
+    
+    // New tool states
+    const [snapEnabled, setSnapEnabled] = useState(true);
+    const [snapStrength, setSnapStrength] = useState(4); // 1, 2, 4, 8, 16
+    const [previewNoteOnDraw, setPreviewNoteOnDraw] = useState(true);
+    const [velocityEditMode, setVelocityEditMode] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editName, setEditName] = useState(activePattern?.name || '');
+    const nameInputRef = useRef(null);
 
     // Drag State
     // type: 'MOVE' | 'RESIZE' | 'SELECT' | 'CREATE'
     const [dragState, setDragState] = useState(null);
 
     // Constants
-    const octaves = 6;
-    const startOctave = 7;
+    const octaves = 8;
+    const startOctave = 8;
     const totalBars = 8;
     const stepsPerBar = 16;
     const keyHeight = 24;
@@ -39,7 +54,7 @@ const PianoRoll = () => {
 
     // Generate keys
     const allKeys = [];
-    for (let o = startOctave; o >= 2; o--) {
+    for (let o = startOctave; o >= 1; o--) {
         KEYS.forEach(key => {
             allKeys.push({
                 note: key,
@@ -62,9 +77,18 @@ const PianoRoll = () => {
     }, []);
 
     // --- Helpers ---
-    const getStepFromX = (x) => Math.floor(x / pixelsPerStep);
+    const getStepFromX = (x) => {
+        // x is already in content coordinates (includes scrollLeft)
+        // Account for piano key width offset (300px)
+        const gridX = x - 300;
+        if (gridX < 0) return 0;
+        const step = Math.floor(gridX / pixelsPerStep);
+        return Math.max(0, step);
+    };
     const getKeyFromY = (y) => {
+        // y is already in content coordinates (includes scrollTop)
         const index = Math.floor(y / keyHeight);
+        if (index < 0 || index >= allKeys.length) return null;
         return allKeys[index] ? allKeys[index].fullName : null;
     };
     const getYFromKey = (noteName) => {
@@ -83,12 +107,16 @@ const PianoRoll = () => {
         // Allow Left (0) and Right (2) clicks
         if (e.button !== 0 && e.button !== 2) return;
 
-        const rect = mainAreaRef.current.getBoundingClientRect();
-        // Since rect.left/top updates as we scroll (it's the content div),
-        // e.clientX - rect.left ALREADY gives us the local coordinate.
-        // We do NOT need to add scrollLeft/scrollTop again.
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        if (!mainAreaRef.current || !scrollRef.current) return;
+
+        const scrollRect = scrollRef.current.getBoundingClientRect();
+        // Calculate coordinates relative to the scroll container viewport
+        const viewportX = e.clientX - scrollRect.left;
+        const viewportY = e.clientY - scrollRect.top;
+        
+        // Add scroll offsets to get content coordinates
+        const x = viewportX + scrollRef.current.scrollLeft;
+        const y = viewportY + scrollRef.current.scrollTop;
 
         const targetIsNote = e.target.closest('.piano-note');
         const targetIsResize = e.target.classList.contains('piano-note-resize');
@@ -181,8 +209,13 @@ const PianoRoll = () => {
         }
 
         // 3. Background Interactions
+        // Only create notes if clicking in the grid area (not on piano keys)
+        if (x < 300) return; // Clicked on piano keys, ignore
+        
         const step = getStepFromX(x);
         const noteName = getKeyFromY(y);
+
+        if (!noteName) return; // Invalid key position
 
         if (selectedTool === 'pencil') {
             // Create Note
@@ -250,8 +283,12 @@ const PianoRoll = () => {
         }
 
         if (dragState.type === 'SELECT') {
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            if (!scrollRef.current) return;
+            const scrollRect = scrollRef.current.getBoundingClientRect();
+            const viewportX = e.clientX - scrollRect.left;
+            const viewportY = e.clientY - scrollRect.top;
+            const x = viewportX + scrollRef.current.scrollLeft;
+            const y = viewportY + scrollRef.current.scrollTop;
 
             setDragState(prev => ({ ...prev, currentX: x, currentY: y }));
         }
@@ -268,6 +305,10 @@ const PianoRoll = () => {
             const y2 = Math.max(dragState.startY, dragState.currentY);
 
             // Find overlapping notes
+            // Adjust selection box coordinates to account for piano key offset (300px)
+            const adjustedX1 = Math.max(0, x1 - 300);
+            const adjustedX2 = Math.max(0, x2 - 300);
+            
             const selectedIds = activePattern.data.notes.filter(n => {
                 const noteY = getYFromKey(n.noteName);
                 const noteX = n.startStep * pixelsPerStep;
@@ -275,7 +316,7 @@ const PianoRoll = () => {
                 const noteH = keyHeight;
 
                 // Simple AABB collision
-                return (noteX < x2 && noteX + noteW > x1 &&
+                return (noteX < adjustedX2 && noteX + noteW > adjustedX1 &&
                     noteY < y2 && noteY + noteH > y1);
             }).map(n => n.id);
 
@@ -311,51 +352,261 @@ const PianoRoll = () => {
         return () => window.removeEventListener('keydown', handleDelete);
     }, [handleDelete]);
 
+    // Track current playback step for pulse animation
+    useEffect(() => {
+        if (!isPlaying) {
+            setCurrentStep(0);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            setCurrentStep(prev => {
+                const next = prev + 1;
+                return next >= totalBars * stepsPerBar ? 0 : next;
+            });
+        }, (60 / (bpm || 120)) * 250); // 16th note interval
+
+        return () => clearInterval(interval);
+    }, [isPlaying, bpm, totalBars, stepsPerBar]);
+
+    // Get notes for each key
+    const getNotesForKey = (keyFullName) => {
+        return activePattern.data.notes.filter(n => n.noteName === keyFullName);
+    };
+
+    // Check if a note is currently playing
+    const isNotePlaying = (note) => {
+        if (!isPlaying) return false;
+        const noteEnd = note.startStep + note.length;
+        return currentStep >= note.startStep && currentStep < noteEnd;
+    };
+
+    // Pattern name editing
+    useEffect(() => {
+        if (activePattern) {
+            setEditName(activePattern.name);
+        }
+    }, [activePattern]);
+
+    useEffect(() => {
+        if (isEditingName && nameInputRef.current) {
+            nameInputRef.current.focus();
+            nameInputRef.current.select();
+        }
+    }, [isEditingName]);
+
+    const handleNameClick = () => {
+        setIsEditingName(true);
+    };
+
+    const handleNameBlur = () => {
+        if (editName.trim() && editName !== activePattern.name) {
+            updatePattern(activePatternId, { name: editName.trim() });
+        } else {
+            setEditName(activePattern.name);
+        }
+        setIsEditingName(false);
+    };
+
+    const handleNameKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleNameBlur();
+        } else if (e.key === 'Escape') {
+            setEditName(activePattern.name);
+            setIsEditingName(false);
+        }
+    };
+
 
     return (
         <div className="piano-roll-window">
+            {/* Header - Blender-style context area */}
+            <div className="piano-header" style={{ backgroundColor: '#1e1e1e', background: '#1e1e1e' }}>
+                <div className="piano-header-left">
+                    {/* Pattern name - inline editable capsule */}
+                    <div className="pattern-name-capsule">
+                        {isEditingName ? (
+                            <input
+                                ref={nameInputRef}
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                onBlur={handleNameBlur}
+                                onKeyDown={handleNameKeyDown}
+                                className="pattern-name-input"
+                            />
+                        ) : (
+                            <span 
+                                className="pattern-name-text"
+                                onClick={handleNameClick}
+                                title="Click to rename"
+                            >
+                                {activePattern.name}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Context indicators */}
+                    <div className="context-indicators">
+                        {snapEnabled && (
+                            <div className="context-badge" title={`Snap: 1/${snapStrength}`}>
+                                <Target size={12} className="blender-icon" />
+                                <span>{snapStrength}</span>
+                            </div>
+                        )}
+                        {velocityEditMode && (
+                            <div className="context-badge" title="Velocity Edit Mode">
+                                <Sliders size={12} className="blender-icon" />
+                            </div>
+                        )}
+                        {previewNoteOnDraw && (
+                            <div className="context-badge" title="Preview Note on Draw">
+                                <Volume2 size={12} className="blender-icon" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
             {/* Toolbar */}
             <div className="piano-toolbar">
-                <div className="piano-curve-corner" title="Menu"></div>
-
+                {/* Play Control */}
                 <button
                     className={`tool-btn ${isPlaying ? 'active' : ''}`}
                     onClick={togglePlayback}
                     title="Play/Pause Pattern"
-                    style={{ color: isPlaying ? '#4ade80' : 'inherit' }}
                 >
-                    <Music size={16} fill={isPlaying ? "currentColor" : "none"} />
+                    <Music size={16} className="blender-icon" />
                 </button>
-                <div className="toolbar-separator" style={{ width: 1, height: 16, background: '#555', margin: '0 4px' }}></div>
+                <div className="toolbar-separator"></div>
 
-                <button
-                    className={`tool-btn ${selectedTool === 'pencil' ? 'active' : ''}`}
-                    onClick={() => setSelectedTool('pencil')}>
-                    <Pencil size={16} />
-                </button>
-                <button
-                    className={`tool-btn ${selectedTool === 'select' ? 'active' : ''}`}
-                    onClick={() => setSelectedTool('select')}>
-                    <MousePointer2 size={16} />
-                </button>
-                <button
-                    className={`tool-btn ${selectedTool === 'eraser' ? 'active' : ''}`}
-                    onClick={() => setSelectedTool('eraser')}>
-                    <Eraser size={16} />
-                </button>
+                {/* Draw / Select Group */}
+                <div className="tool-group">
+                    <button
+                        className={`tool-btn ${selectedTool === 'pencil' ? 'active' : ''}`}
+                        onClick={() => setSelectedTool('pencil')}
+                        title="Pencil Tool">
+                        <Pencil size={16} className="blender-icon" />
+                    </button>
+                    <button
+                        className={`tool-btn ${selectedTool === 'select' ? 'active' : ''}`}
+                        onClick={() => setSelectedTool('select')}
+                        title="Select Tool">
+                        <MousePointer2 size={16} className="blender-icon" />
+                    </button>
+                </div>
 
-                <div style={{ width: 10 }}></div>
-                <button className="tool-btn"><Magnet size={16} /></button>
-                <div style={{ width: 5 }}></div>
-                <button className="tool-btn" onClick={() => setZoom(z => Math.max(10, z - 5))} title="Zoom Out">
-                    <ZoomOut size={16} />
-                </button>
+                {/* Erase Group */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button
+                        className={`tool-btn ${selectedTool === 'eraser' ? 'active' : ''}`}
+                        onClick={() => setSelectedTool('eraser')}
+                        title="Eraser Tool">
+                        <Eraser size={16} className="blender-icon" />
+                    </button>
+                </div>
+
+                {/* Link Group */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button 
+                        className="tool-btn" 
+                        title="Link Notes"
+                        onClick={() => {/* TODO: Implement link notes */}}
+                    >
+                        <Link2 size={16} className="blender-icon" />
+                    </button>
+                </div>
+
+                {/* Snap Group */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button
+                        className={`tool-btn ${snapEnabled ? 'active' : ''}`}
+                        onClick={() => setSnapEnabled(!snapEnabled)}
+                        title="Snap to Grid">
+                        <Target size={16} className="blender-icon" />
+                    </button>
+                    {snapEnabled && (
+                        <div className="snap-strength-selector">
+                            <button
+                                className={`snap-btn ${snapStrength === 1 ? 'active' : ''}`}
+                                onClick={() => setSnapStrength(1)}
+                                title="1/16 note snap"
+                            >
+                                1
+                            </button>
+                            <button
+                                className={`snap-btn ${snapStrength === 2 ? 'active' : ''}`}
+                                onClick={() => setSnapStrength(2)}
+                                title="1/8 note snap"
+                            >
+                                2
+                            </button>
+                            <button
+                                className={`snap-btn ${snapStrength === 4 ? 'active' : ''}`}
+                                onClick={() => setSnapStrength(4)}
+                                title="1/4 note snap"
+                            >
+                                4
+                            </button>
+                            <button
+                                className={`snap-btn ${snapStrength === 8 ? 'active' : ''}`}
+                                onClick={() => setSnapStrength(8)}
+                                title="1/2 note snap"
+                            >
+                                8
+                            </button>
+                            <button
+                                className={`snap-btn ${snapStrength === 16 ? 'active' : ''}`}
+                                onClick={() => setSnapStrength(16)}
+                                title="1 bar snap"
+                            >
+                                16
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Quantize */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button
+                        className="tool-btn"
+                        onClick={() => {/* TODO: Implement quantize */}}
+                        title="Quantize Selected Notes">
+                        <AlignCenter size={16} className="blender-icon" />
+                    </button>
+                </div>
+
+                {/* Preview & Velocity */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button
+                        className={`tool-btn ${previewNoteOnDraw ? 'active' : ''}`}
+                        onClick={() => setPreviewNoteOnDraw(!previewNoteOnDraw)}
+                        title="Preview Note on Draw">
+                        {previewNoteOnDraw ? <Volume2 size={16} className="blender-icon" /> : <VolumeX size={16} className="blender-icon" />}
+                    </button>
+                    <button
+                        className={`tool-btn ${velocityEditMode ? 'active' : ''}`}
+                        onClick={() => setVelocityEditMode(!velocityEditMode)}
+                        title="Velocity Edit Mode">
+                        <Sliders size={16} className="blender-icon" />
+                    </button>
+                </div>
+
+                {/* Zoom Group */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button className="tool-btn" onClick={() => setZoom(z => Math.max(10, z - 5))} title="Zoom Out">
+                        <ZoomOut size={16} className="blender-icon" />
+                    </button>
                 <button className="tool-btn" onClick={() => setZoom(z => Math.min(100, z + 5))} title="Zoom In">
-                    <ZoomIn size={16} />
+                    <ZoomIn size={16} className="blender-icon" />
                 </button>
-
-                <div style={{ flex: 1 }}></div>
-                <div style={{ color: '#888', fontSize: '11px', marginRight: '10px' }}>{activePattern.name}</div>
+                </div>
             </div>
 
             {/* Main Scrollable Area */}
@@ -366,13 +617,29 @@ const PianoRoll = () => {
                 onMouseDown={handleMouseDown}
             >
                 <div ref={mainAreaRef} style={{ position: 'relative' }}>
-                    {allKeys.map((k) => (
-                        <div className="piano-row" key={k.fullName} style={{ height: `${keyHeight}px` }}>
-                            {/* Sticky Key */}
-                            <div className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'}`} style={{ height: `${keyHeight}px`, position: 'sticky', left: 0, zIndex: 10 }}>
-                                {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
-                                {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.3 }}>{k.note}</span>}
-                            </div>
+                    {allKeys.map((k) => {
+                        const keyNotes = getNotesForKey(k.fullName);
+                        const hasNotes = keyNotes.length > 0;
+                        const isPlayingNote = keyNotes.some(note => isNotePlaying(note));
+                        const isHovered = hoveredKey === k.fullName;
+
+                        return (
+                            <div 
+                                className="piano-row" 
+                                key={k.fullName} 
+                                style={{ height: `${keyHeight}px` }}
+                                onMouseEnter={() => setHoveredKey(k.fullName)}
+                                onMouseLeave={() => setHoveredKey(null)}
+                            >
+                                {/* Sticky Key */}
+                                <div 
+                                    className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
+                                    style={{ height: `${keyHeight}px`, position: 'sticky', left: 0, zIndex: 10 }}
+                                >
+                                    {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
+                                    {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.4 }}>{k.note}</span>}
+                                    {hasNotes && <div className="key-note-indicator"></div>}
+                                </div>
 
                             {/* Grid Row */}
                             <div className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}>
@@ -384,19 +651,21 @@ const PianoRoll = () => {
                                         <div
                                             key={step}
                                             className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
+                                            style={{ width: `${pixelsPerStep}px` }}
                                         // onPointerDown handled by parent onMouseDown
                                         ></div>
                                     );
                                 })}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
 
                     {/* Render Notes Layer Overlay */}
                     <div className="piano-notes-overlay" style={{
                         position: 'absolute',
                         top: 0,
-                        left: '40px', // width of sticky keys
+                        left: '100px', // width of sticky keys
                         width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
                         height: `${allKeys.length * keyHeight}px`,
                         pointerEvents: 'none' // Let clicks pass through to rows unless on a note
@@ -430,13 +699,14 @@ const PianoRoll = () => {
                         {dragState && dragState.type === 'SELECT' && (
                             <div style={{
                                 position: 'absolute',
-                                left: Math.min(dragState.startX, dragState.currentX),
+                                left: Math.min(dragState.startX, dragState.currentX) - 300, // Account for piano key offset
                                 top: Math.min(dragState.startY, dragState.currentY),
                                 width: Math.abs(dragState.currentX - dragState.startX),
                                 height: Math.abs(dragState.currentY - dragState.startY),
-                                border: '1px solid #fff',
-                                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                pointerEvents: 'none'
+                                border: '1px solid #4ade80',
+                                backgroundColor: 'rgba(74, 222, 128, 0.15)',
+                                pointerEvents: 'none',
+                                borderRadius: '2px'
                             }}></div>
                         )}
                     </div>

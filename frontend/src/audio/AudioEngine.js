@@ -4,6 +4,7 @@ class AudioEngine {
     constructor() {
         this.channels = new Map(); // id -> Tone.Channel
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
+        this.audioPlayers = new Map(); // audioClipId -> Tone.Player
         this.isInitialized = false;
         this.previewSynth = null; // Dedicated synth for Piano Roll
     }
@@ -70,6 +71,9 @@ class AudioEngine {
         // Schedule Melody (Piano Roll)
         pattern.data.notes.forEach(note => {
             // note: { id, noteName: "C5", startStep, length }
+            // Skip notes with invalid noteName
+            if (!note.noteName) return;
+            
             const time = `0:0:${note.startStep}`;
             const duration = `0:0:${note.length}`;
 
@@ -81,7 +85,7 @@ class AudioEngine {
 
             Tone.Transport.schedule((t) => {
                 // Use dedicated poly synth
-                if (this.previewSynth) {
+                if (this.previewSynth && note.noteName) {
                     this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
                 }
             }, time);
@@ -90,7 +94,7 @@ class AudioEngine {
         console.log('Scheduled pattern:', pattern.id);
     }
 
-    schedulePlaylist(tracks, patterns) {
+    schedulePlaylist(tracks, patterns, audioClips = []) {
         Tone.Transport.cancel();
         console.log("Scheduling Playlist (Song Mode)...");
 
@@ -98,6 +102,38 @@ class AudioEngine {
 
         tracks.forEach(track => {
             track.clips.forEach(clip => {
+                // Handle audio clips
+                if (clip.type === 'audio') {
+                    const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+                    if (!audioClip) {
+                        console.warn(`Audio clip ${clip.audioClipId} not found`);
+                        return;
+                    }
+
+                    // Convert offset from beats to time
+                    const startTime = Tone.Time(`${clip.offset}q`).toSeconds();
+                    const duration = Tone.Time(`${clip.length}q`).toSeconds();
+
+                    // Get or create audio player
+                    let player = this.audioPlayers.get(clip.audioClipId);
+                    if (!player && audioClip.url) {
+                        player = new Tone.Player({
+                            url: audioClip.url,
+                            volume: -6
+                        }).toDestination();
+                        this.audioPlayers.set(clip.audioClipId, player);
+                    }
+
+                    if (player) {
+                        // Schedule audio playback
+                        Tone.Transport.schedule((t) => {
+                            player.start(t, 0, duration);
+                        }, startTime);
+                    }
+                    return;
+                }
+
+                // Handle pattern clips (existing code)
                 const pattern = patterns.find(p => p.id === clip.patternId);
                 if (!pattern) {
                     console.warn(`Pattern ${clip.patternId} not found for clip`);
@@ -132,6 +168,9 @@ class AudioEngine {
 
                 // 2. Schedule Notes (Piano Roll)
                 pattern.data.notes.forEach(note => {
+                    // Skip notes with invalid noteName
+                    if (!note.noteName) return;
+                    
                     const absStep = clipStartStep + note.startStep;
                     const bar = Math.floor(absStep / 16);
                     const beat = Math.floor((absStep % 16) / 4);
@@ -146,7 +185,7 @@ class AudioEngine {
                     const duration = `${dBar}:${dBeat}:${dSixteen}`;
 
                     Tone.Transport.schedule((t) => {
-                        if (this.previewSynth) {
+                        if (this.previewSynth && note.noteName) {
                             this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
                         }
                     }, time);
@@ -213,12 +252,15 @@ class AudioEngine {
         }
     }
 
-    updateChannelPan(id, panMinus50to50) {
+    updateChannelPan(id, pan0to100) {
         const channel = this.channels.get(id);
         if (channel) {
-            // Map -50..50 to -1..1
-            const panVal = panMinus50to50 / 50;
-            channel.pan.rampTo(panVal, 0.1);
+            // Map 0-100 (where 50 is center) to -1..1
+            // 0 -> -1, 50 -> 0, 100 -> 1
+            const panVal = (pan0to100 - 50) / 50;
+            // Clamp to valid range [-1, 1]
+            const clampedPan = Math.max(-1, Math.min(1, panVal));
+            channel.pan.rampTo(clampedPan, 0.1);
         }
     }
 
