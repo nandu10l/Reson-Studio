@@ -5,6 +5,7 @@ class AudioEngine {
         this.channels = new Map(); // id -> Tone.Channel
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
         this.isInitialized = false;
+        this.previewSynth = null; // Dedicated synth for Piano Roll
     }
 
     async init() {
@@ -14,6 +15,14 @@ class AudioEngine {
 
         // Setup Transport
         Tone.Transport.bpm.value = 120;
+
+        // Setup Preview Synth
+        this.previewSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle" },
+            envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
+        }).toDestination();
+        this.previewSynth.volume.value = -10;
+
         this.isInitialized = true;
     }
 
@@ -71,15 +80,79 @@ class AudioEngine {
             // We'll use a default PolySynth for preview, or map to a specific channel if we add that metadata
 
             Tone.Transport.schedule((t) => {
-                // Use a default synth for now
-                const synth = this.sources.get(5) || this.sources.get(1); // Fallback
-                if (synth && synth.triggerAttackRelease) {
-                    synth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                // Use dedicated poly synth
+                if (this.previewSynth) {
+                    this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
                 }
             }, time);
         });
 
         console.log('Scheduled pattern:', pattern.id);
+    }
+
+    schedulePlaylist(tracks, patterns) {
+        Tone.Transport.cancel();
+        console.log("Scheduling Playlist (Song Mode)...");
+
+        Tone.Transport.loop = false; // Song mode typically doesn't loop the whole arrangement by default in this MVP
+
+        tracks.forEach(track => {
+            track.clips.forEach(clip => {
+                const pattern = patterns.find(p => p.id === clip.patternId);
+                if (!pattern) {
+                    console.warn(`Pattern ${clip.patternId} not found for clip`);
+                    return;
+                }
+
+                // clip.offset is in BEATS (quarters). Convert to STEPS (sixteenths).
+                // Assuming 4 steps per beat.
+                const clipStartStep = (clip.offset || 0) * 4;
+                console.log(`Scheduling clip Pattern ${pattern.id} at step ${clipStartStep}`);
+
+                // 1. Schedule Steps (Drums)
+                Object.entries(pattern.data.steps).forEach(([channelId, steps]) => {
+                    const id = parseInt(channelId);
+                    steps.forEach((isActive, index) => {
+                        if (isActive && index < pattern.length) { // Respect pattern length
+                            // Calculate absolute step
+                            const absStep = clipStartStep + index;
+                            // Convert to Bars:Beats:Sixteenths
+                            // Assuming 16 steps per bar
+                            const bar = Math.floor(absStep / 16);
+                            const beat = Math.floor((absStep % 16) / 4);
+                            const sixteen = absStep % 4;
+                            const time = `${bar}:${beat}:${sixteen}`;
+
+                            Tone.Transport.schedule((t) => {
+                                this.previewSound(id);
+                            }, time);
+                        }
+                    });
+                });
+
+                // 2. Schedule Notes (Piano Roll)
+                pattern.data.notes.forEach(note => {
+                    const absStep = clipStartStep + note.startStep;
+                    const bar = Math.floor(absStep / 16);
+                    const beat = Math.floor((absStep % 16) / 4);
+                    const sixteen = absStep % 4;
+                    const time = `${bar}:${beat}:${sixteen}`;
+
+                    const durationStep = note.length;
+                    // Duration in notation (e.g. 0:0:2 for 2 steps)
+                    const dBar = Math.floor(durationStep / 16);
+                    const dBeat = Math.floor((durationStep % 16) / 4);
+                    const dSixteen = durationStep % 4;
+                    const duration = `${dBar}:${dBeat}:${dSixteen}`;
+
+                    Tone.Transport.schedule((t) => {
+                        if (this.previewSynth) {
+                            this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                        }
+                    }, time);
+                });
+            });
+        });
     }
 
     // Create a channel strip (Volume + Pan)
@@ -97,27 +170,28 @@ class AudioEngine {
         const n = name.toLowerCase();
 
         // Basic Synthesis logic based on name
+        // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
         if (n.includes('kick')) {
-            source = new Tone.MembraneSynth().connect(channel);
+            source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
         } else if (n.includes('snare') || n.includes('clap')) {
-            source = new Tone.NoiseSynth({
+            source = new Tone.PolySynth(Tone.NoiseSynth, {
                 noise: { type: 'white' },
                 envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
             }).connect(channel);
         } else if (n.includes('hat') || n.includes('cymbal')) {
-            source = new Tone.MetalSynth({
-                frequency: 200, isEnvelope: true, harmonicity: 5.1, modulationIndex: 32,
+            source = new Tone.PolySynth(Tone.MetalSynth, {
+                frequency: 200, harmonicity: 5.1, modulationIndex: 32,
                 envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
                 volume: -10
             }).connect(channel);
         } else if (n.includes('bass')) {
-            source = new Tone.MonoSynth({
+            source = new Tone.PolySynth(Tone.MonoSynth, {
                 oscillator: { type: "square" },
                 envelope: { attack: 0.1 }
             }).connect(channel);
         } else {
             // Default Synth
-            source = new Tone.PolySynth().connect(channel);
+            source = new Tone.PolySynth(Tone.Synth).connect(channel);
         }
 
         this.sources.set(id, source);
@@ -151,11 +225,9 @@ class AudioEngine {
     previewSound(id) {
         const source = this.sources.get(id);
         if (source) {
-            if (source.name === 'NoiseSynth') {
-                source.triggerAttackRelease("8n");
-            } else {
-                source.triggerAttackRelease("C2", "8n");
-            }
+            // PolySynth always expects a note, even for Noise (it just ignores it)
+            // We use C2 as default trigger
+            source.triggerAttackRelease("C2", "8n");
         }
     }
 }

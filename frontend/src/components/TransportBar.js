@@ -60,33 +60,13 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
 
   return (
     <div className="transport-bar">
-      <div className="transport-left">
-        <button className="btn small icon-btn" onClick={handleResetTime} {...useGuideHandlers('Stop / Reset')}>
-          <SkipBack size={16} />
-        </button>
-        <button className="btn small icon-btn" onClick={() => togglePlayback()} {...useGuideHandlers('Play')}>
-          <Play size={16} color={isPlaying ? '#0f0' : '#fff'} />
-        </button>
-        <button className="btn small icon-btn" onClick={() => togglePlayback()} {...useGuideHandlers('Pause')}>
-          <Pause size={16} />
-        </button>
-        <div className="time-display" {...useGuideHandlers('Song Position')}>{formatTime(currentTime)}</div>
-      </div>
-      <div className="transport-center">
-        <div className="bpm" style={{ marginRight: '16px' }} {...useGuideHandlers('Tempo (BPM)')}>
-          BPM: <input
-            type="number"
-            value={bpm}
-            onChange={handleBpmChange}
-            min="60"
-            max="200"
-            style={{ width: '50px', textAlign: 'center', border: 'none', background: 'transparent', fontWeight: 'bold', color: '#fff' }}
-          />
-        </div>
+      {/* Pattern Selector */}
+      <div className="transport-center" style={{ paddingLeft: 10 }}>
         <div {...useGuideHandlers('Pattern Selector')}>
           <PatternSelector />
         </div>
       </div>
+
       <div className="transport-right">
         {/* Window Toggles */}
         <button
@@ -120,15 +100,6 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           {...useGuideHandlers('View Mixer')}
         >
           <Sliders size={16} />
-        </button>
-
-        <div className="divider" style={{ width: 1, height: 20, background: '#ccc', margin: '0 8px' }}></div>
-
-        <button className={`btn small ${metronomeOn ? 'active' : ''}`} onClick={toggleMetronome} {...useGuideHandlers('Metronome')}>
-          Metronome {metronomeOn ? 'On' : 'Off'}
-        </button>
-        <button className={`btn small ${loopOn ? 'active' : ''}`} onClick={toggleLoop} {...useGuideHandlers('Loop Mode')}>
-          Loop {loopOn ? 'On' : 'Off'}
         </button>
       </div>
     </div>

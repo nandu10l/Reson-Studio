@@ -12,7 +12,9 @@ const PianoRoll = () => {
         addNoteToActivePattern,
         removeNoteFromActivePattern,
         updateNote,
-        deleteNotes
+        deleteNotes,
+        isPlaying,
+        togglePlayback
     } = useProject();
 
     // Local State
@@ -315,6 +317,16 @@ const PianoRoll = () => {
             {/* Toolbar */}
             <div className="piano-toolbar">
                 <div className="piano-curve-corner" title="Menu"></div>
+
+                <button
+                    className={`tool-btn ${isPlaying ? 'active' : ''}`}
+                    onClick={togglePlayback}
+                    title="Play/Pause Pattern"
+                    style={{ color: isPlaying ? '#4ade80' : 'inherit' }}
+                >
+                    <Music size={16} fill={isPlaying ? "currentColor" : "none"} />
+                </button>
+                <div className="toolbar-separator" style={{ width: 1, height: 16, background: '#555', margin: '0 4px' }}></div>
 
                 <button
                     className={`tool-btn ${selectedTool === 'pencil' ? 'active' : ''}`}

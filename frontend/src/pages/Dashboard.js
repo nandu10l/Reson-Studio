@@ -174,7 +174,16 @@ function Dashboard() {
   return (
     <div className="app-container">
 
-      <Navbar onChangeView={(v) => setView(v)} currentView={view} onCreateProject={(project) => setProjects(prev => [...prev, project])} onSaveProject={() => console.log('Project saved:', currentProject)} />
+      <Navbar
+        onChangeView={(v) => setView(v)}
+        currentView={view}
+        onCreateProject={(project) => setProjects(prev => [...prev, project])}
+        onSaveProject={() => console.log('Project saved:', currentProject)}
+        playing={playing}
+        onPlayToggle={() => setPlaying(!playing)}
+        bpm={bpm}
+        onBpmChange={setBpm}
+      />
       <TransportBar
         activeWindows={activeWindows}
         onToggleWindow={toggleWindow}

@@ -141,9 +141,14 @@ export const ProjectProvider = ({ children }) => {
         initAudio();
     }, []);
 
+    // --- Project File State ---
+    const [currentProjectPath, setCurrentProjectPath] = useState(null);
+
     // --- Transport State ---
     const [isPlaying, setIsPlaying] = useState(false);
     const [bpm, setBpm] = useState(120);
+    const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
+    const [isRecording, setIsRecording] = useState(false);
 
     // --- Actions ---
 
@@ -238,6 +243,18 @@ export const ProjectProvider = ({ children }) => {
         patterns.find(p => p.id === activePatternId) || patterns[0]
         , [patterns, activePatternId]);
 
+    // --- Scheduling Logic ---
+    React.useEffect(() => {
+        if (playbackMode === 'PAT') {
+            if (activePattern) {
+                audioEngine.schedulePattern(activePattern);
+            }
+        } else {
+            // SONG mode
+            audioEngine.schedulePlaylist(playlistTracks, patterns);
+        }
+    }, [activePattern, playbackMode, patterns, playlistTracks]);
+
     const value = {
         patterns,
         activePatternId,
@@ -263,7 +280,13 @@ export const ProjectProvider = ({ children }) => {
         bpm,
         togglePlayback,
         stopPlayback,
-        updateBpm
+        updateBpm,
+        currentProjectPath,
+        setCurrentProjectPath,
+        playbackMode,
+        setPlaybackMode,
+        isRecording,
+        setIsRecording
     };
 
     return (

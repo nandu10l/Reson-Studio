@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './ChannelRack.css';
-import { Plus, MoreHorizontal, RotateCcw, ChevronRight, Settings } from 'lucide-react';
+import { Plus, MoreHorizontal, RotateCcw, ChevronRight, Settings, Music } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import { useGuide } from '../contexts/GuideContext';
 
@@ -172,7 +172,7 @@ const Channel = ({ id, name, vol, pan, steps = [] }) => {
 };
 
 const ChannelRack = () => {
-    const { channels, activePattern } = useProject();
+    const { channels, activePattern, isPlaying, togglePlayback } = useProject();
 
     // activePattern.data.steps is an object keyed by channelId
     // e.g. { 1: [true, false...], 2: [...] }
@@ -183,6 +183,14 @@ const ChannelRack = () => {
             <div className="rack-header">
                 <div className="header-controls">
                     <button className="header-btn"><Settings size={14} /></button>
+                    <button
+                        className="header-btn"
+                        onClick={togglePlayback}
+                        title="Play Pattern"
+                        style={{ color: isPlaying ? '#4ade80' : 'inherit' }}
+                    >
+                        {isPlaying ? <Music size={14} fill="currentColor" /> : <Music size={14} />}
+                    </button>
                     <div className="filter-group">
                         <span>All</span>
                         <ChevronRight size={12} />

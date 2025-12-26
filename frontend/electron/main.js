@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Tray, Menu, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
@@ -81,6 +82,33 @@ ipcMain.handle('open-file-dialog', async () => {
         ]
     });
     return result.filePaths;
+});
+
+ipcMain.handle('save-file', async (event, content) => {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Project',
+        defaultPath: 'project.reson',
+        filters: [
+            { name: 'Reson Project', extensions: ['reson'] },
+            { name: 'JSON Project', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] }
+        ]
+    });
+
+    if (filePath) {
+        fs.writeFileSync(filePath, content);
+        return { success: true, filePath };
+    }
+    return { canceled: true };
+});
+
+ipcMain.handle('save-file-silent', async (event, filePath, content) => {
+    try {
+        fs.writeFileSync(filePath, content);
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 });
 
 // This method will be called when Electron has finished

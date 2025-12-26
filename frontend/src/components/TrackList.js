@@ -146,6 +146,15 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
               <div
                 className="resize-handle"
                 onPointerDown={(e) => onResizeStart(e, track.id, idx)}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '10px',
+                  height: '100%',
+                  cursor: 'ew-resize',
+                  zIndex: 20
+                }}
               />
 
               <button
