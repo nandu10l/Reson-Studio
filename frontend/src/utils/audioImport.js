@@ -37,24 +37,50 @@ export const decodeAudioFile = async (file) => {
  * @param {number} samples - Number of peaks to generate (width in pixels)
  * @returns {Array<{min: number, max: number}>}
  */
-export const generateWaveform = (audioBuffer, samples = 1000) => {
+export const generateWaveform = (audioBuffer, samples = 2000) => {
   const rawData = audioBuffer.getChannelData(0); // Use first channel
-  const blockSize = Math.floor(rawData.length / samples);
+  const dataLength = rawData.length;
+  
+  // Generate more samples for better accuracy - at least 2000 or based on duration
+  // This ensures we have enough detail to accurately represent the audio
+  const targetSamples = Math.max(samples, Math.min(2000, Math.floor(dataLength / 100)));
+  const blockSize = Math.floor(dataLength / targetSamples);
   const peaks = [];
 
-  for (let i = 0; i < samples; i++) {
+  // First pass: collect all peaks by analyzing blocks of audio data
+  for (let i = 0; i < targetSamples; i++) {
     const start = blockSize * i;
-    const end = start + blockSize;
+    const end = Math.min(start + blockSize, dataLength);
     let min = 0;
     let max = 0;
 
-    for (let j = start; j < end && j < rawData.length; j++) {
+    // Find min and max in this block
+    for (let j = start; j < end; j++) {
       const sample = rawData[j];
       if (sample < min) min = sample;
       if (sample > max) max = sample;
     }
 
     peaks.push({ min, max });
+  }
+
+  // Normalize peaks to use full range (0-1) while preserving relative amplitudes
+  // Find the maximum absolute value across all peaks
+  let maxPeak = 0;
+  peaks.forEach(peak => {
+    const absMin = Math.abs(peak.min);
+    const absMax = Math.abs(peak.max);
+    if (absMin > maxPeak) maxPeak = absMin;
+    if (absMax > maxPeak) maxPeak = absMax;
+  });
+
+  // Normalize all peaks relative to the maximum
+  // This ensures the waveform uses the full height while maintaining relative amplitudes
+  if (maxPeak > 0) {
+    peaks.forEach(peak => {
+      peak.min = peak.min / maxPeak;
+      peak.max = peak.max / maxPeak;
+    });
   }
 
   return peaks;

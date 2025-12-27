@@ -37,6 +37,11 @@ export const Music = (props) => <BlenderIcon icon={LucideIcons.Music} {...props}
 export const Grid = (props) => <BlenderIcon icon={LucideIcons.Grid3x3} {...props} />;
 export const LayoutGrid = (props) => <BlenderIcon icon={LucideIcons.LayoutGrid} {...props} />;
 export const ListMusic = (props) => <BlenderIcon icon={LucideIcons.ListMusic} {...props} />;
+export const FileAudio = (props) => <BlenderIcon icon={LucideIcons.FileAudio} {...props} />;
+export const TrendingUp = (props) => <BlenderIcon icon={LucideIcons.TrendingUp} {...props} />;
+export const FolderOpen = (props) => <BlenderIcon icon={LucideIcons.FolderOpen} {...props} />;
+export const Scissors = (props) => <BlenderIcon icon={LucideIcons.Scissors} {...props} />;
+export const FileText = (props) => <BlenderIcon icon={LucideIcons.FileText} {...props} />;
 
 // Tools & Settings
 export const ZoomIn = (props) => <BlenderIcon icon={LucideIcons.ZoomIn} {...props} />;
@@ -69,6 +74,7 @@ export const Filter = (props) => <BlenderIcon icon={LucideIcons.Filter} {...prop
 export const MoreHorizontal = (props) => <BlenderIcon icon={LucideIcons.MoreHorizontal} {...props} />;
 export const MoreVertical = (props) => <BlenderIcon icon={LucideIcons.MoreVertical} {...props} />;
 export const RotateCcw = (props) => <BlenderIcon icon={LucideIcons.RotateCcw} {...props} />;
+export const Circle = (props) => <BlenderIcon icon={LucideIcons.Circle} {...props} />;
 
 // Export default for convenience
 export default {

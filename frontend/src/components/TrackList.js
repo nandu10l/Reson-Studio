@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Grid, ChevronDown, Trash, Edit, Copy, Palette } from './icons/BlenderIcons';
+import { Plus, Grid, ChevronDown, Trash, Edit, Copy, Palette, Volume2, VolumeX, GripVertical, Headphones } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
@@ -19,6 +19,12 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
   const handleRename = () => {
     setIsEditing(true);
     setEditName(track.name);
+  };
+
+  const handleDoubleClick = () => {
+    if (!isEditing) {
+      handleRename();
+    }
   };
 
   const handleSaveRename = () => {
@@ -48,25 +54,97 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
     }
   }, [isEditing]);
 
+  // Generate or get track color (for visual identification)
+  const trackColor = track.color || `hsl(${(track.id * 137.5) % 360}, 45%, 45%)`;
+  const isSelected = selected && selected.trackId === track.id;
+  const isActive = isSelected;
+
   return (
-    <div className="track-row" data-track-id={track.id}>
-      <div className="track-header" style={{
-        background: '#363d43', // Base dark color
-        borderBottom: '1px solid #282c31', // Subtle separator
-        borderRight: '1px solid #1e2226',
-        padding: '0 12px',
-        minHeight: '64px',
+    <div 
+      className="track-row" 
+      data-track-id={track.id}
+      style={{
+        position: 'relative',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        boxSizing: 'border-box',
-        position: 'relative'
+        borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
       }}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => !isEditing && setShowActions(false)}
+    >
+      {/* Color Strip - Far Left */}
+      <div
+        className="track-color-strip"
+        style={{
+          width: '3px',
+          background: isActive ? trackColor : trackColor,
+          opacity: isActive ? 1 : 0.4,
+          flexShrink: 0,
+          transition: 'opacity 0.2s ease',
+          cursor: 'pointer'
+        }}
+        onClick={() => onSelect && onSelect({ trackId: track.id })}
+      />
+
+      {/* Track Header */}
+      <div 
+        className="track-header" 
+        style={{
+          flex: 1,
+          background: isActive 
+            ? 'rgba(96, 165, 250, 0.06)' 
+            : '#1a1a1a',
+          borderLeft: isActive 
+            ? '2px solid #60a5fa' 
+            : '2px solid transparent',
+          borderRight: '1px solid rgba(255, 255, 255, 0.05)',
+          padding: '0 6px',
+          minHeight: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
+          position: 'relative',
+          transition: 'all 0.15s ease',
+          cursor: 'default'
+        }}
+        onMouseEnter={() => setShowActions(true)}
+        onMouseLeave={() => !isEditing && setShowActions(false)}
+        onClick={() => onSelect && onSelect({ trackId: track.id })}
       >
-        {/* Track Name and Actions */}
-        <div className="track-name-container" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+        {/* Left: Drag Handle (Progressive Disclosure) */}
+        <div
+          className="track-drag-handle"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '14px',
+            height: '14px',
+            marginRight: '4px',
+            cursor: 'grab',
+            opacity: showActions ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+            pointerEvents: showActions ? 'auto' : 'none',
+            flexShrink: 0
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            // Drag handle functionality would go here
+          }}
+        >
+          <GripVertical size={11} className="blender-icon" style={{ color: '#6b7280' }} />
+        </div>
+
+        {/* Center: Track Name - Always Visible, Double-click to Edit */}
+        <div 
+          className="track-name-container" 
+          style={{ 
+            flex: 1, 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '4px', 
+            minWidth: 0 
+          }}
+          onDoubleClick={handleDoubleClick}
+        >
           {isEditing ? (
             <input
               ref={inputRef}
@@ -75,108 +153,252 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
               onChange={(e) => setEditName(e.target.value)}
               onBlur={handleSaveRename}
               onKeyDown={handleKeyDown}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 flex: 1,
-                background: '#4b5563',
-                border: '1px solid #60a5fa',
-                borderRadius: '3px',
+                background: 'rgba(96, 165, 250, 0.12)',
+                border: '1px solid rgba(96, 165, 250, 0.4)',
+                borderRadius: '2px',
                 padding: '2px 6px',
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: 500,
+                color: '#e5e7eb',
+                fontSize: '11px',
+                fontWeight: 400,
                 outline: 'none',
-                minWidth: 0
+                minWidth: 0,
+                fontFamily: 'inherit',
+                letterSpacing: '0.01em'
               }}
             />
           ) : (
             <>
-              <div className="track-name" style={{ flex: 1, color: '#9ca3af', fontWeight: 500, fontSize: '13px', letterSpacing: '0.01em', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div 
+                className="track-name" 
+                style={{ 
+                  flex: 1, 
+                  color: isActive ? '#9ca3af' : '#6b7280', 
+                  fontWeight: 400, 
+                  fontSize: '11px', 
+                  letterSpacing: '0.01em', 
+                  minWidth: 0, 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap',
+                  lineHeight: '1.3',
+                  opacity: isActive ? 1 : 0.75,
+                  transition: 'opacity 0.15s ease',
+                  position: 'relative',
+                  cursor: 'default'
+                }}
+                title={track.name}
+                onMouseEnter={(e) => {
+                  // Show full name on hover by expanding
+                  const nameEl = e.currentTarget;
+                  const isOverflowing = nameEl.scrollWidth > nameEl.clientWidth;
+                  if (isOverflowing) {
+                    nameEl.style.position = 'absolute';
+                    nameEl.style.background = '#1a1a1a';
+                    nameEl.style.padding = '3px 8px',
+                    nameEl.style.borderRadius = '2px';
+                    nameEl.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+                    nameEl.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.5)';
+                    nameEl.style.zIndex = '1000';
+                    nameEl.style.whiteSpace = 'nowrap';
+                    nameEl.style.overflow = 'visible';
+                    nameEl.style.textOverflow = 'clip';
+                    nameEl.style.maxWidth = 'none';
+                    nameEl.style.width = 'auto';
+                    nameEl.style.left = '0';
+                    nameEl.style.top = '-2px';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  // Restore truncated state
+                  const nameEl = e.currentTarget;
+                  nameEl.style.position = 'relative';
+                  nameEl.style.background = 'transparent';
+                  nameEl.style.padding = '0';
+                  nameEl.style.borderRadius = '0';
+                  nameEl.style.border = 'none';
+                  nameEl.style.boxShadow = 'none';
+                  nameEl.style.zIndex = 'auto';
+                  nameEl.style.whiteSpace = 'nowrap';
+                  nameEl.style.overflow = 'hidden';
+                  nameEl.style.textOverflow = 'ellipsis';
+                  nameEl.style.maxWidth = '100%';
+                  nameEl.style.width = '100%';
+                  nameEl.style.left = 'auto';
+                  nameEl.style.top = 'auto';
+                }}
+              >
                 {track.name}
               </div>
-              {showActions && (
-                <div className="track-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRename();
-                    }}
-                    title="Rename Track"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#9ca3af',
-                      cursor: 'pointer',
-                      padding: '2px 4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '3px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                      e.currentTarget.style.color = '#60a5fa';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = '#9ca3af';
-                    }}
-                  >
-                    <Edit size={14} color="#9ca3af" className="blender-icon" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(`Delete "${track.name}"?`)) {
-                        onDeleteTrack(track.id);
-                      }
-                    }}
-                    title="Delete Track"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#9ca3af',
-                      cursor: 'pointer',
-                      padding: '2px 4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '3px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
-                      e.currentTarget.style.color = '#ef4444';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                      e.currentTarget.style.color = '#9ca3af';
-                    }}
-                  >
-                    <Trash size={14} color="#9ca3af" className="blender-icon" />
-                  </button>
-                </div>
-              )}
+              
+              {/* Secondary Controls - Progressive Disclosure on Hover */}
+              <div 
+                className="track-secondary-controls" 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '2px', 
+                  flexShrink: 0,
+                  opacity: showActions ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                  pointerEvents: showActions ? 'auto' : 'none'
+                }}
+              >
+                {/* Solo Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleState('soloed');
+                  }}
+                  title={trackState.soloed ? "Unsolo" : "Solo"}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                    transition: 'all 0.15s ease',
+                    width: '18px',
+                    height: '18px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <Headphones 
+                    size={12} 
+                    className="blender-icon" 
+                    style={{ 
+                      color: trackState.soloed ? '#fbbf24' : '#6b7280' 
+                    }} 
+                  />
+                </button>
+
+                {/* Edit Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRename();
+                  }}
+                  title="Rename Track"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                    transition: 'all 0.15s ease',
+                    width: '18px',
+                    height: '18px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                    const icon = e.currentTarget.querySelector('.blender-icon');
+                    if (icon) icon.style.color = '#60a5fa';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    const icon = e.currentTarget.querySelector('.blender-icon');
+                    if (icon) icon.style.color = '#6b7280';
+                  }}
+                >
+                  <Edit size={12} className="blender-icon" style={{ color: '#6b7280' }} />
+                </button>
+
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Delete "${track.name}"?`)) {
+                      onDeleteTrack(track.id);
+                    }
+                  }}
+                  title="Delete Track"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '3px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '2px',
+                    transition: 'all 0.15s ease',
+                    width: '18px',
+                    height: '18px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)';
+                    const icon = e.currentTarget.querySelector('.blender-icon');
+                    if (icon) icon.style.color = '#ef4444';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    const icon = e.currentTarget.querySelector('.blender-icon');
+                    if (icon) icon.style.color = '#6b7280';
+                  }}
+                >
+                  <Trash size={12} className="blender-icon" style={{ color: '#6b7280' }} />
+                </button>
+              </div>
             </>
           )}
         </div>
 
-        {/* Status LED (Right Aligned) */}
-        <div
-          className={`track-status-led ${!trackState.muted ? 'active' : ''}`}
-          onClick={() => onToggleState('muted')}
-          title="Toggle Mute"
-          style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: !trackState.muted ? '#4ade80' : '#4b5563',
-            boxShadow: !trackState.muted ? '0 0 6px #4ade80' : 'none',
-            cursor: 'pointer',
-            border: '1px solid #282c31',
-            flexShrink: 0,
-            transition: 'all 0.2s ease',
-            marginLeft: '8px'
+        {/* Right: Mute Icon - Always Visible */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleState('muted');
           }}
-        />
+          title={trackState.muted ? "Unmute" : "Mute"}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '2px',
+            transition: 'all 0.15s ease',
+            width: '18px',
+            height: '18px',
+            flexShrink: 0,
+            marginLeft: '4px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          {trackState.muted ? (
+            <VolumeX 
+              size={13} 
+              className="blender-icon" 
+              style={{ color: '#6b7280' }}
+            />
+          ) : (
+            <Volume2 
+              size={13} 
+              className="blender-icon" 
+              style={{ color: '#60a5fa' }}
+            />
+          )}
+        </button>
       </div>
 
       <div
@@ -427,7 +649,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
   );
 }
 
-export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4 }) {
+export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) {
   const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips } = useProject();
   const [selected, setSelected] = useState(null);
 
@@ -679,16 +901,16 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       } else {
         // Resizing from right - adjust length only
         const newLength = Math.max(0.25, rs.startLength + deltaBeats);
-        const snappedLength = Math.round(newLength * 4) / 4;
+      const snappedLength = Math.round(newLength * 4) / 4;
 
-        setPlaylistTracks(prev => prev.map(t => {
-          if (t.id !== rs.trackId) return t;
-          const newClips = [...t.clips];
-          if (newClips[rs.clipIndex]) {
-            newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
-          }
-          return { ...t, clips: newClips };
-        }));
+      setPlaylistTracks(prev => prev.map(t => {
+        if (t.id !== rs.trackId) return t;
+        const newClips = [...t.clips];
+        if (newClips[rs.clipIndex]) {
+          newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
+        }
+        return { ...t, clips: newClips };
+      }));
       }
       return;
     }
@@ -827,12 +1049,12 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       onMouseLeave={(e) => {
         e.currentTarget.style.background = 'transparent';
       }}
-      onClick={() => {
-        setPlaylistTracks(prev => [
-          ...prev,
-          { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
-        ]);
-      }}
+        onClick={() => {
+          setPlaylistTracks(prev => [
+            ...prev,
+            { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
+          ]);
+        }}
       >
         <div className="track-header" style={{
           background: 'transparent',

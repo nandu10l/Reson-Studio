@@ -7,6 +7,8 @@ class AudioEngine {
         this.audioPlayers = new Map(); // audioClipId -> Tone.Player
         this.isInitialized = false;
         this.previewSynth = null; // Dedicated synth for Piano Roll
+        this.masterAnalyser = null; // Analyser for visualization
+        this.masterGain = null; // Master gain node
     }
 
     async init() {
@@ -17,25 +19,138 @@ class AudioEngine {
         // Setup Transport
         Tone.Transport.bpm.value = 120;
 
-        // Setup Preview Synth
+        // Setup Master Gain and Analyser for visualization
+        // Create a master gain node that all audio routes through
+        this.masterGain = new Tone.Gain(1);
+        
+        // Create analyser for visualization with larger FFT size for better resolution
+        this.masterAnalyser = new Tone.Analyser('fft', 512);
+        
+        // Store direct reference to underlying Web Audio API AnalyserNode
+        // Tone.js Analyser wraps a Web Audio API AnalyserNode
+        // Access it after connection is established
+        this.masterAnalyserNode = null;
+        
+        // Connect master gain to analyser and destination
+        this.masterGain.connect(this.masterAnalyser);
+        this.masterAnalyser.toDestination();
+        
+        // Get the underlying Web Audio API node after connection
+        // Try multiple ways to access it
+        if (this.masterAnalyser._analyser) {
+            this.masterAnalyserNode = this.masterAnalyser._analyser;
+        } else if (this.masterAnalyser.input && this.masterAnalyser.input._analyser) {
+            this.masterAnalyserNode = this.masterAnalyser.input._analyser;
+        } else {
+            // Fallback: access via context
+            const context = this.masterAnalyser.context;
+            if (context && context.rawContext) {
+                // The analyser node should be accessible through the internal structure
+                // Try to find it in the node graph
+                const internalNode = this.masterAnalyser.input || this.masterAnalyser;
+                if (internalNode && internalNode._analyser) {
+                    this.masterAnalyserNode = internalNode._analyser;
+                }
+            }
+        }
+        
+        // Set analyser properties for better visualization
+        if (this.masterAnalyserNode) {
+            this.masterAnalyserNode.fftSize = 512;
+            this.masterAnalyserNode.smoothingTimeConstant = 0.3;
+        }
+
+        // Setup Preview Synth - connect to master gain instead of destination
         this.previewSynth = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: "triangle" },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
-        }).toDestination();
+        }).connect(this.masterGain);
         this.previewSynth.volume.value = -10;
 
         this.isInitialized = true;
     }
 
+    // Get analyser node for visualization
+    getAnalyser() {
+        return this.masterAnalyser;
+    }
+    
+    // Get underlying Web Audio API AnalyserNode for direct access
+    getAnalyserNode() {
+        // Return the stored reference if available
+        if (this.masterAnalyserNode) {
+            return this.masterAnalyserNode;
+        }
+        
+        // Fallback: try to access it dynamically
+        if (this.masterAnalyser) {
+            if (this.masterAnalyser._analyser) {
+                return this.masterAnalyser._analyser;
+            }
+            if (this.masterAnalyser.input && this.masterAnalyser.input._analyser) {
+                return this.masterAnalyser.input._analyser;
+            }
+        }
+        return null;
+    }
+
+    // Get master gain node (for channels to connect to)
+    getMasterGain() {
+        return this.masterGain;
+    }
+
     // --- Transport Controls ---
     start() {
-        if (Tone.Transport.state !== 'started') {
-            Tone.Transport.start();
+        // Check if transport is paused, and resume if so
+        if (Tone.Transport.state === 'paused') {
+            Tone.Transport.start(); // Resume from paused state
+        } else if (Tone.Transport.state !== 'started') {
+            Tone.Transport.start(); // Start from stopped state
         }
     }
 
     pause() {
-        Tone.Transport.pause();
+        // Only pause if currently playing
+        if (Tone.Transport.state === 'started') {
+            // Pause Transport - this pauses scheduled events
+            Tone.Transport.pause();
+            
+            // Stop all currently playing audio players
+            // Transport.pause() doesn't stop players that are already playing
+            this.audioPlayers.forEach((player) => {
+                try {
+                    // Check if player is actually playing
+                    if (player && (player.state === 'started' || player.loaded)) {
+                        player.stop();
+                    }
+                } catch (error) {
+                    // Ignore errors if player can't be stopped
+                    console.warn('Error stopping audio player on pause:', error);
+                }
+            });
+            
+            // Release all active synth notes (these should stop immediately)
+            this.sources.forEach((source) => {
+                try {
+                    if (source && typeof source.releaseAll === 'function') {
+                        source.releaseAll();
+                    }
+                } catch (error) {
+                    console.warn('Error releasing synth source:', error);
+                }
+            });
+            
+            // Release preview synth notes
+            if (this.previewSynth) {
+                try {
+                    if (typeof this.previewSynth.releaseAll === 'function') {
+                        this.previewSynth.releaseAll();
+                    }
+                } catch (error) {
+                    console.warn('Error releasing preview synth:', error);
+                }
+            }
+        }
     }
 
     stop() {
@@ -54,16 +169,27 @@ class AudioEngine {
         const loopLength = "1m"; // Assuming 16 steps = 1 measure
         Tone.Transport.loop = true;
         Tone.Transport.loopEnd = loopLength;
+        
+        // Get current position in the pattern loop
+        const currentTime = Tone.Transport.seconds;
+        const loopLengthSeconds = Tone.Time(loopLength).toSeconds();
+        const positionInLoop = currentTime % loopLengthSeconds;
 
         // Schedule Drums (Steps)
         Object.entries(pattern.data.steps).forEach(([channelId, steps]) => {
             const id = parseInt(channelId);
             steps.forEach((isActive, index) => {
                 if (isActive) {
-                    const time = `0:0:${index}`; // bars:quarters:sixteenths
-                    Tone.Transport.schedule((t) => {
-                        this.previewSound(id);
-                    }, time);
+                    const stepTime = Tone.Time(`0:0:${index}`).toSeconds();
+                    const stepTimeInLoop = stepTime % loopLengthSeconds;
+                    
+                    // Schedule if step hasn't passed in current loop iteration
+                    if (stepTimeInLoop >= positionInLoop) {
+                        const time = `0:0:${index}`; // bars:quarters:sixteenths
+                        Tone.Transport.schedule((t) => {
+                            this.previewSound(id);
+                        }, time);
+                    }
                 }
             });
         });
@@ -74,21 +200,21 @@ class AudioEngine {
             // Skip notes with invalid noteName
             if (!note.noteName) return;
             
-            const time = `0:0:${note.startStep}`;
+            const noteStartTime = Tone.Time(`0:0:${note.startStep}`).toSeconds();
+            const noteStartInLoop = noteStartTime % loopLengthSeconds;
             const duration = `0:0:${note.length}`;
 
-            // Map "C5" to "C5" (direct) or parse if needed
-            // Our piano roll uses "C5", "F#4" etc which Tone.js understands
-
-            // Need a melodic source. For now, we don't have per-track instruments in Piano Roll
-            // We'll use a default PolySynth for preview, or map to a specific channel if we add that metadata
-
-            Tone.Transport.schedule((t) => {
-                // Use dedicated poly synth
-                if (this.previewSynth && note.noteName) {
-                    this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
-                }
-            }, time);
+            // Schedule if note hasn't passed in current loop iteration
+            if (noteStartInLoop >= positionInLoop) {
+                const time = `0:0:${note.startStep}`;
+                
+                Tone.Transport.schedule((t) => {
+                    // Use dedicated poly synth
+                    if (this.previewSynth && note.noteName) {
+                        this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                    }
+                }, time);
+            }
         });
 
         console.log('Scheduled pattern:', pattern.id);
@@ -111,24 +237,87 @@ class AudioEngine {
                     }
 
                     // Convert offset from beats to time
-                    const startTime = Tone.Time(`${clip.offset}q`).toSeconds();
-                    const duration = Tone.Time(`${clip.length}q`).toSeconds();
+                    const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
+                    const clipEndTime = clipStartTime + Tone.Time(`${clip.length}q`).toSeconds();
+                    const currentTime = Tone.Transport.seconds;
+                    
+                    // Only schedule if clip hasn't finished playing yet
+                    if (clipEndTime > currentTime) {
+                        // Get or create audio player
+                        let player = this.audioPlayers.get(clip.audioClipId);
+                        if (!player && audioClip.url) {
+                            player = new Tone.Player({
+                                url: audioClip.url,
+                                volume: -6
+                            });
+                            // Connect to master gain if available, otherwise to destination
+                            if (this.masterGain) {
+                                player.connect(this.masterGain);
+                            } else {
+                                player.toDestination();
+                            }
+                            this.audioPlayers.set(clip.audioClipId, player);
+                        }
 
-                    // Get or create audio player
-                    let player = this.audioPlayers.get(clip.audioClipId);
-                    if (!player && audioClip.url) {
-                        player = new Tone.Player({
-                            url: audioClip.url,
-                            volume: -6
-                        }).toDestination();
-                        this.audioPlayers.set(clip.audioClipId, player);
-                    }
-
-                    if (player) {
-                        // Schedule audio playback
-                        Tone.Transport.schedule((t) => {
-                            player.start(t, 0, duration);
-                        }, startTime);
+                        if (player) {
+                            // Calculate when to start playback
+                            let playStartTime = clipStartTime;
+                            let playOffset = 0; // Offset into the audio file
+                            
+                            // If clip has already started, calculate offset
+                            if (currentTime > clipStartTime && currentTime < clipEndTime) {
+                                playStartTime = currentTime; // Start now
+                                playOffset = currentTime - clipStartTime; // Offset into audio
+                            }
+                            
+                            const remainingDuration = clipEndTime - playStartTime;
+                            
+                            // Schedule audio playback
+                            Tone.Transport.schedule((t) => {
+                                try {
+                                    // Tone.js Player.start() internally calls restart() which requires the player to be started first
+                                    // To avoid the 'start must be called before stop' error, we need to handle the state carefully
+                                    const playerState = player.state;
+                                    
+                                    // If player is started, stop it first before restarting
+                                    if (playerState === 'started') {
+                                        player.stop();
+                                    }
+                                    
+                                    // Use a small delay if we stopped the player to ensure state is clean
+                                    const startAudio = () => {
+                                        try {
+                                            if (playOffset > 0) {
+                                                // Resume from offset - use start() with offset parameter
+                                                player.start(t, playOffset, remainingDuration);
+                                            } else {
+                                                // Start from beginning
+                                                player.start(t, 0, remainingDuration);
+                                            }
+                                        } catch (startError) {
+                                            // If start fails (e.g., player in invalid state), try to reset and start
+                                            console.warn('Error starting player, attempting reset:', startError);
+                                            try {
+                                                // Try starting with minimal parameters
+                                                player.start(t);
+                                            } catch (finalError) {
+                                                console.error('Failed to start audio player after all attempts:', finalError);
+                                            }
+                                        }
+                                    };
+                                    
+                                    if (playerState === 'started') {
+                                        // Small delay to ensure stop completes before restart
+                                        setTimeout(startAudio, 5);
+                                    } else {
+                                        // Player is not started, safe to start directly
+                                        startAudio();
+                                    }
+                                } catch (error) {
+                                    console.error('Error in audio playback schedule:', error);
+                                }
+                            }, playStartTime);
+                        }
                     }
                     return;
                 }
@@ -201,7 +390,14 @@ class AudioEngine {
         const channel = new Tone.Channel({
             volume: -6, // Default -6dB
             pan: 0,
-        }).toDestination();
+        });
+        
+        // Connect to master gain instead of destination directly
+        if (this.masterGain) {
+            channel.connect(this.masterGain);
+        } else {
+            channel.toDestination(); // Fallback if master gain not initialized
+        }
 
         this.channels.set(id, channel);
 

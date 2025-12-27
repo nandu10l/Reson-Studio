@@ -1,215 +1,162 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ListMusic, Grid, LayoutGrid, Sliders } from './icons/BlenderIcons';
+import { ListMusic, Grid, LayoutGrid, Sliders, Play, Pause, Stop, Circle } from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import '../styles/blender-icons.css';
+import './TransportBar.css';
 
-// Transport Controls Component
+// Professional DAW Transport Bar Component
 function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
-  const { isPlaying, togglePlayback, bpm, updateBpm, stopPlayback } = useProject();
+  const { isPlaying, togglePlayback, bpm, updateBpm, stopPlayback, playheadPosition, playbackMode, setPlaybackMode, isRecording, setIsRecording } = useProject();
 
-  // Local UI state
-  const [currentTime, setCurrentTime] = useState(0);
-  const [metronomeOn, setMetronomeOn] = useState(false);
-  const [loopOn, setLoopOn] = useState(false);
-  const intervalRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
-  // Sync internal timer with isPlaying context
-  useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setCurrentTime(prev => prev + 0.1);
-      }, 100);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [isPlaying]);
-
-  const formatTime = (time) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  // Format time position from playhead (in beats) to bar:beat:sixteenth
+  const formatTimePosition = (beats) => {
+    const beatsPerBar = 4;
+    const sixteenthsPerBeat = 4;
+    const totalSixteenths = Math.floor(beats * sixteenthsPerBeat);
+    
+    const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
+    const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
+    const sixteenth = totalSixteenths % sixteenthsPerBeat;
+    
+    return `${bar}:${beat}:${sixteenth}`;
   };
 
   const handleBpmChange = (e) => {
     const newBpm = parseInt(e.target.value, 10);
-    if (!isNaN(newBpm) && newBpm > 0) {
+    if (!isNaN(newBpm) && newBpm > 0 && newBpm <= 300) {
       updateBpm(newBpm);
     }
   };
 
-  const toggleMetronome = () => {
-    setMetronomeOn(!metronomeOn);
-  };
-
-  const toggleLoop = () => {
-    setLoopOn(!loopOn);
-  };
-
-  const handleResetTime = () => {
-    setCurrentTime(0);
-    stopPlayback(); // Reset often stops
-    if (onResetTime) onResetTime();
+  const handleBpmBlur = (e) => {
+    const newBpm = parseInt(e.target.value, 10);
+    if (isNaN(newBpm) || newBpm <= 0 || newBpm > 300) {
+      e.target.value = bpm; // Reset to current BPM if invalid
+    }
   };
 
   return (
-    <div className="transport-bar" style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      height: '32px',
-      background: '#1e1e1e',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-      padding: '0 12px',
-      gap: '12px'
-    }}>
+    <div className="transport-bar">
       {/* Left: Pattern Navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+      <div className="transport-left">
         <div {...useGuideHandlers('Pattern Selector')}>
           <PatternSelector />
         </div>
       </div>
 
-      {/* Center: Empty space for hierarchy */}
-      <div style={{ flex: 1 }} />
+      {/* Center: Transport Controls - Primary */}
+      <div className="transport-center">
+        {/* Transport Controls Cluster */}
+        <div className="transport-controls-cluster">
+          <button
+            className={`transport-btn transport-btn-play ${isPlaying ? 'active' : ''}`}
+            onClick={togglePlayback}
+            title={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <Pause size={16} className="blender-icon" />
+            ) : (
+              <Play size={16} className="blender-icon" />
+            )}
+          </button>
+          
+          <button
+            className="transport-btn transport-btn-stop"
+            onClick={stopPlayback}
+            title="Stop"
+          >
+            <Stop size={14} className="blender-icon" />
+          </button>
+          
+          <button
+            className={`transport-btn transport-btn-record ${isRecording ? 'recording' : ''}`}
+            onClick={() => setIsRecording(prev => !prev)}
+            title="Record"
+          >
+            <Circle size={12} className="blender-icon" />
+          </button>
+        </div>
 
-      {/* Right: View Controls */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-        flexShrink: 0
-      }}>
-        <button
-          onClick={() => onToggleWindow && onToggleWindow('playlist')}
-          title="Playlist"
-          {...useGuideHandlers('View Playlist')}
-          style={{
-            width: '24px',
-            height: '24px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: activeWindows?.playlist ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
-            border: 'none',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!activeWindows?.playlist) {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!activeWindows?.playlist) {
-              e.currentTarget.style.background = 'transparent';
-            }
-          }}
-        >
-          <ListMusic size={18} color={activeWindows?.playlist ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
-        </button>
+        {/* Time Position - Prominent */}
+        <div className="transport-time-display">
+          {formatTimePosition(playheadPosition)}
+        </div>
+      </div>
 
-        <button
-          onClick={() => onToggleWindow && onToggleWindow('pianoRoll')}
-          title="Piano Roll"
-          {...useGuideHandlers('View Piano Roll')}
-          style={{
-            width: '24px',
-            height: '24px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: activeWindows?.pianoRoll ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
-            border: 'none',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!activeWindows?.pianoRoll) {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!activeWindows?.pianoRoll) {
-              e.currentTarget.style.background = 'transparent';
-            }
-          }}
-        >
-          <Grid size={18} color={activeWindows?.pianoRoll ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
-        </button>
+      {/* Right: Secondary Controls */}
+      <div className="transport-right">
+        {/* Mode Toggle - Secondary */}
+        <div className="transport-mode-cluster">
+          <button
+            className={`transport-mode-btn ${playbackMode === 'PAT' ? 'active' : ''}`}
+            onClick={() => setPlaybackMode('PAT')}
+            title="Pattern Mode"
+          >
+            PAT
+          </button>
+          <button
+            className={`transport-mode-btn ${playbackMode === 'SONG' ? 'active' : ''}`}
+            onClick={() => setPlaybackMode('SONG')}
+            title="Song Mode"
+          >
+            SONG
+          </button>
+        </div>
 
-        <button
-          onClick={() => onToggleWindow && onToggleWindow('channelRack')}
-          title="Channel Rack"
-          {...useGuideHandlers('View Channel Rack')}
-          style={{
-            width: '24px',
-            height: '24px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: activeWindows?.channelRack ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
-            border: 'none',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!activeWindows?.channelRack) {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!activeWindows?.channelRack) {
-              e.currentTarget.style.background = 'transparent';
-            }
-          }}
-        >
-          <LayoutGrid size={18} color={activeWindows?.channelRack ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
-        </button>
+        {/* BPM - Secondary */}
+        <div className="transport-bpm-cluster">
+          <input
+            type="number"
+            className="transport-bpm-input"
+            value={bpm}
+            onChange={handleBpmChange}
+            onBlur={handleBpmBlur}
+            min="1"
+            max="300"
+            title="BPM"
+          />
+          <span className="transport-bpm-label">BPM</span>
+        </div>
 
-        <button
-          onClick={() => onToggleWindow && onToggleWindow('mixer')}
-          title="Mixer"
-          {...useGuideHandlers('View Mixer')}
-          style={{
-            width: '24px',
-            height: '24px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: activeWindows?.mixer ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
-            border: 'none',
-            borderRadius: '2px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease'
-          }}
-          onMouseEnter={(e) => {
-            if (!activeWindows?.mixer) {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!activeWindows?.mixer) {
-              e.currentTarget.style.background = 'transparent';
-            }
-          }}
-        >
-          <Sliders size={18} color={activeWindows?.mixer ? '#60a5fa' : '#b3b3b3'} className="blender-icon" />
-        </button>
+        {/* View Controls - Secondary */}
+        <div className="transport-views-cluster">
+          <button
+            className={`transport-view-btn ${activeWindows?.playlist ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('playlist')}
+            title="Playlist"
+            {...useGuideHandlers('View Playlist')}
+          >
+            <ListMusic size={16} className="blender-icon" />
+          </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.pianoRoll ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('pianoRoll')}
+            title="Piano Roll"
+            {...useGuideHandlers('View Piano Roll')}
+          >
+            <Grid size={16} className="blender-icon" />
+          </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.channelRack ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('channelRack')}
+            title="Channel Rack"
+            {...useGuideHandlers('View Channel Rack')}
+          >
+            <LayoutGrid size={16} className="blender-icon" />
+          </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.mixer ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('mixer')}
+            title="Mixer"
+            {...useGuideHandlers('View Mixer')}
+          >
+            <Sliders size={16} className="blender-icon" />
+          </button>
+        </div>
       </div>
     </div>
   );

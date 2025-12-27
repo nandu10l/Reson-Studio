@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
 import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats } from '../utils/audioImport';
+import * as Tone from 'tone';
 
 const ProjectContext = createContext();
 
@@ -165,6 +166,8 @@ export const ProjectProvider = ({ children }) => {
     const [bpm, setBpm] = useState(120);
     const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
     const [isRecording, setIsRecording] = useState(false);
+    const [playheadPosition, setPlayheadPosition] = useState(0); // Position in beats
+    const playheadIntervalRef = useRef(null);
 
     // --- Actions ---
 
@@ -205,18 +208,64 @@ export const ProjectProvider = ({ children }) => {
     const togglePlayback = useCallback(async () => {
         await audioEngine.init();
         if (isPlaying) {
+            // Pause playback
             audioEngine.pause();
             setIsPlaying(false);
         } else {
+            // Start or resume playback from current playhead position
+            const wasPaused = Tone.Transport.state === 'paused';
+            const wasStopped = Tone.Transport.state === 'stopped';
+            
+            // Seek Transport to current playhead position (in seconds)
+            const beatsPerSecond = bpm / 60;
+            const currentTimeSeconds = playheadPosition / beatsPerSecond;
+            Tone.Transport.seconds = currentTimeSeconds;
+            
+            // Always reschedule from current position (whether paused or stopped)
+            if (playbackMode === 'SONG') {
+                // Reschedule playlist from current playhead position
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips);
+            } else if (playbackMode === 'PAT') {
+                // Reschedule pattern from current playhead position
+                const activePattern = patterns.find(p => p.id === activePatternId);
+                if (activePattern) {
+                    audioEngine.schedulePattern(activePattern);
+                }
+            }
+            
             audioEngine.start();
             setIsPlaying(true);
         }
-    }, [isPlaying]);
+    }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm]);
 
     const stopPlayback = useCallback(() => {
         audioEngine.stop();
         setIsPlaying(false);
+        setPlayheadPosition(0);
     }, []);
+
+    // Track playhead position during playback
+    useEffect(() => {
+        if (isPlaying) {
+            playheadIntervalRef.current = setInterval(() => {
+                // Get position from Tone.js Transport in seconds, convert to beats
+                const positionSeconds = Tone.Transport.seconds;
+                const beatsPerSecond = bpm / 60;
+                const positionBeats = positionSeconds * beatsPerSecond;
+                setPlayheadPosition(positionBeats);
+            }, 16); // Update ~60fps for smooth animation
+        } else {
+            if (playheadIntervalRef.current) {
+                clearInterval(playheadIntervalRef.current);
+                playheadIntervalRef.current = null;
+            }
+        }
+        return () => {
+            if (playheadIntervalRef.current) {
+                clearInterval(playheadIntervalRef.current);
+            }
+        };
+    }, [isPlaying, bpm]);
 
     const updateBpm = useCallback((newBpm) => {
         setBpm(newBpm);
@@ -270,8 +319,11 @@ export const ProjectProvider = ({ children }) => {
             // Decode audio
             const audioBuffer = await decodeAudioFile(file);
             
-            // Generate waveform
-            const waveform = generateWaveform(audioBuffer, 1000); // 1000 samples for waveform
+            // Generate waveform - use more samples for better accuracy
+            // Calculate samples based on duration: ~100 samples per second, min 2000
+            const samplesPerSecond = 100;
+            const targetSamples = Math.max(2000, Math.floor(audioBuffer.duration * samplesPerSecond));
+            const waveform = generateWaveform(audioBuffer, targetSamples);
             
             // Calculate duration in beats
             const durationBeats = audioDurationToBeats(audioBuffer, bpm);
@@ -301,12 +353,12 @@ export const ProjectProvider = ({ children }) => {
             // Find first track or selected track
             const targetTrack = playlistTracks.find(t => t.clips.length === 0) || playlistTracks[0];
             if (targetTrack) {
-                const currentPlayhead = 0; // TODO: Get actual playhead position
+                // Use current playhead position in beats
                 const newClip = {
                     id: Date.now(), // Unique ID for the clip instance
                     type: 'audio',
                     audioClipId: audioClip.id,
-                    offset: currentPlayhead,
+                    offset: playheadPosition,
                     length: durationBeats,
                     name: audioClip.name
                 };
@@ -378,6 +430,8 @@ export const ProjectProvider = ({ children }) => {
         setPlaybackMode,
         isRecording,
         setIsRecording,
+        playheadPosition,
+        setPlayheadPosition,
 
         // Audio Clips
         audioClips,
@@ -398,3 +452,5 @@ export const ProjectProvider = ({ children }) => {
         </ProjectContext.Provider>
     );
 };
+
+

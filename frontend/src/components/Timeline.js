@@ -2,14 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
 
-function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, isPlaying = false, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange }) {
+function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition = 0, isPlaying = false, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange, onSeek }) {
   const timelineRef = useRef(null);
 
-  // Calculate time position for playhead
-  const timeToPixels = (time) => {
-    const beatsPerSecond = bpm / 60;
-    const totalBeats = time * beatsPerSecond;
-    return totalBeats * pixelsPerBeat;
+  // Calculate pixel position for playhead (playheadPosition is in beats)
+  const beatsToPixels = (beats) => {
+    return beats * pixelsPerBeat;
   };
 
   const pixelsToTime = (pixels) => {
@@ -32,9 +30,10 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
     if (!timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const time = pixelsToTime(x);
-    // Here you would typically dispatch an action to set the current time
-    console.log('Seek to time:', time);
+    const beats = x / pixelsPerBeat;
+    if (onSeek) {
+      onSeek(beats);
+    }
   };
 
   const renderTicks = () => {
@@ -175,17 +174,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, currentTime = 0, 
           {renderTicks()}
         </div>
 
-        {/* Playhead */}
-        <div
-          className="playhead"
-          style={{
-            left: `${timeToPixels(currentTime)}px`,
-            display: isPlaying ? 'block' : 'none'
-          }}
-        >
-          <div className="playhead-line" />
-          <div className="playhead-head" />
-        </div>
+        {/* Playhead is rendered in track-area to span both timeline and tracks */}
 
         {/* Time markers for major divisions */}
         <div className="time-markers">

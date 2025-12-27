@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './PianoRoll.css';
 import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit } from './icons/BlenderIcons';
+import Playhead from './Playhead';
 import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
 
@@ -18,7 +19,8 @@ const PianoRoll = () => {
         togglePlayback,
         bpm,
         updatePattern,
-        activePatternId
+        activePatternId,
+        playheadPosition
     } = useProject();
 
     // Local State
@@ -49,7 +51,8 @@ const PianoRoll = () => {
     const stepsPerBar = 16;
     const keyHeight = 24;
 
-    const scrollRef = useRef(null);
+    const pianoKeysRef = useRef(null);
+    const gridAreaRef = useRef(null);
     const mainAreaRef = useRef(null);
 
     // Generate keys
@@ -65,25 +68,56 @@ const PianoRoll = () => {
         });
     }
 
-    // Scroll to C5 on mount
+    // Scroll to C5 on mount and sync vertical scrolling
     useEffect(() => {
-        if (scrollRef.current) {
-            const rowC5 = allKeys.findIndex(k => k.note === 'C' && k.octave === 5);
-            if (rowC5 !== -1) {
-                // Center C5 roughly
-                scrollRef.current.scrollTop = (rowC5 * keyHeight) - (scrollRef.current.clientHeight / 2) + (keyHeight / 2);
+        const rowC5 = allKeys.findIndex(k => k.note === 'C' && k.octave === 5);
+        if (rowC5 !== -1) {
+            const scrollTop = (rowC5 * keyHeight) - ((pianoKeysRef.current?.clientHeight || 400) / 2) + (keyHeight / 2);
+            if (pianoKeysRef.current) {
+                pianoKeysRef.current.scrollTop = scrollTop;
+            }
+            if (gridAreaRef.current) {
+                gridAreaRef.current.scrollTop = scrollTop;
             }
         }
-    }, []);
+    }, [allKeys, keyHeight]);
+
+    // Auto-scroll to keep playhead visible during playback (only grid area scrolls)
+    useEffect(() => {
+        if (!gridAreaRef.current || !isPlaying) return;
+        
+        const scrollContainer = gridAreaRef.current;
+        const playheadPixelX = playheadPosition * pixelsPerStep * 4; // 4 steps per beat, no piano keys offset
+        
+        // Get viewport bounds
+        const scrollLeft = scrollContainer.scrollLeft;
+        const viewportWidth = scrollContainer.clientWidth;
+        const visibleStart = scrollLeft;
+        const visibleEnd = scrollLeft + viewportWidth;
+        
+        // Calculate margins (keep playhead centered with some padding)
+        const margin = viewportWidth * 0.2; // 20% margin on each side
+        
+        // Check if playhead is outside visible area
+        if (playheadPixelX < visibleStart + margin) {
+            // Scroll left to show playhead
+            scrollContainer.scrollLeft = Math.max(0, playheadPixelX - margin);
+        } else if (playheadPixelX > visibleEnd - margin) {
+            // Scroll right to show playhead
+            scrollContainer.scrollLeft = playheadPixelX - viewportWidth + margin;
+        }
+    }, [playheadPosition, pixelsPerStep, isPlaying]);
 
     // --- Helpers ---
     const getStepFromX = (x) => {
-        // x is already in content coordinates (includes scrollLeft)
-        // Account for piano key width offset (300px)
-        const gridX = x - 300;
-        if (gridX < 0) return 0;
-        const step = Math.floor(gridX / pixelsPerStep);
-        return Math.max(0, step);
+        // x is relative to grid area (no piano keys offset needed)
+        if (gridAreaRef.current) {
+            const rect = gridAreaRef.current.getBoundingClientRect();
+            const gridX = x - rect.left + gridAreaRef.current.scrollLeft;
+            const step = Math.floor(gridX / pixelsPerStep);
+            return Math.max(0, step);
+        }
+        return 0;
     };
     const getKeyFromY = (y) => {
         // y is already in content coordinates (includes scrollTop)
@@ -107,16 +141,16 @@ const PianoRoll = () => {
         // Allow Left (0) and Right (2) clicks
         if (e.button !== 0 && e.button !== 2) return;
 
-        if (!mainAreaRef.current || !scrollRef.current) return;
+        if (!mainAreaRef.current || !gridAreaRef.current) return;
 
-        const scrollRect = scrollRef.current.getBoundingClientRect();
-        // Calculate coordinates relative to the scroll container viewport
+        const scrollRect = gridAreaRef.current.getBoundingClientRect();
+        // Calculate coordinates relative to the grid area viewport
         const viewportX = e.clientX - scrollRect.left;
         const viewportY = e.clientY - scrollRect.top;
         
         // Add scroll offsets to get content coordinates
-        const x = viewportX + scrollRef.current.scrollLeft;
-        const y = viewportY + scrollRef.current.scrollTop;
+        const x = viewportX + gridAreaRef.current.scrollLeft;
+        const y = viewportY + gridAreaRef.current.scrollTop;
 
         const targetIsNote = e.target.closest('.piano-note');
         const targetIsResize = e.target.classList.contains('piano-note-resize');
@@ -283,12 +317,12 @@ const PianoRoll = () => {
         }
 
         if (dragState.type === 'SELECT') {
-            if (!scrollRef.current) return;
-            const scrollRect = scrollRef.current.getBoundingClientRect();
+            if (!gridAreaRef.current) return;
+            const scrollRect = gridAreaRef.current.getBoundingClientRect();
             const viewportX = e.clientX - scrollRect.left;
             const viewportY = e.clientY - scrollRect.top;
-            const x = viewportX + scrollRef.current.scrollLeft;
-            const y = viewportY + scrollRef.current.scrollTop;
+            const x = viewportX + gridAreaRef.current.scrollLeft;
+            const y = viewportY + gridAreaRef.current.scrollTop;
 
             setDragState(prev => ({ ...prev, currentX: x, currentY: y }));
         }
@@ -613,10 +647,10 @@ const PianoRoll = () => {
             <div
                 className="piano-main-area"
                 onContextMenu={handleContextMenu}
-                ref={scrollRef}
                 onMouseDown={handleMouseDown}
             >
-                <div ref={mainAreaRef} style={{ position: 'relative' }}>
+                {/* Piano Keys Column - Fixed, no horizontal scroll */}
+                <div className="piano-keys-column" ref={pianoKeysRef}>
                     {allKeys.map((k) => {
                         const keyNotes = getNotesForKey(k.fullName);
                         const hasNotes = keyNotes.length > 0;
@@ -625,90 +659,105 @@ const PianoRoll = () => {
 
                         return (
                             <div 
-                                className="piano-row" 
-                                key={k.fullName} 
+                                className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
+                                key={k.fullName}
                                 style={{ height: `${keyHeight}px` }}
                                 onMouseEnter={() => setHoveredKey(k.fullName)}
                                 onMouseLeave={() => setHoveredKey(null)}
                             >
-                                {/* Sticky Key */}
-                                <div 
-                                    className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
-                                    style={{ height: `${keyHeight}px`, position: 'sticky', left: 0, zIndex: 10 }}
-                                >
-                                    {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
-                                    {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.4 }}>{k.note}</span>}
-                                    {hasNotes && <div className="key-note-indicator"></div>}
-                                </div>
-
-                            {/* Grid Row */}
-                            <div className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}>
-                                {/* Render Grid Background Cells */}
-                                {Array.from({ length: totalBars * stepsPerBar }).map((_, step) => {
-                                    const isBar = step % 16 === 0;
-                                    const isBeat = step % 4 === 0;
-                                    return (
-                                        <div
-                                            key={step}
-                                            className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
-                                            style={{ width: `${pixelsPerStep}px` }}
-                                        // onPointerDown handled by parent onMouseDown
-                                        ></div>
-                                    );
-                                })}
+                                {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
+                                {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.4 }}>{k.note}</span>}
+                                {hasNotes && <div className="key-note-indicator"></div>}
                             </div>
-                        </div>
                         );
                     })}
+                </div>
 
-                    {/* Render Notes Layer Overlay */}
-                    <div className="piano-notes-overlay" style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '100px', // width of sticky keys
-                        width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
-                        height: `${allKeys.length * keyHeight}px`,
-                        pointerEvents: 'none' // Let clicks pass through to rows unless on a note
-                    }}>
-                        {activePattern.data.notes.map(note => {
-                            const top = getYFromKey(note.noteName);
-                            const left = note.startStep * pixelsPerStep;
-                            const width = note.length * pixelsPerStep;
-                            const isSelected = selection.includes(note.id);
+                {/* Grid Area - Scrollable horizontally */}
+                <div className="piano-grid-area" ref={gridAreaRef}>
+                    <div ref={mainAreaRef} style={{ position: 'relative' }}>
+                        {/* Playhead for piano roll */}
+                        <Playhead
+                            mode="smooth"
+                            pixelsPerBeat={pixelsPerStep * 4} // 4 steps per beat
+                            headerOffset={0} // No header offset in grid area
+                        />
+                        {allKeys.map((k) => {
+                            const keyNotes = getNotesForKey(k.fullName);
+                            const hasNotes = keyNotes.length > 0;
+                            const isPlayingNote = keyNotes.some(note => isNotePlaying(note));
 
                             return (
-                                <div
-                                    key={note.id}
-                                    data-id={note.id}
-                                    className={`piano-note ${isSelected ? 'selected' : ''}`}
-                                    style={{
-                                        position: 'absolute',
-                                        top: `${top}px`,
-                                        left: `${left}px`,
-                                        width: `${width}px`,
-                                        height: `${keyHeight}px`,
-                                        pointerEvents: 'auto'
-                                    }}
+                                <div 
+                                    className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} 
+                                    key={k.fullName}
+                                    style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}
                                 >
-                                    <div className="piano-note-resize"></div>
+                                    {/* Render Grid Background Cells */}
+                                    {Array.from({ length: totalBars * stepsPerBar }).map((_, step) => {
+                                        const isBar = step % 16 === 0;
+                                        const isBeat = step % 4 === 0;
+                                        return (
+                                            <div
+                                                key={step}
+                                                className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
+                                                style={{ width: `${pixelsPerStep}px` }}
+                                            ></div>
+                                        );
+                                    })}
                                 </div>
                             );
-                        })}
+                        }                        )}
 
-                        {/* Selection Box */}
-                        {dragState && dragState.type === 'SELECT' && (
-                            <div style={{
-                                position: 'absolute',
-                                left: Math.min(dragState.startX, dragState.currentX) - 300, // Account for piano key offset
-                                top: Math.min(dragState.startY, dragState.currentY),
-                                width: Math.abs(dragState.currentX - dragState.startX),
-                                height: Math.abs(dragState.currentY - dragState.startY),
-                                border: '1px solid #4ade80',
-                                backgroundColor: 'rgba(74, 222, 128, 0.15)',
-                                pointerEvents: 'none',
-                                borderRadius: '2px'
-                            }}></div>
-                        )}
+                        {/* Render Notes Layer Overlay */}
+                        <div className="piano-notes-overlay" style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0, // No offset needed, grid area starts at 0
+                            width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
+                            height: `${allKeys.length * keyHeight}px`,
+                            pointerEvents: 'none' // Let clicks pass through to rows unless on a note
+                        }}>
+                            {activePattern.data.notes.map(note => {
+                                const top = getYFromKey(note.noteName);
+                                const left = note.startStep * pixelsPerStep;
+                                const width = note.length * pixelsPerStep;
+                                const isSelected = selection.includes(note.id);
+
+                                return (
+                                    <div
+                                        key={note.id}
+                                        data-id={note.id}
+                                        className={`piano-note ${isSelected ? 'selected' : ''}`}
+                                        style={{
+                                            position: 'absolute',
+                                            top: `${top}px`,
+                                            left: `${left}px`,
+                                            width: `${width}px`,
+                                            height: `${keyHeight}px`,
+                                            pointerEvents: 'auto'
+                                        }}
+                                    >
+                                        <div className="piano-note-resize"></div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Selection Box */}
+                            {dragState && dragState.type === 'SELECT' && (
+                                <div style={{
+                                    position: 'absolute',
+                                    left: Math.min(dragState.startX, dragState.currentX), // No piano key offset needed
+                                    top: Math.min(dragState.startY, dragState.currentY),
+                                    width: Math.abs(dragState.currentX - dragState.startX),
+                                    height: Math.abs(dragState.currentY - dragState.startY),
+                                    border: '1px solid #4ade80',
+                                    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+                                    pointerEvents: 'none',
+                                    borderRadius: '2px'
+                                }}></div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

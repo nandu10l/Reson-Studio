@@ -11,6 +11,9 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
+        title: 'Reson Studio',
+        frame: false, // Completely remove default titlebar
+        titleBarStyle: 'hidden', // Additional setting for macOS
         autoHideMenuBar: true, // Hide the menu bar
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -35,7 +38,41 @@ function createWindow() {
         mainWindow.webContents.openDevTools();
     }
 
+    // Prevent Electron from adding symbols to the title
+    // Use setInterval to continuously clean the title (aggressive approach)
+    const cleanTitleInterval = setInterval(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const currentTitle = mainWindow.getTitle();
+            // Remove any electron symbols (⚡) and other unwanted characters
+            const cleanTitle = currentTitle.replace(/⚡/g, '').replace(/\s+/g, ' ').trim() || 'Reson Studio';
+            if (currentTitle !== cleanTitle) {
+                mainWindow.setTitle(cleanTitle);
+            }
+        } else {
+            clearInterval(cleanTitleInterval);
+        }
+    }, 50); // Check every 50ms for faster response
+
+    // Listen for title updates and clean them
+    mainWindow.webContents.on('page-title-updated', (event, title) => {
+        event.preventDefault();
+        // Remove any electron symbols (⚡) and other unwanted characters
+        const cleanTitle = title.replace(/⚡/g, '').replace(/\s+/g, ' ').trim() || 'Reson Studio';
+        mainWindow.setTitle(cleanTitle);
+    });
+
+    // Also set title immediately after load
+    mainWindow.webContents.on('did-finish-load', () => {
+        const currentTitle = mainWindow.getTitle();
+        const cleanTitle = currentTitle.replace(/⚡/g, '').replace(/\s+/g, ' ').trim() || 'Reson Studio';
+        if (currentTitle !== cleanTitle) {
+            mainWindow.setTitle(cleanTitle);
+        }
+    });
+
+    // Clean up interval when window is closed
     mainWindow.on('closed', () => {
+        clearInterval(cleanTitleInterval);
         mainWindow = null;
     });
 }
