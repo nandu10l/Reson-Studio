@@ -8,7 +8,7 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool }) {
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onAddAudioClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool }) {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -778,6 +778,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           trackState={ensureTrackState(track.id)}
           onToggleState={(state) => toggleTrackState(track.id, state)}
           onAddClip={addClip}
+          onAddAudioClip={onAddAudioClip}
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
           onResizeStart={onResizeStart}

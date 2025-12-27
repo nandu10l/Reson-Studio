@@ -73,7 +73,7 @@ class AudioEngine {
             // note: { id, noteName: "C5", startStep, length }
             // Skip notes with invalid noteName
             if (!note.noteName) return;
-            
+
             const time = `0:0:${note.startStep}`;
             const duration = `0:0:${note.length}`;
 
@@ -170,7 +170,7 @@ class AudioEngine {
                 pattern.data.notes.forEach(note => {
                     // Skip notes with invalid noteName
                     if (!note.noteName) return;
-                    
+
                     const absStep = clipStartStep + note.startStep;
                     const bar = Math.floor(absStep / 16);
                     const beat = Math.floor((absStep % 16) / 4);
