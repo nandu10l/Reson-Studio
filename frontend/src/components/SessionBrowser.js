@@ -1,10 +1,10 @@
 import React from 'react';
 import { useProject } from '../contexts/ProjectContext';
-import { Grid, Music } from './icons/BlenderIcons';
+import { Grid, Music, Plus, Activity, AudioWaveform } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
 
 export default function SessionBrowser() {
-  const { patterns, setActivePatternId, activePatternId, audioClips, pickerTab, setPickerTab } = useProject();
+  const { patterns, setActivePatternId, activePatternId, audioClips, pickerTab, setPickerTab, createPattern, importAudioFile } = useProject();
 
   const handleDragStart = (e, pattern) => {
     e.dataTransfer.setData('application/json', JSON.stringify({
@@ -28,54 +28,104 @@ export default function SessionBrowser() {
     <div className="picker-panel" style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', background: '#363d43', color: '#c5c5c5' }}>
 
       {/* Picker Tabs */}
-      <div className="picker-tabs" style={{ display: 'flex', padding: '0 8px', gap: '0', borderBottom: '1px solid #1e2226' }}>
+      <div className="picker-tabs" style={{
+        display: 'flex',
+        padding: '0 8px',
+        gap: '4px',
+        borderBottom: '1px solid #1e2226',
+        height: '32px',
+        alignItems: 'center',
+        background: '#282c31'
+      }}>
+        {/* Add Button */}
         <div
-          onClick={() => setPickerTab('PAT')}
-          style={{
-            padding: '8px 12px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            color: pickerTab === 'PAT' ? '#fff' : '#6b7280',
-            background: pickerTab === 'PAT' ? '#4b5563' : 'transparent',
-            borderBottom: pickerTab === 'PAT' ? '2px solid #4ade80' : '2px solid transparent',
-            transition: 'all 0.2s',
-            marginBottom: '-1px'
+          onClick={() => {
+            if (pickerTab === 'AUDIO') {
+              importAudioFile(); // Assuming this is available in context, accessed via useProject
+            } else {
+              createPattern();
+            }
           }}
+          title={pickerTab === 'AUDIO' ? "Import Audio File" : "Create New Pattern"}
+          style={{
+            width: '24px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: '#b3b3b3',
+            opacity: 0.8,
+            transition: 'opacity 0.2s',
+            marginRight: '8px'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+          onMouseLeave={(e) => e.currentTarget.style.opacity = '0.8'}
         >
-          PAT
+          <Plus size={16} />
         </div>
+
+        {/* Vertical Divider */}
+        <div style={{ width: '1px', height: '16px', background: '#3f444b', marginRight: '4px' }}></div>
+
+        {/* Audio Clips Tab */}
         <div
           onClick={() => setPickerTab('AUDIO')}
+          title="Audio Clips"
           style={{
-            padding: '8px 12px',
-            fontSize: '11px',
-            fontWeight: 'bold',
+            width: '28px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: 'pointer',
             color: pickerTab === 'AUDIO' ? '#fff' : '#6b7280',
             background: pickerTab === 'AUDIO' ? '#4b5563' : 'transparent',
-            borderBottom: pickerTab === 'AUDIO' ? '2px solid #4ade80' : '2px solid transparent',
-            transition: 'all 0.2s',
-            marginBottom: '-1px'
+            borderRadius: '4px',
+            transition: 'all 0.2s'
           }}
         >
-          AUDIO
+          <AudioWaveform size={14} />
         </div>
+
+        {/* Automation Clips Tab */}
         <div
           onClick={() => setPickerTab('AUTO')}
+          title="Automation Clips"
           style={{
-            padding: '8px 12px',
-            fontSize: '11px',
-            fontWeight: 'bold',
+            width: '28px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             cursor: 'pointer',
             color: pickerTab === 'AUTO' ? '#fff' : '#6b7280',
             background: pickerTab === 'AUTO' ? '#4b5563' : 'transparent',
-            borderBottom: pickerTab === 'AUTO' ? '2px solid #4ade80' : '2px solid transparent',
-            transition: 'all 0.2s',
-            marginBottom: '-1px'
+            borderRadius: '4px',
+            transition: 'all 0.2s'
           }}
         >
-          AUTO
+          <Activity size={14} />
+        </div>
+
+        {/* Patterns Tab */}
+        <div
+          onClick={() => setPickerTab('PAT')}
+          title="Patterns"
+          style={{
+            width: '28px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: pickerTab === 'PAT' ? '#fff' : '#6b7280',
+            background: pickerTab === 'PAT' ? '#4b5563' : 'transparent',
+            borderRadius: '4px',
+            transition: 'all 0.2s'
+          }}
+        >
+          <Grid size={14} />
         </div>
       </div>
 
@@ -150,9 +200,9 @@ export default function SessionBrowser() {
                 >
                   <Music size={16} color="#60a5fa" className="blender-icon" style={{ flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div 
-                      style={{ 
-                        fontWeight: 500, 
+                    <div
+                      style={{
+                        fontWeight: 500,
                         marginBottom: '2px',
                         wordBreak: 'break-word',
                         lineHeight: '1.4',

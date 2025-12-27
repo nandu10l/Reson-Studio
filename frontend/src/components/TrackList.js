@@ -8,7 +8,7 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack }) {
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool }) {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -62,8 +62,8 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
         boxSizing: 'border-box',
         position: 'relative'
       }}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => !isEditing && setShowActions(false)}
+        onMouseEnter={() => setShowActions(true)}
+        onMouseLeave={() => !isEditing && setShowActions(false)}
       >
         {/* Track Name and Actions */}
         <div className="track-name-container" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
@@ -181,7 +181,15 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 
       <div
         className="track-clip-area"
-        style={{ minWidth: `${measures * beatsPerBar * pixelsPerBeat}px` }}
+        style={{
+          minWidth: `${measures * beatsPerBar * pixelsPerBeat}px`,
+          cursor: activeTool === 'draw' ? 'cell' :
+            activeTool === 'paint' ? 'copy' :
+              activeTool === 'delete' ? 'not-allowed' :
+                activeTool === 'slice' ? 'crosshair' :
+                  activeTool === 'mute' ? 'help' :
+                    activeTool === 'zoom' ? 'zoom-in' : 'default'
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
@@ -222,15 +230,15 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
             const sixteenthInBeat = sixteenth % 4;
             const isBeat = sixteenthInBeat === 0;
             const isDownbeat = isBeat && (beat % beatsPerBar === 0);
-            
+
             return (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className={`grid-line ${isDownbeat ? 'downbeat' : isBeat ? 'beat' : 'sixteenth'}`}
-                style={{ 
+                style={{
                   width: `${pixelsPerBeat / 4}px`,
                   left: `${(sixteenth / 4) * pixelsPerBeat}px`
-                }} 
+                }}
               />
             );
           })}
@@ -280,8 +288,8 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
               style={{
                 left: `${clip.offset * pixelsPerBeat}px`,
                 width: `${clip.length * pixelsPerBeat}px`,
-                background: isClipSelected 
-                  ? `linear-gradient(180deg, ${clipColor}E6 0%, ${clipColor}CC 100%)` 
+                background: isClipSelected
+                  ? `linear-gradient(180deg, ${clipColor}E6 0%, ${clipColor}CC 100%)`
                   : `linear-gradient(180deg, ${clipColor}80 0%, ${clipColor}60 100%)`,
                 borderColor: isClipSelected ? clipColor : `${clipColor}80`,
                 borderWidth: isClipSelected ? '2px' : '1px',
@@ -290,11 +298,11 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: isClipSelected 
-                  ? `inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 16px ${clipColor}80, 0 4px 8px rgba(0, 0, 0, 0.4)` 
+                boxShadow: isClipSelected
+                  ? `inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 16px ${clipColor}80, 0 4px 8px rgba(0, 0, 0, 0.4)`
                   : isClipHovered
-                  ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3)`
-                  : `inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2)`,
+                    ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3)`
+                    : `inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2)`,
                 minHeight: '52px',
                 opacity: isClipSelected ? 1 : isClipHovered ? 0.95 : 0.85,
                 transition: 'all 0.2s ease',
@@ -315,18 +323,18 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 onStartDrag(e, track.id, idx);
               }}
             >
-              <div className="clip-header" style={{ 
-                background: isClipSelected ? clipColor : `${clipColor}CC`, 
-                padding: '0 8px', 
-                fontSize: '10px', 
-                color: '#fff', 
-                fontWeight: 600, 
-                height: '18px', 
-                whiteSpace: 'nowrap', 
-                overflow: 'hidden', 
-                textOverflow: 'ellipsis', 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div className="clip-header" style={{
+                background: isClipSelected ? clipColor : `${clipColor}CC`,
+                padding: '0 8px',
+                fontSize: '10px',
+                color: '#fff',
+                fontWeight: 600,
+                height: '18px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: 'flex',
+                alignItems: 'center',
                 letterSpacing: '0.01em',
                 opacity: isClipSelected ? 1 : 0.9
               }}>
@@ -428,7 +436,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 }
 
 export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4 }) {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeTool } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Local UI state for mute/solo/arm
@@ -783,6 +791,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           onOpenMenu={setMenu}
           onRenameTrack={renameTrack}
           onDeleteTrack={deleteTrack}
+          activeTool={activeTool}
         />
       ))}
 
@@ -821,18 +830,18 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
         cursor: 'pointer',
         transition: 'background 0.15s ease'
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-      }}
-      onClick={() => {
-        setPlaylistTracks(prev => [
-          ...prev,
-          { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
-        ]);
-      }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+        }}
+        onClick={() => {
+          setPlaylistTracks(prev => [
+            ...prev,
+            { id: prev.length + 1, name: `Track ${prev.length + 1}`, clips: [] }
+          ]);
+        }}
       >
         <div className="track-header" style={{
           background: 'transparent',

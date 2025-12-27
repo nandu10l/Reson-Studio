@@ -64,6 +64,9 @@ export const ProjectProvider = ({ children }) => {
     // 6. Loading State
     const [isImportingAudio, setIsImportingAudio] = useState(false);
 
+    // 7. Global Tool State
+    const [activeTool, setActiveTool] = useState('draw'); // 'draw', 'paint', 'delete', 'mute', 'slice', 'select', 'zoom', 'playback'
+
     // --- Actions ---
 
     const createPattern = useCallback(() => {
@@ -85,7 +88,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const updatePattern = useCallback((patternId, updates) => {
-        setPatterns(prev => prev.map(p => 
+        setPatterns(prev => prev.map(p =>
             p.id === patternId ? { ...p, ...updates } : p
         ));
     }, []);
@@ -269,10 +272,10 @@ export const ProjectProvider = ({ children }) => {
 
             // Decode audio
             const audioBuffer = await decodeAudioFile(file);
-            
+
             // Generate waveform
             const waveform = generateWaveform(audioBuffer, 1000); // 1000 samples for waveform
-            
+
             // Calculate duration in beats
             const durationBeats = audioDurationToBeats(audioBuffer, bpm);
 
@@ -311,8 +314,8 @@ export const ProjectProvider = ({ children }) => {
                     name: audioClip.name
                 };
 
-                setPlaylistTracks(prev => prev.map(t => 
-                    t.id === targetTrack.id 
+                setPlaylistTracks(prev => prev.map(t =>
+                    t.id === targetTrack.id
                         ? { ...t, clips: [...t.clips, newClip] }
                         : t
                 ));
@@ -389,7 +392,11 @@ export const ProjectProvider = ({ children }) => {
         setPickerTab,
 
         // Loading State
-        isImportingAudio
+        isImportingAudio,
+
+        // Tools
+        activeTool,
+        setActiveTool
     };
 
     return (

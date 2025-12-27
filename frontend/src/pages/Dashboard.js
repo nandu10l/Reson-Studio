@@ -14,6 +14,8 @@ import '../styles/daw.css';
 import DraggableWindow from '../components/DraggableWindow';
 import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
+import PlaylistToolbar from '../components/PlaylistToolbar';
+import { useProject } from '../contexts/ProjectContext';
 // Mixer is already imported
 
 function Dashboard() {
@@ -39,6 +41,8 @@ function Dashboard() {
   const [bpm, setBpm] = useState(120);
   const [projects, setProjects] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
+
+  const { activeTool, setActiveTool } = useProject();
 
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
@@ -135,8 +139,19 @@ function Dashboard() {
                 '--inspector-width': '0px'
               }}
             >
+              {/* 0. Top Toolbar (Playlist Tools) */}
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 10
+              }}>
+                <PlaylistToolbar activeTool={activeTool} onToolChange={setActiveTool} />
+              </div>
+
               {/* 1. Left Panel (Session Browser) */}
-              <div className="session-browser">
+              <div className="session-browser" style={{ marginTop: '36px' }}>
                 <ProjectSidebar projects={projects} />
               </div>
 
@@ -144,12 +159,13 @@ function Dashboard() {
               <div
                 className="resizer left-resizer"
                 onPointerDown={(e) => startResize(e, 'browser')}
+                style={{ top: '36px' }}
               >
                 <GripVertical size={12} />
               </div>
 
               {/* 3. Center Canvas */}
-              <div className="center-canvas">
+              <div className="center-canvas" style={{ paddingTop: '36px' }}>
                 <div className="track-area">
                   <Timeline
                     measures={64}
