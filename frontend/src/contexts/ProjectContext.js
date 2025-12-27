@@ -67,6 +67,12 @@ export const ProjectProvider = ({ children }) => {
     // 7. Global Tool State
     const [activeTool, setActiveTool] = useState('draw'); // 'draw', 'paint', 'delete', 'mute', 'slice', 'select', 'zoom', 'playback'
 
+    // --- Selectors (Derived State) ---
+    const activePattern = useMemo(() =>
+        patterns.find(p => p.id === activePatternId) || patterns[0]
+        , [patterns, activePatternId]);
+
+
     // --- Actions ---
 
     const createPattern = useCallback(() => {
@@ -207,6 +213,20 @@ export const ProjectProvider = ({ children }) => {
     // Transport Actions
     const togglePlayback = useCallback(async () => {
         await audioEngine.init();
+
+        // Check for empty content before starting
+        if (!isPlaying) {
+            if (playbackMode === 'SONG') {
+                const hasContent = playlistTracks.some(track => track.clips.length > 0);
+                if (!hasContent) return;
+            } else {
+                // PAT Mode
+                const hasNotes = activePattern.data.notes.length > 0;
+                const hasSteps = Object.values(activePattern.data.steps).some(steps => steps.some(s => s));
+                if (!hasNotes && !hasSteps) return;
+            }
+        }
+
         if (isPlaying) {
             audioEngine.pause();
             setIsPlaying(false);
@@ -214,7 +234,7 @@ export const ProjectProvider = ({ children }) => {
             audioEngine.start();
             setIsPlaying(true);
         }
-    }, [isPlaying]);
+    }, [isPlaying, playbackMode, playlistTracks, activePattern]);
 
     const stopPlayback = useCallback(() => {
         audioEngine.stop();
@@ -331,10 +351,7 @@ export const ProjectProvider = ({ children }) => {
         }
     }, [bpm, playlistTracks]);
 
-    // --- Selectors (Derived State) ---
-    const activePattern = useMemo(() =>
-        patterns.find(p => p.id === activePatternId) || patterns[0]
-        , [patterns, activePatternId]);
+
 
     // --- Scheduling Logic ---
     React.useEffect(() => {

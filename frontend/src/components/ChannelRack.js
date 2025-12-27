@@ -119,8 +119,8 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
             {/* Left Controls Group */}
             <div className="channel-controls-left">
                 {/* Color Indicator */}
-                <div 
-                    className="channel-color-indicator" 
+                <div
+                    className="channel-color-indicator"
                     style={{ backgroundColor: color || '#4C8DB0' }}
                     title="Channel Color"
                 />
@@ -193,7 +193,7 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
                     const isBeat = i % 4 === 0;
                     const isBar = i % 16 === 0;
                     const playing = isStepPlaying(i);
-                    
+
                     return (
                         <button
                             key={i}
@@ -209,7 +209,7 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
 };
 
 const ChannelRack = () => {
-    const { channels, activePattern, isPlaying, togglePlayback, bpm } = useProject();
+    const { channels, activePattern, isPlaying, togglePlayback, bpm, setPlaybackMode, playbackMode } = useProject();
     const [currentStep, setCurrentStep] = useState(0);
 
     // Track current playback step
@@ -240,7 +240,18 @@ const ChannelRack = () => {
                     </button>
                     <button
                         className={`header-btn ${isPlaying ? 'active' : ''}`}
-                        onClick={togglePlayback}
+                        onClick={() => {
+                            if (isPlaying) {
+                                if (playbackMode === 'SONG') {
+                                    setPlaybackMode('PAT');
+                                } else {
+                                    togglePlayback();
+                                }
+                            } else {
+                                setPlaybackMode('PAT');
+                                togglePlayback();
+                            }
+                        }}
                         title="Play Pattern"
                     >
                         <Music size={14} />

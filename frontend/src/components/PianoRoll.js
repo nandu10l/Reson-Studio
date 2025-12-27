@@ -18,7 +18,9 @@ const PianoRoll = () => {
         togglePlayback,
         bpm,
         updatePattern,
-        activePatternId
+        activePatternId,
+        setPlaybackMode,
+        playbackMode
     } = useProject();
 
     // Local State
@@ -28,7 +30,7 @@ const PianoRoll = () => {
     const [selection, setSelection] = useState([]); // Array of note IDs
     const [hoveredKey, setHoveredKey] = useState(null); // Currently hovered key fullName
     const [currentStep, setCurrentStep] = useState(0); // Current playback step for pulse animation
-    
+
     // New tool states
     const [snapEnabled, setSnapEnabled] = useState(true);
     const [snapStrength, setSnapStrength] = useState(4); // 1, 2, 4, 8, 16
@@ -113,7 +115,7 @@ const PianoRoll = () => {
         // Calculate coordinates relative to the scroll container viewport
         const viewportX = e.clientX - scrollRect.left;
         const viewportY = e.clientY - scrollRect.top;
-        
+
         // Add scroll offsets to get content coordinates
         const x = viewportX + scrollRef.current.scrollLeft;
         const y = viewportY + scrollRef.current.scrollTop;
@@ -211,7 +213,7 @@ const PianoRoll = () => {
         // 3. Background Interactions
         // Only create notes if clicking in the grid area (not on piano keys)
         if (x < 300) return; // Clicked on piano keys, ignore
-        
+
         const step = getStepFromX(x);
         const noteName = getKeyFromY(y);
 
@@ -308,7 +310,7 @@ const PianoRoll = () => {
             // Adjust selection box coordinates to account for piano key offset (300px)
             const adjustedX1 = Math.max(0, x1 - 300);
             const adjustedX2 = Math.max(0, x2 - 300);
-            
+
             const selectedIds = activePattern.data.notes.filter(n => {
                 const noteY = getYFromKey(n.noteName);
                 const noteX = n.startStep * pixelsPerStep;
@@ -436,7 +438,7 @@ const PianoRoll = () => {
                                 className="pattern-name-input"
                             />
                         ) : (
-                            <span 
+                            <span
                                 className="pattern-name-text"
                                 onClick={handleNameClick}
                                 title="Click to rename"
@@ -473,7 +475,19 @@ const PianoRoll = () => {
                 {/* Play Control */}
                 <button
                     className={`tool-btn ${isPlaying ? 'active' : ''}`}
-                    onClick={togglePlayback}
+                    onClick={() => {
+                        if (isPlaying) {
+                            if (playbackMode === 'SONG') {
+                                setPlaybackMode('PAT');
+                                // Don't stop, just switch logic (Context handles this via useEffect)
+                            } else {
+                                togglePlayback();
+                            }
+                        } else {
+                            setPlaybackMode('PAT'); // Ensure we are in pattern mode
+                            togglePlayback();
+                        }
+                    }}
                     title="Play/Pause Pattern"
                 >
                     <Music size={16} className="blender-icon" />
@@ -510,10 +524,10 @@ const PianoRoll = () => {
                 {/* Link Group */}
                 <div className="toolbar-separator"></div>
                 <div className="tool-group">
-                    <button 
-                        className="tool-btn" 
+                    <button
+                        className="tool-btn"
                         title="Link Notes"
-                        onClick={() => {/* TODO: Implement link notes */}}
+                        onClick={() => {/* TODO: Implement link notes */ }}
                     >
                         <Link2 size={16} className="blender-icon" />
                     </button>
@@ -574,7 +588,7 @@ const PianoRoll = () => {
                 <div className="tool-group">
                     <button
                         className="tool-btn"
-                        onClick={() => {/* TODO: Implement quantize */}}
+                        onClick={() => {/* TODO: Implement quantize */ }}
                         title="Quantize Selected Notes">
                         <AlignCenter size={16} className="blender-icon" />
                     </button>
@@ -603,9 +617,9 @@ const PianoRoll = () => {
                     <button className="tool-btn" onClick={() => setZoom(z => Math.max(10, z - 5))} title="Zoom Out">
                         <ZoomOut size={16} className="blender-icon" />
                     </button>
-                <button className="tool-btn" onClick={() => setZoom(z => Math.min(100, z + 5))} title="Zoom In">
-                    <ZoomIn size={16} className="blender-icon" />
-                </button>
+                    <button className="tool-btn" onClick={() => setZoom(z => Math.min(100, z + 5))} title="Zoom In">
+                        <ZoomIn size={16} className="blender-icon" />
+                    </button>
                 </div>
             </div>
 
@@ -624,15 +638,15 @@ const PianoRoll = () => {
                         const isHovered = hoveredKey === k.fullName;
 
                         return (
-                            <div 
-                                className="piano-row" 
-                                key={k.fullName} 
+                            <div
+                                className="piano-row"
+                                key={k.fullName}
                                 style={{ height: `${keyHeight}px` }}
                                 onMouseEnter={() => setHoveredKey(k.fullName)}
                                 onMouseLeave={() => setHoveredKey(null)}
                             >
                                 {/* Sticky Key */}
-                                <div 
+                                <div
                                     className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
                                     style={{ height: `${keyHeight}px`, position: 'sticky', left: 0, zIndex: 10 }}
                                 >
@@ -641,23 +655,23 @@ const PianoRoll = () => {
                                     {hasNotes && <div className="key-note-indicator"></div>}
                                 </div>
 
-                            {/* Grid Row */}
-                            <div className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}>
-                                {/* Render Grid Background Cells */}
-                                {Array.from({ length: totalBars * stepsPerBar }).map((_, step) => {
-                                    const isBar = step % 16 === 0;
-                                    const isBeat = step % 4 === 0;
-                                    return (
-                                        <div
-                                            key={step}
-                                            className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
-                                            style={{ width: `${pixelsPerStep}px` }}
-                                        // onPointerDown handled by parent onMouseDown
-                                        ></div>
-                                    );
-                                })}
+                                {/* Grid Row */}
+                                <div className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}>
+                                    {/* Render Grid Background Cells */}
+                                    {Array.from({ length: totalBars * stepsPerBar }).map((_, step) => {
+                                        const isBar = step % 16 === 0;
+                                        const isBeat = step % 4 === 0;
+                                        return (
+                                            <div
+                                                key={step}
+                                                className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
+                                                style={{ width: `${pixelsPerStep}px` }}
+                                            // onPointerDown handled by parent onMouseDown
+                                            ></div>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
                         );
                     })}
 

@@ -14,7 +14,9 @@ import '../styles/daw.css';
 import DraggableWindow from '../components/DraggableWindow';
 import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
+
 import PlaylistToolbar from '../components/PlaylistToolbar';
+import PlayheadOverlay from '../components/PlayheadOverlay';
 import { useProject } from '../contexts/ProjectContext';
 // Mixer is already imported
 
@@ -178,6 +180,13 @@ function Dashboard() {
                     measures={64}
                     onSelectClip={(c) => setSelectedClip(c)}
                     pixelsPerBeat={pixelsPerBeat}
+                  />
+
+                  <PlayheadOverlay
+                    pixelsPerBeat={pixelsPerBeat}
+                    bpm={bpm}
+                    measures={64}
+                    beatsPerBar={4}
                   />
                 </div>
               </div>

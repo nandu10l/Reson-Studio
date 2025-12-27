@@ -213,7 +213,8 @@ class AudioEngine {
         if (n.includes('kick')) {
             source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
         } else if (n.includes('snare') || n.includes('clap')) {
-            source = new Tone.PolySynth(Tone.NoiseSynth, {
+            // NoiseSynth is not Monophonic, so we use it directly (single voice for now)
+            source = new Tone.NoiseSynth({
                 noise: { type: 'white' },
                 envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
             }).connect(channel);
@@ -267,10 +268,31 @@ class AudioEngine {
     previewSound(id) {
         const source = this.sources.get(id);
         if (source) {
-            // PolySynth always expects a note, even for Noise (it just ignores it)
-            // We use C2 as default trigger
-            source.triggerAttackRelease("C2", "8n");
+            if (source instanceof Tone.PolySynth) {
+                // PolySynth always expects a note
+                source.triggerAttackRelease("C2", "8n");
+            } else if (source instanceof Tone.NoiseSynth) {
+                // NoiseSynth expects (duration)
+                source.triggerAttackRelease("8n");
+            } else {
+                // Fallback (e.g. MembraceSynth direct)
+                try {
+                    source.triggerAttackRelease("C2", "8n");
+                } catch (e) {
+                    console.warn("Could not preview source", e);
+                }
+            }
         }
+    }
+
+    getCurrentTime() {
+        return Tone.Transport.seconds;
+    }
+
+    seek(timeInSeconds) {
+        // Ensure time is positive
+        const t = Math.max(0, timeInSeconds);
+        Tone.Transport.seconds = t;
     }
 }
 
