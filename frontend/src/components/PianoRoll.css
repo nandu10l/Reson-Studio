@@ -236,11 +236,44 @@
 .piano-main-area {
     flex: 1;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    overflow: hidden;
+    background: #14181C;
+    position: relative;
+}
+
+/* Piano keys column - fixed, no horizontal scroll */
+.piano-keys-column {
+    width: 100px;
+    min-width: 100px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #14181C;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    /* Hide scrollbar */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.piano-keys-column::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+/* Grid area - scrollable horizontally */
+.piano-grid-area {
+    flex: 1;
     overflow: auto;
     background: #14181C;
     position: relative;
     scroll-behavior: smooth;
+    /* Hide scrollbar */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.piano-grid-area::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
 }
 
 .piano-row {

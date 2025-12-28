@@ -1,37 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
-import { audioEngine } from '../audio/AudioEngine';
-import { useProject } from '../contexts/ProjectContext';
 
-function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange }) {
-  const { playbackMode } = useProject();
+function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition = 0, isPlaying = false, zoom, onZoomChange, pixelsPerBeat, onPixelsPerBeatChange, onSeek }) {
   const timelineRef = useRef(null);
-  const playheadRef = useRef(null);
-  const rafRef = useRef(null);
 
-  // Sync Playhead with Audio Engine
-  useEffect(() => {
-    const updatePlayhead = () => {
-      if (playbackMode === 'PAT') {
-        // Don't update position in PAT mode
-        rafRef.current = requestAnimationFrame(updatePlayhead);
-        return;
-      }
-
-      if (playheadRef.current) {
-        const time = audioEngine.getCurrentTime();
-        // Time (s) -> Beats -> Pixels
-        const beats = time * (bpm / 60);
-        const x = beats * pixelsPerBeat;
-        playheadRef.current.style.transform = `translateX(${x}px)`;
-      }
-      rafRef.current = requestAnimationFrame(updatePlayhead);
-    };
-
-    rafRef.current = requestAnimationFrame(updatePlayhead);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [bpm, pixelsPerBeat, playbackMode]);
+  // Calculate pixel position for playhead (playheadPosition is in beats)
+  const beatsToPixels = (beats) => {
+    return beats * pixelsPerBeat;
+  };
 
   const pixelsToTime = (pixels) => {
     const beats = pixels / pixelsPerBeat;
@@ -49,31 +26,14 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
     onPixelsPerBeatChange(prev => Math.max(prev / 1.5, 15));
   };
 
-  // Seeking Logic
-  const seek = (e) => {
+  const handleTimelineClick = (e) => {
     if (!timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    const x = Math.max(0, e.clientX - rect.left);
-    const time = pixelsToTime(x);
-    audioEngine.seek(time);
-  };
-
-  const handlePointerDown = (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    seek(e);
-
-    const onPointerMove = (moveEvent) => {
-      seek(moveEvent);
-    };
-
-    const onPointerUp = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-    };
-
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    const x = e.clientX - rect.left;
+    const beats = x / pixelsPerBeat;
+    if (onSeek) {
+      onSeek(beats);
+    }
   };
 
   const renderTicks = () => {
@@ -87,7 +47,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
       const sixteenthInBeat = sixteenth % sixteenthsPerBeat;
       const bar = Math.floor(beat / beatsPerBar);
       const beatInBar = (beat % beatsPerBar);
-
+      
       const isDownbeat = beatInBar === 0 && sixteenthInBeat === 0;
       const isBeat = sixteenthInBeat === 0 && !isDownbeat;
       const isSixteenth = !isBeat && !isDownbeat;
@@ -105,7 +65,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
         >
           {isDownbeat && (
             <div className="tick-label">
-              {bar + 1}
+              {bar}
             </div>
           )}
           <div className="tick-line" />
@@ -125,17 +85,17 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
         height: '100%',
         borderRight: '1px solid rgba(255, 255, 255, 0.08)'
       }}>
-        <div className="timeline-controls" style={{
-          display: 'flex',
-          alignItems: 'center',
+        <div className="timeline-controls" style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
           gap: '4px',
           height: '100%'
         }}>
-          <button
-            className="timeline-btn"
+          <button 
+            className="timeline-btn" 
             onClick={handleZoomOut}
             title="Zoom Out"
-            style={{
+            style={{ 
               width: '24px',
               height: '24px',
               padding: '0',
@@ -157,10 +117,10 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
           >
             <ZoomOut size={18} color="#b3b3b3" className="blender-icon" />
           </button>
-
-          <span className="zoom-level" style={{
-            padding: '0 8px',
-            minWidth: '48px',
+          
+          <span className="zoom-level" style={{ 
+            padding: '0 8px', 
+            minWidth: '48px', 
             textAlign: 'center',
             fontSize: '12px',
             color: '#b3b3b3',
@@ -170,12 +130,12 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
           }}>
             {Math.round(zoom * 100)}%
           </span>
-
-          <button
-            className="timeline-btn"
+          
+          <button 
+            className="timeline-btn" 
             onClick={handleZoomIn}
             title="Zoom In"
-            style={{
+            style={{ 
               width: '24px',
               height: '24px',
               padding: '0',
@@ -203,7 +163,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
       <div
         className="timeline-ruler"
         ref={timelineRef}
-        onPointerDown={handlePointerDown}
+        onClick={handleTimelineClick}
         style={{
           minWidth: `${measures * beatsPerBar * pixelsPerBeat}px`,
           height: '100%',
@@ -214,20 +174,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
           {renderTicks()}
         </div>
 
-        {/* Playhead Head Only (Sticky) */}
-        <div
-          ref={playheadRef}
-          className="playhead"
-          style={{
-            left: 0, // Controlled by transform
-            willChange: 'transform',
-            width: '1px', // Keep it minimal to not block clicks?
-            display: 'block' // Always show
-          }}
-        >
-          {/* We only render the head here. The line is in PlayheadOverlay */}
-          <div className="playhead-head" style={{ left: '-5px' }} />
-        </div>
+        {/* Playhead is rendered in track-area to span both timeline and tracks */}
 
         {/* Time markers for major divisions */}
         <div className="time-markers">
@@ -237,7 +184,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, zoom, onZoomChang
               className="time-marker"
               style={{ left: `${i * beatsPerBar * pixelsPerBeat}px` }}
             >
-              {i + 1}:00
+              {i}:00
             </div>
           ))}
         </div>

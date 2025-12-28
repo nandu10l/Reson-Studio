@@ -464,7 +464,8 @@
 }
 
 
-.transport-bar {
+/* Transport bar styles moved to TransportBar.css */
+.transport-bar-legacy {
   display: flex;
   align-items: center;
   padding: 0 12px;
@@ -575,8 +576,14 @@
   flex-direction: column;
   overflow: auto;
   /* Enable scrolling for both axes */
+  overflow-y: auto;
+  overflow-x: auto;
   position: relative;
   /* Context for sticky */
+  /* Ensure playhead spans full content height */
+  min-height: 100%;
+  /* Allow playhead label to be visible above */
+  padding-top: 0;
 }
 
 /* Professional Timeline Styles */
@@ -594,7 +601,7 @@
   min-width: 100%;
   width: max-content;
   user-select: none;
-  overflow: visible;
+  overflow: visible; /* Allow playhead label to be visible */
   flex-shrink: 0;
 }
 
@@ -1027,6 +1034,8 @@
   background: #14181C;
   /* Dark grid background */
   min-width: 100%;
+  /* Ensure alignment with timeline ruler */
+  box-sizing: border-box;
 }
 
 .track-grid {

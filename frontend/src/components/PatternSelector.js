@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from './icons/BlenderIcons';
+import { ChevronLeft, ChevronRight, Plus, ChevronDown } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
+import './PatternSelector.css';
 
 const PatternSelector = () => {
     const {
@@ -14,8 +15,11 @@ const PatternSelector = () => {
 
     const activePattern = patterns.find(p => p.id === activePatternId) || patterns[0];
     const [isEditing, setIsEditing] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
     const [editName, setEditName] = useState(activePattern?.name || '');
     const inputRef = useRef(null);
+    const dropdownRef = useRef(null);
+    const containerRef = useRef(null);
 
     useEffect(() => {
         if (activePattern) {
@@ -30,22 +34,49 @@ const PatternSelector = () => {
         }
     }, [isEditing]);
 
-    const handleNext = () => {
+    // Close dropdown on click outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+                containerRef.current && !containerRef.current.contains(event.target)) {
+                setShowDropdown(false);
+            }
+        };
+        if (showDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDropdown]);
+
+    const handleNext = (e) => {
+        e.stopPropagation();
         const currentIndex = patterns.findIndex(p => p.id === activePatternId);
         if (currentIndex < patterns.length - 1) {
             setActivePatternId(patterns[currentIndex + 1].id);
         }
     };
 
-    const handlePrev = () => {
+    const handlePrev = (e) => {
+        e.stopPropagation();
         const currentIndex = patterns.findIndex(p => p.id === activePatternId);
         if (currentIndex > 0) {
             setActivePatternId(patterns[currentIndex - 1].id);
         }
     };
 
-    const handleNameClick = () => {
+    const handleNameClick = (e) => {
+        e.stopPropagation();
         setIsEditing(true);
+        setShowDropdown(false);
+    };
+
+    const handleCapsuleClick = (e) => {
+        e.stopPropagation();
+        if (!isEditing) {
+            setShowDropdown(!showDropdown);
+        }
     };
 
     const handleNameBlur = () => {
@@ -66,53 +97,41 @@ const PatternSelector = () => {
         }
     };
 
+    const handlePatternSelect = (patternId) => {
+        setActivePatternId(patternId);
+        setShowDropdown(false);
+    };
+
     const canGoPrev = patterns.findIndex(p => p.id === activePatternId) > 0;
     const canGoNext = patterns.findIndex(p => p.id === activePatternId) < patterns.length - 1;
 
     return (
-        <div className="pattern-selector" style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0',
-            height: '100%'
-        }}>
-            {/* Navigation Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
-                <button
-                    onClick={handlePrev}
-                    disabled={!canGoPrev}
-                    title="Previous Pattern"
-                    style={{
-                        width: '24px',
-                        height: '24px',
-                        padding: '0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: canGoPrev ? 'pointer' : 'not-allowed',
-                        opacity: canGoPrev ? 1 : 0.3,
-                        transition: 'opacity 0.15s ease'
-                    }}
-                >
-                    <ChevronLeft size={16} color="#b3b3b3" className="blender-icon" />
-                </button>
+        <div className="pattern-selector" ref={containerRef}>
+            {/* Secondary Navigation - Minimal */}
+            <button
+                onClick={handlePrev}
+                disabled={!canGoPrev}
+                className="pattern-nav-btn pattern-nav-prev"
+                title="Previous Pattern"
+            >
+                <ChevronLeft size={12} className="blender-icon" />
+            </button>
 
-                {/* Color Indicator */}
+            {/* Primary: Pattern Name Capsule */}
+            <div 
+                className="pattern-capsule"
+                onClick={handleCapsuleClick}
+                title="Click to select pattern, double-click to rename"
+            >
+                {/* Color Indicator - Integrated */}
                 <div
+                    className="pattern-color-indicator"
                     style={{
-                        width: '16px',
-                        height: '16px',
-                        background: activePattern?.color || '#4C8DB0',
-                        borderRadius: '2px',
-                        margin: '0 8px',
-                        flexShrink: 0
+                        background: activePattern?.color || '#4C8DB0'
                     }}
-                    title="Pattern Color"
                 />
-
-                {/* Inline-editable Pattern Name */}
+                
+                {/* Pattern Name - Inline Editable */}
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -121,95 +140,62 @@ const PatternSelector = () => {
                         onChange={(e) => setEditName(e.target.value)}
                         onBlur={handleNameBlur}
                         onKeyDown={handleNameKeyDown}
-                        style={{
-                            background: 'transparent',
-                            border: '1px solid #60a5fa',
-                            outline: 'none',
-                            color: '#fff',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            padding: '2px 6px',
-                            minWidth: '80px',
-                            maxWidth: '120px',
-                            fontFamily: 'inherit',
-                            letterSpacing: '0.01em'
-                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="pattern-name-input"
                     />
                 ) : (
                     <span
-                        onClick={handleNameClick}
-                        style={{
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            color: '#b3b3b3',
-                            padding: '2px 6px',
-                            minWidth: '80px',
-                            cursor: 'text',
-                            userSelect: 'none',
-                            letterSpacing: '0.01em',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: 'inline-block',
-                            maxWidth: '120px'
-                        }}
-                        title="Click to edit"
+                        className="pattern-name-text"
+                        onDoubleClick={handleNameClick}
                     >
                         {activePattern?.name || 'Pattern 1'}
                     </span>
                 )}
 
-                <button
-                    onClick={handleNext}
-                    disabled={!canGoNext}
-                    title="Next Pattern"
-                    style={{
-                        width: '24px',
-                        height: '24px',
-                        padding: '0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: canGoNext ? 'pointer' : 'not-allowed',
-                        opacity: canGoNext ? 1 : 0.3,
-                        transition: 'opacity 0.15s ease'
-                    }}
-                >
-                    <ChevronRight size={16} color="#b3b3b3" className="blender-icon" />
-                </button>
-
-                {/* Divider */}
-                <div style={{
-                    width: '1px',
-                    height: '16px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    margin: '0 8px'
-                }} />
-
-                {/* Add Pattern Button */}
-                <button
-                    onClick={createPattern}
-                    title="Create New Pattern"
-                    style={{
-                        width: '24px',
-                        height: '24px',
-                        padding: '0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        transition: 'opacity 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                >
-                    <Plus size={16} color="#b3b3b3" className="blender-icon" />
-                </button>
+                {/* Dropdown Indicator */}
+                <ChevronDown size={11} className="pattern-dropdown-icon" />
             </div>
+
+            {/* Secondary Navigation - Minimal */}
+            <button
+                onClick={handleNext}
+                disabled={!canGoNext}
+                className="pattern-nav-btn pattern-nav-next"
+                title="Next Pattern"
+            >
+                <ChevronRight size={12} className="blender-icon" />
+            </button>
+
+            {/* Secondary: Add Button - Minimal */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    createPattern();
+                }}
+                className="pattern-add-btn"
+                title="Create New Pattern"
+            >
+                <Plus size={12} className="blender-icon" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {showDropdown && (
+                <div className="pattern-dropdown" ref={dropdownRef}>
+                    {patterns.map((pattern) => (
+                        <div
+                            key={pattern.id}
+                            className={`pattern-dropdown-item ${pattern.id === activePatternId ? 'active' : ''}`}
+                            onClick={() => handlePatternSelect(pattern.id)}
+                        >
+                            <div
+                                className="pattern-dropdown-color"
+                                style={{ background: pattern.color || '#4C8DB0' }}
+                            />
+                            <span className="pattern-dropdown-name">{pattern.name}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

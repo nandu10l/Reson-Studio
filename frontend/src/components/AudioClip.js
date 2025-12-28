@@ -30,35 +30,61 @@ export default function AudioClip({
     const height = 44;
     const centerY = height / 2;
 
+    // Set canvas size with device pixel ratio for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Set waveform color with transparency
-    const waveformColor = isSelected ? 'rgba(96, 165, 250, 0.8)' : 'rgba(59, 130, 246, 0.6)';
-    ctx.fillStyle = waveformColor;
+    // Set waveform color - vibrant and visible
+    const waveformColor = isSelected ? '#fb923c' : '#9ca3af'; // Orange when selected, gray when not
     ctx.strokeStyle = waveformColor;
 
     const peaks = clip.waveform;
     if (peaks.length === 0) return;
 
-    const barWidth = Math.max(2, width / peaks.length); // Thicker bars (min 2px)
-    const maxBarHeight = centerY * 0.9; // Limit max height for better visibility
+    // Use all available peaks for maximum detail
+    // Calculate spacing to make lines appear connected
+    const samplesToDisplay = peaks.length;
+    const lineSpacing = width / samplesToDisplay;
+    const maxBarHeight = centerY * 0.9; // Use 90% of available height
 
-    peaks.forEach((peak, i) => {
-      const x = i * barWidth;
-      const minHeight = Math.min(Math.abs(peak.min) * centerY, maxBarHeight);
-      const maxHeight = Math.min(Math.abs(peak.max) * centerY, maxBarHeight);
-      const totalHeight = maxHeight + minHeight;
+    // Set line properties for waveform - thinner lines for connected appearance
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
 
-      // Draw thicker waveform bars
-      if (totalHeight > 2) {
-        ctx.fillRect(x, centerY - maxHeight, barWidth, totalHeight);
-      } else {
-        // Draw thin line for very quiet sections
-        ctx.fillRect(x, centerY - 1, barWidth, 2);
-      }
-    });
-  }, [clip.waveform, clip.length, pixelsPerBeat]);
+    // Draw waveform lines that correspond to the audio
+    // Draw them close together so they appear connected
+    for (let i = 0; i < samplesToDisplay; i++) {
+      const peak = peaks[i];
+      if (!peak) continue;
+      
+      // Position lines very close together (overlapping slightly for connected look)
+      const x = i * lineSpacing;
+      
+      // Peaks are normalized (0-1 range)
+      // Calculate heights extending both up and down from center
+      const topHeight = Math.abs(peak.max) * maxBarHeight;
+      const bottomHeight = Math.abs(peak.min) * maxBarHeight;
+      
+      // Draw vertical line extending both upward and downward from center
+      ctx.beginPath();
+      
+      // Draw line from bottom peak to top peak
+      const startY = centerY + bottomHeight;
+      const endY = centerY - topHeight;
+      
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+      
+      ctx.stroke();
+    }
+  }, [clip.waveform, clip.length, pixelsPerBeat, isSelected]);
 
   const clipWidth = clip.length * pixelsPerBeat;
   const clipName = clip.name || clip.fileName || 'Audio Clip';

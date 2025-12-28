@@ -1,0 +1,245 @@
+/* Professional DAW Transport Bar - Hardware-Inspired Design */
+
+.transport-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px; /* Low-profile height */
+  background: #1a1a1a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 8px;
+  gap: 12px;
+  /* Calm, hardware-inspired, instantly readable */
+}
+
+/* Left Section: Pattern Navigation */
+.transport-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Center Section: Primary Transport Controls */
+.transport-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Transport Controls Cluster - Primary */
+.transport-controls-cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 2px 4px;
+  /* Subtle background separation */
+}
+
+.transport-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  /* Clear visual dominance */
+}
+
+.transport-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.transport-btn-play {
+  /* Slightly larger for prominence */
+  width: 26px;
+  height: 26px;
+}
+
+.transport-btn-play.active {
+  background: #60a5fa; /* Single accent color */
+  color: #1a1a1a;
+}
+
+.transport-btn-play.active .blender-icon {
+  color: #1a1a1a;
+}
+
+.transport-btn-stop {
+  /* Standard size */
+}
+
+.transport-btn-record {
+  /* Record button - red only when active */
+  width: 22px;
+  height: 22px;
+}
+
+.transport-btn-record.recording {
+  background: #ef4444; /* Red only for active recording */
+  color: #fff;
+}
+
+.transport-btn-record.recording .blender-icon {
+  color: #fff;
+  fill: #fff;
+}
+
+/* Time Position Display - Prominent */
+.transport-time-display {
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa; /* Accent color for prominence */
+  letter-spacing: 0.1em;
+  min-width: 60px;
+  text-align: center;
+  /* Monospaced numerals, prominently displayed */
+}
+
+/* Right Section: Secondary Controls */
+.transport-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Mode Toggle Cluster - Secondary */
+.transport-mode-cluster {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  padding: 1px;
+  gap: 1px;
+  /* Compact cluster */
+}
+
+.transport-mode-btn {
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  letter-spacing: 0.02em;
+  /* Restrained, secondary */
+}
+
+.transport-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #9ca3af;
+}
+
+.transport-mode-btn.active {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  /* Accent color for active mode */
+}
+
+/* BPM Cluster - Secondary */
+.transport-bpm-cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  padding: 2px 6px;
+  /* Compact, restrained */
+}
+
+.transport-bpm-input {
+  width: 36px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: right;
+  padding: 0;
+  outline: none;
+  /* Monospaced for alignment */
+}
+
+.transport-bpm-input:focus {
+  color: #b3b3b3;
+}
+
+.transport-bpm-label {
+  font-size: 8px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  /* Restrained label */
+}
+
+/* View Controls Cluster - Secondary */
+.transport-views-cluster {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  padding: 2px;
+  /* Compact cluster */
+}
+
+.transport-view-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  /* Minimal, secondary */
+}
+
+.transport-view-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.transport-view-btn.active {
+  background: rgba(96, 165, 250, 0.12);
+  /* Subtle accent for active view */
+}
+
+.transport-view-btn.active .blender-icon {
+  color: #60a5fa;
+}
+
+/* Ensure icons are properly styled */
+.transport-btn .blender-icon,
+.transport-view-btn .blender-icon {
+  color: #9ca3af;
+  transition: color 0.1s ease;
+}
+
+.transport-btn:hover .blender-icon,
+.transport-view-btn:hover .blender-icon {
+  color: #b3b3b3;
+}
+

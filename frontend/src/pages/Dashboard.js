@@ -4,23 +4,25 @@ import ProjectSidebar from '../components/ProjectSidebar';
 import TransportBar from '../components/TransportBar';
 import Timeline from '../components/Timeline';
 import TrackList from '../components/TrackList';
+import Playhead from '../components/Playhead';
 import Mixer from '../components/Mixer';
 // import Inspector from '../components/Inspector';
 import PluginPanel from '../components/PluginPanel';
 import SessionBrowser from '../components/SessionBrowser';
+import TitleBar from '../components/TitleBar';
 import { GripVertical } from 'lucide-react';
+import { useProject } from '../contexts/ProjectContext';
+import * as Tone from 'tone';
 import '../styles/daw.css';
 
 import DraggableWindow from '../components/DraggableWindow';
 import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
-
-import PlaylistToolbar from '../components/PlaylistToolbar';
-import PlayheadOverlay from '../components/PlayheadOverlay';
-import { useProject } from '../contexts/ProjectContext';
 // Mixer is already imported
 
 function Dashboard() {
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks } = useProject();
+  
   // Window states
   const [activeWindows, setActiveWindows] = useState({
     mixer: false,
@@ -40,11 +42,8 @@ function Dashboard() {
   const [playing, setPlaying] = useState(false);
   const [selectedClip, setSelectedClip] = useState(null);
   const [view, setView] = useState('arrange'); // arrange | projects | settings | home
-  const [bpm, setBpm] = useState(120);
   const [projects, setProjects] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
-
-  const { activeTool, setActiveTool } = useProject();
 
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
@@ -53,6 +52,60 @@ function Dashboard() {
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(40);
+  const trackAreaRef = useRef(null);
+  const [playheadHeight, setPlayheadHeight] = useState('100%');
+
+  // Update playhead height to span all content
+  useEffect(() => {
+    if (!trackAreaRef.current) return;
+    
+    const updateHeight = () => {
+      const trackArea = trackAreaRef.current;
+      if (trackArea) {
+        // Use scrollHeight to get full content height, or clientHeight if no scroll
+        const height = Math.max(trackArea.scrollHeight, trackArea.clientHeight);
+        setPlayheadHeight(`${height}px`);
+      }
+    };
+
+    updateHeight();
+    
+    // Update on resize or content changes
+    const resizeObserver = new ResizeObserver(updateHeight);
+    if (trackAreaRef.current) {
+      resizeObserver.observe(trackAreaRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [playlistTracks]); // Update when tracks change
+
+  // Auto-scroll to keep playhead visible during playback
+  useEffect(() => {
+    if (!trackAreaRef.current || !isPlaying) return;
+    
+    const trackArea = trackAreaRef.current;
+    const playheadPixelX = 140 + (playheadPosition * pixelsPerBeat); // 140px header offset
+    
+    // Get viewport bounds
+    const scrollLeft = trackArea.scrollLeft;
+    const viewportWidth = trackArea.clientWidth;
+    const visibleStart = scrollLeft;
+    const visibleEnd = scrollLeft + viewportWidth;
+    
+    // Calculate margins (keep playhead centered with some padding)
+    const margin = viewportWidth * 0.2; // 20% margin on each side
+    
+    // Check if playhead is outside visible area
+    if (playheadPixelX < visibleStart + margin) {
+      // Scroll left to show playhead
+      trackArea.scrollLeft = Math.max(0, playheadPixelX - margin);
+    } else if (playheadPixelX > visibleEnd - margin) {
+      // Scroll right to show playhead
+      trackArea.scrollLeft = playheadPixelX - viewportWidth + margin;
+    }
+  }, [playheadPosition, pixelsPerBeat, isPlaying]);
 
   const resizeState = useRef({ resizing: false, startX: 0, startWidth: 0, target: null });
 
@@ -141,19 +194,8 @@ function Dashboard() {
                 '--inspector-width': '0px'
               }}
             >
-              {/* 0. Top Toolbar (Playlist Tools) */}
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                zIndex: 10
-              }}>
-                <PlaylistToolbar activeTool={activeTool} onToolChange={setActiveTool} />
-              </div>
-
               {/* 1. Left Panel (Session Browser) */}
-              <div className="session-browser" style={{ marginTop: '36px' }}>
+              <div className="session-browser">
                 <ProjectSidebar projects={projects} />
               </div>
 
@@ -161,32 +203,43 @@ function Dashboard() {
               <div
                 className="resizer left-resizer"
                 onPointerDown={(e) => startResize(e, 'browser')}
-                style={{ top: '36px' }}
               >
                 <GripVertical size={12} />
               </div>
 
               {/* 3. Center Canvas */}
-              <div className="center-canvas" style={{ paddingTop: '36px' }}>
-                <div className="track-area">
+              <div className="center-canvas">
+                <div className="track-area" ref={trackAreaRef} style={{ position: 'relative' }}>
+                  {/* Unified playhead that spans both timeline and tracks */}
+                <Playhead
+                  mode="smooth"
+                  pixelsPerBeat={pixelsPerBeat}
+                  headerOffset={140}
+                  beatsPerBar={4}
+                  style={{ height: playheadHeight }}
+                />
                   <Timeline
                     measures={64}
                     zoom={zoom}
                     onZoomChange={setZoom}
                     pixelsPerBeat={pixelsPerBeat}
                     onPixelsPerBeatChange={setPixelsPerBeat}
+                    playheadPosition={playheadPosition}
+                    isPlaying={isPlaying}
+                    bpm={bpm}
+                    onSeek={(beats) => {
+                      setPlayheadPosition(beats);
+                      // Seek Tone.js Transport to the new position
+                      const beatsPerSecond = bpm / 60;
+                      const seconds = beats / beatsPerSecond;
+                      Tone.Transport.seconds = seconds;
+                    }}
                   />
                   <TrackList
                     measures={64}
                     onSelectClip={(c) => setSelectedClip(c)}
                     pixelsPerBeat={pixelsPerBeat}
-                  />
-
-                  <PlayheadOverlay
-                    pixelsPerBeat={pixelsPerBeat}
-                    bpm={bpm}
-                    measures={64}
-                    beatsPerBar={4}
+                    playheadPosition={playheadPosition}
                   />
                 </div>
               </div>
@@ -198,16 +251,12 @@ function Dashboard() {
 
   return (
     <div className="app-container">
-
+      <TitleBar />
       <Navbar
         onChangeView={(v) => setView(v)}
         currentView={view}
         onCreateProject={(project) => setProjects(prev => [...prev, project])}
         onSaveProject={() => console.log('Project saved:', currentProject)}
-        playing={playing}
-        onPlayToggle={() => setPlaying(!playing)}
-        bpm={bpm}
-        onBpmChange={setBpm}
       />
       <TransportBar
         activeWindows={activeWindows}
