@@ -1,0 +1,31 @@
+/* butterDAWg general.css (trimmed essentials) */
+:root {
+    --bg-light: #646b73;
+    --bg-medium: #434c51;
+    --bg-dark: #242f35;
+    --bg-darker: #181e22;
+
+    --track-light: #34444e;
+    --track-dark: #2e3e48;
+
+    --border-color: #010102aa;
+
+    --text-color: aliceblue;
+
+    --bg-default: #656c76;
+}
+
+* { user-select: none; }
+
+html { overflow: hidden; height:100%; }
+
+body { background-color: var(--bg-default); margin:0; height:100%; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+
+#drag_container { display:none; position:absolute; left:0; top:0; z-index:100; background-color: var(--bg-darker); }
+
+/* scrollbar styling */
+::-webkit-scrollbar { background-color: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background-color: var(--bg-medium); border-style: solid; border-color: #000000aa; border-width: 1px; }
+
+/* simple utility */
+.hidden { display:none !important; }

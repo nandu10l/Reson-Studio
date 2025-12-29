@@ -1,0 +1,9 @@
+/* trimmed Playlist.css essentials for tracks area */
+.tracks_wrapper { height:inherit; background-color:#3f484d; display:flex; flex-direction:column; overflow:hidden; position:relative; }
+.tracks_top_bar { height:42px; width:100%; background-color:#3f484d; display:flex; flex-direction:row; }
+.tracks_canvas { flex-grow:1; min-width:0; }
+.tracks_palette { width:200px; background-color:#313c45; padding:3px; }
+.tracks_content_wrapper { display:flex; }
+.line_cursor { display:none; width:11px; height:100%; position:absolute; z-index:3; left:0px; border-left:1px solid #32cd32; }
+.tracks_tool_bar { display:flex; height:22px; margin-top:5px; margin-bottom:3px; }
+.tool_button { width:17px; height:17px; margin:0 2px; }

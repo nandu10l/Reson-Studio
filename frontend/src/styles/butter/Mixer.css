@@ -1,0 +1,363 @@
+/* Professional DAW Mixer - Blender-style Dark Theme */
+
+.mixer {
+  display: flex;
+  height: 100%;
+  background-color: #1e1e1e;
+  color: #b3b3b3;
+  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px;
+  box-sizing: border-box;
+  gap: 2px;
+}
+
+/* Master Section Divider */
+.mixer-divider {
+  width: 1px;
+  background-color: rgba(255, 255, 255, 0.08);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.mixer-spacer {
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* Individual Channel Strip */
+.mixer-channel {
+  display: flex;
+  flex-direction: column;
+  width: 64px;
+  height: 100%;
+  background-color: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.mixer-channel:hover {
+  background-color: #2f2f2f;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.mixer-channel.master {
+  background-color: #252525;
+  border-color: rgba(255, 255, 255, 0.1);
+  width: 72px;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.1);
+}
+
+.mixer-channel.master:hover {
+  background-color: #2a2a2a;
+  border-color: rgba(96, 165, 250, 0.2);
+}
+
+/* Channel Header - Track Name */
+.channel-header {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
+}
+
+.channel-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: #d0d0d0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+  letter-spacing: 0.01em;
+}
+
+.channel-name:hover {
+  color: #fff;
+}
+
+.channel-name-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 2px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  padding: 2px 4px;
+  text-align: center;
+  outline: none;
+}
+
+/* Level Meter */
+.level-meter {
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.meter-track {
+  width: 4px;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.meter-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  border-radius: 2px;
+  transition: height 0.05s linear, background-color 0.1s ease;
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Pan Section */
+.pan-section {
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0;
+  position: relative;
+}
+
+.pan-knob-container {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+
+.pan-knob {
+  width: 32px;
+  height: 32px;
+  background: #1e1e1e;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  position: relative;
+  cursor: ns-resize;
+  transition: border-color 0.15s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.pan-knob:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.pan-indicator {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 10px;
+  background: #b3b3b3;
+  border-radius: 1px;
+  transition: background-color 0.15s ease;
+}
+
+.pan-knob:hover .pan-indicator {
+  background: #d0d0d0;
+}
+
+.pan-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: ns-resize;
+  z-index: 1;
+}
+
+/* Controls Section - Mute/Solo */
+.controls-section {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.control-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #9ca3af;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  outline: none;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #d0d0d0;
+}
+
+.control-btn.mute.active {
+  background: #4ade80;
+  border-color: #4ade80;
+  color: #000;
+  box-shadow: 0 0 4px rgba(74, 222, 128, 0.4);
+}
+
+.control-btn.solo.active {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #000;
+  box-shadow: 0 0 4px rgba(251, 191, 36, 0.4);
+}
+
+.control-btn .blender-icon {
+  color: inherit;
+}
+
+/* Fader Section */
+.fader-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  min-height: 200px;
+  position: relative;
+}
+
+.fader-track {
+  flex: 1;
+  width: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  position: relative;
+  margin: 0 auto;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+}
+
+.fader-fill {
+  width: 100%;
+  background: linear-gradient(to top, #4ade80 0%, #fbbf24 70%, #f44336 90%);
+  border-radius: 0 0 4px 4px;
+  transition: height 0.1s ease;
+  opacity: 0.6;
+  box-shadow: 0 0 4px rgba(74, 222, 128, 0.3);
+  min-height: 0;
+}
+
+.fader-handle {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 16px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: ns-resize;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.fader-handle:hover {
+  background: #333;
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(96, 165, 250, 0.3);
+}
+
+.fader-handle-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 1px;
+}
+
+.fader-input {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 100%;
+  opacity: 0;
+  cursor: ns-resize;
+  z-index: 3;
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  margin: 0;
+  padding: 0;
+}
+
+.fader-value {
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-align: center;
+  min-height: 14px;
+  letter-spacing: 0.02em;
+}
+
+/* Channel Footer */
+.channel-footer {
+  height: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #666;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.05em;
+}
+
+/* Scrollbar Styling */
+.mixer::-webkit-scrollbar {
+  height: 8px;
+}
+
+.mixer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.mixer::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.mixer::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}

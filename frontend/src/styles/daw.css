@@ -1,0 +1,1728 @@
+/* Modern DAW styles with refined aesthetics */
+
+* {
+  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+:root {
+  --primary: #4f46e5;
+  /* Keep specific primary or change to orange/green? usage suggests keeping it distinct or matching accent. Let's keep it but maybe desaturate or shift if needed, but for now just dark mode bases. */
+  --primary-light: #6366f1;
+  --primary-dark: #4338ca;
+
+  /* Dark Theme Styling */
+  --surface: #363d43;
+  --surface-hover: #404850;
+  --text: #d4d8dd;
+  --text-secondary: #9aa;
+  --border: #1e2226;
+  --bg-app: #2f363c;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 28px;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text);
+  font-size: 14px;
+  letter-spacing: '0.01em';
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  transition: all 0.2s;
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-row {
+  display: flex;
+  gap: 18px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 28px;
+  border-top: 1px solid var(--border);
+}
+
+.navbar {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  /* Adjusted padding */
+  height: 64px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  z-index: 1000;
+}
+
+.navbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-light), var(--primary));
+}
+
+/* REMOVED .navbar-brand */
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  /* Use space-around/space-between for better distribution or flex-grow for view-buttons */
+  flex: 1;
+  /* Allows it to take up space */
+  justify-content: space-between;
+  gap: 20px;
+  /* Gap between main sections */
+}
+
+/* New Session Controls for New/Open/Save */
+.session-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn.small {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn.small:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.btn.small.primary-btn {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.btn.small.primary-btn:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+  color: white;
+}
+
+
+.view-buttons {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-hover);
+  padding: 4px;
+  border-radius: 10px;
+  /* Add auto margins to push it to the center-ish area if needed, or remove them */
+  margin: 0 auto;
+}
+
+.view-buttons button {
+  padding: 8px 16px;
+  /* Slightly reduced padding */
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-buttons button:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text);
+  transform: none;
+  /* Remove translateY for a cleaner navbar look */
+  box-shadow: none;
+}
+
+.view-buttons button.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.15);
+}
+
+.view-buttons button.active::before {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--primary-light), var(--primary));
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.right-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* Reduced gap */
+}
+
+.right-controls button {
+  padding: 6px 12px;
+  /* Adjusted padding to match session-controls */
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.right-controls button:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+  transform: none;
+  /* Remove translateY for a cleaner navbar look */
+  box-shadow: none;
+}
+
+/* Search Input Styling */
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 6px 12px 6px 30px;
+  /* Left padding for icon */
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+  color: var(--text);
+  font-size: 13px;
+  width: 150px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-secondary);
+}
+
+
+.user-info {
+  padding: 6px 12px;
+  /* Adjusted padding */
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Window Controls for Electron */
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
+}
+
+.window-controls button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  height: 64px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.window-controls button:hover {
+  background-color: var(--surface-hover);
+  color: var(--text);
+}
+
+.window-controls .close-btn:hover {
+  background-color: #ef4444;
+  /* Red color for close */
+  color: white;
+}
+
+/* REMOVED .navbar-top and related styles */
+.navbar-top,
+.top-controls,
+.top-right,
+.brand,
+.search {
+  /* These selectors are now redundant/obsolete and should be removed from the original file if possible */
+  display: none !important;
+}
+
+
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-app);
+}
+
+.view-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.daw-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  background-color: var(--bg-app);
+  background: linear-gradient(180deg, #2f363c 0%, #252a2e 100%);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ... (rest of the CSS) ... */
+
+/* View containers and transitions */
+.projects-view,
+.settings-view,
+.home-view {
+  padding: 32px;
+  animation: fadeSlideIn 0.3s ease-out;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.projects-view h2,
+.settings-view h2,
+.home-view h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  letter-spacing: -0.02em;
+}
+
+.projects-view h2::after,
+.settings-view h2::after,
+.home-view h2::after {
+  content: '';
+  height: 2px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+  margin-left: 8px;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* Transport bar styles moved to TransportBar.css */
+.transport-bar-legacy {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: #1e1e1e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 32px;
+  height: 32px;
+}
+
+.transport-left {
+  display: flex;
+  gap: 12px;
+  align-items: center
+}
+
+.transport-center {
+  flex: 1;
+  text-align: center
+}
+
+.transport-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-right: 14px;
+}
+
+.btn.small {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.icon-btn {
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.time-display {
+  font-family: monospace;
+  color: var(--primary)
+}
+
+.daw-main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  flex: 1
+}
+
+.session-browser {
+  width: 200px;
+  /* Adjust if needed, FL Picker is usually sizable */
+  background: #363d43;
+  /* Base color */
+  border-right: 1px solid #1e2226;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-browser h4 {
+  margin: 0 0 10px
+}
+
+.session-browser ul {
+  list-style: none;
+  padding: 0;
+  margin: 0
+}
+
+.session-browser li {
+  padding: 10px;
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--text)
+}
+
+.session-browser li:hover {
+  background: var(--surface-hover)
+}
+
+.center-canvas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  /* Crucial for scrolling inside flex */
+  min-width: 0;
+}
+
+.track-area {
+  background: #14181C;
+  /* border-radius: 12px; REMOVED */
+  border: none;
+  /* Handled by inner borders */
+  flex: 1;
+  /* Take remaining height */
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  /* Enable scrolling for both axes */
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  /* Context for sticky */
+  /* Ensure playhead spans full content height */
+  min-height: 100%;
+  /* Allow playhead label to be visible above */
+  padding-top: 0;
+}
+
+/* Professional Timeline Styles */
+.timeline {
+  display: flex;
+  flex-direction: row;
+  /* Fixed: Row layout for Header | Ruler */
+  height: 40px;
+  min-height: 40px;
+  background: #14181C;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-width: 100%;
+  width: max-content;
+  user-select: none;
+  overflow: visible; /* Allow playhead label to be visible */
+  flex-shrink: 0;
+}
+
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  height: 100%;
+  background: #363d43;
+  /* Match track header */
+  border-bottom: 1px solid #1e2226;
+  border-right: 1px solid #1e2226;
+  position: sticky;
+  left: 0;
+  z-index: 25;
+  width: 200px;
+  min-width: 200px;
+  /* Force width */
+  box-sizing: border-box;
+}
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-btn {
+  width: 28px;
+  height: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 4px;
+}
+
+.timeline-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+.zoom-level {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 50px;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.timeline-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.bpm-display {
+  color: var(--primary);
+}
+
+.time-signature {
+  color: var(--text);
+}
+
+.timeline-ruler {
+  flex: 1;
+  position: relative;
+  cursor: pointer;
+  overflow: visible;
+  height: 100%;
+  min-height: 40px;
+  background: #14181C;
+}
+
+.timeline-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Fixed: Relative to ruler now */
+  right: 0;
+  bottom: 0;
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
+
+.timeline-tick {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  height: 100%;
+  min-height: 40px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.tick-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.tick-line {
+  width: 1px;
+  background: #6b7280;
+  /* Lighter gray for visibility */
+  flex: 1;
+  max-height: 12px;
+  min-height: 8px;
+}
+
+.timeline-tick.downbeat .tick-line {
+  background: rgba(96, 165, 250, 0.5);
+  width: 1px;
+  max-height: 20px;
+  opacity: 0.8;
+}
+
+.timeline-tick.beat .tick-line {
+  background: rgba(255, 255, 255, 0.15);
+  width: 1px;
+  max-height: 12px;
+  opacity: 0.6;
+}
+
+.timeline-tick.sixteenth .tick-line {
+  background: rgba(255, 255, 255, 0.06);
+  width: 1px;
+  max-height: 6px;
+  opacity: 0.4;
+}
+
+/* Playhead */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.playhead-line {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
+}
+
+.playhead-head {
+  position: absolute;
+  top: -6px;
+  left: -4px;
+  width: 10px;
+  height: 12px;
+  background: #ef4444;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  filter: drop-shadow(0 1px 2px rgba(239, 68, 68, 0.3));
+}
+
+/* Time markers */
+.time-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Fixed: Relative to ruler */
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  height: 100%;
+}
+
+.time-marker {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  top: 4px;
+  z-index: 5;
+}
+
+/* Hover effects */
+.timeline-ruler:hover .time-marker {
+  opacity: 0.8;
+}
+
+/* Selection and loop regions */
+.timeline-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(79, 70, 229, 0.1);
+  border: 1px solid var(--primary-light);
+  border-top: none;
+  pointer-events: none;
+}
+
+.timeline-loop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid #22c55e;
+  border-top: none;
+  pointer-events: none;
+}
+
+.timeline-loop::before,
+.timeline-loop::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+}
+
+.timeline-loop::before {
+  left: -4px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.timeline-loop::after {
+  right: -4px;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
+/* Track list */
+.tracklist {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: visible;
+  /* Handled by parent */
+  position: relative;
+  min-width: 100%;
+  width: max-content;
+  /* Ensure rows expand */
+}
+
+.track-row {
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  min-height: 64px;
+  position: relative;
+}
+
+.track-row:not(:hover) {
+  opacity: 0.7;
+}
+
+.add-track-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+  border-radius: 6px;
+  font-size: '13px';
+  letter-spacing: '0.01em';
+}
+
+.add-track-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+
+.track-header {
+  width: 140px;
+  /* Reduced width */
+  padding: 0;
+  /* Padding handled by inner elements */
+  display: flex;
+  align-items: center;
+  /* styles removed to allow inline override */
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.track-row:hover .track-header {
+  opacity: 1;
+}
+
+.track-controls {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.track-button {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-button:hover {
+  background: var(--surface-hover);
+  color: var(--primary);
+  border-color: var(--primary-light);
+}
+
+.track-button.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.track-name {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.track-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--primary-light);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.track-fader {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+}
+
+.track-fader-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--primary);
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.track-pan {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.track-pan-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--text-secondary);
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+}
+
+/* Clip area */
+.track-clip-area {
+  flex: 1;
+  position: relative;
+  overflow: visible;
+  /* Let content expand parent */
+  background: #14181C;
+  /* Dark grid background */
+  min-width: 100%;
+  /* Ensure alignment with timeline ruler */
+  box-sizing: border-box;
+}
+
+.track-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  pointer-events: none;
+  min-width: 100%;
+  width: max-content;
+  /* Force container to be as wide as grid lines */
+}
+
+.grid-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.grid-line.downbeat {
+  border-right: 1px solid rgba(96, 165, 250, 0.2);
+  opacity: 0.6;
+}
+
+.grid-line.beat {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0.4;
+}
+
+.grid-line.sixteenth {
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  opacity: 0.3;
+}
+
+.track-clip {
+  position: absolute;
+  height: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.2s;
+  font-size: 11px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: rgba(79, 70, 229, 0.2);
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.track-clip:hover .resize-handle {
+  opacity: 1;
+}
+
+.track-clip:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border-color: var(--primary-light);
+}
+
+.clip-delete {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 3;
+}
+
+.clip-delete:hover {
+  color: var(--primary);
+  border-color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.add-clip-inline {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.add-clip-inline:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+  background: var(--surface-hover);
+}
+
+.drag-clone {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-hover) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 6px 8px;
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.08);
+  z-index: 9999;
+}
+
+.track-row.drop-target {
+  outline: 2px dashed rgba(79, 70, 229, 0.12);
+}
+
+.clip-title {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.01em;
+}
+
+.clip-waveform {
+  flex: 1;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.waveform-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.inspector {
+  width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e9f0f7;
+  height: calc(100% - 24px)
+}
+
+.plugin-panel {
+  width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid #e9f0f7;
+  height: calc(100% - 24px)
+}
+
+.mixer {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+  border-top: 1px solid rgba(0, 0, 0, 0.03);
+  margin-top: 12px
+}
+
+.mixer-channel {
+  width: 120px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px
+}
+
+.mixer-channel .channel-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 4px
+}
+
+.mixer-channel .pan-control,
+.mixer-channel .volume-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%
+}
+
+.mixer-channel .pan-control label,
+.mixer-channel .volume-control label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500
+}
+
+.pan-fader,
+.fader {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer
+}
+
+.pan-fader::-webkit-slider-thumb,
+.fader::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2)
+}
+
+.pan-fader::-moz-range-thumb,
+.fader::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2)
+}
+
+.mixer-channel .channel-controls {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px
+}
+
+/* Responsive */
+@media (max-width:1100px) {
+  .session-browser {
+    display: none
+  }
+}
+
+@media (max-width:900px) {
+
+  .inspector,
+  .plugin-panel {
+    display: none
+  }
+}
+
+/* Modern DAW styles with refined aesthetics */
+
+:root {
+  --primary: #4f46e5;
+  --primary-light: #818cf8;
+  --primary-dark: #3730a3;
+  --surface: #ffffff;
+  --surface-hover: #f8fafc;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+
+  /* Initial values for panel widths */
+  --browser-width: 240px;
+  --inspector-width: 300px;
+}
+
+/* ... (Omitted Navbar/View styles for brevity) ... */
+
+/* --- CORE LAYOUT MODIFICATION for Sideways Resizing --- */
+.daw-main {
+  display: grid;
+  padding: 12px;
+  flex: 1;
+  gap: 0;
+  height: 100%;
+  /* Ensure it fills the vertical space */
+
+  /* Define 5 columns: Left Panel | Left Resizer | Center Canvas | Right Resizer | Right Panel */
+  grid-template-columns: var(--browser-width) 6px 1fr 6px var(--inspector-width);
+}
+
+/* Panel Styles - Use grid-column to place them */
+.session-browser {
+  grid-column: 1;
+  background: #363d43;
+  border-radius: 0;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #1e2226;
+  height: calc(100vh - 64px - 44px - 24px);
+  /* Full height minus Navbar, TransportBar, and vertical padding */
+  width: 100%;
+  overflow-y: auto;
+}
+
+.center-canvas {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 12px;
+  /* Visual spacing */
+}
+
+/* Inspector and Plugin Panel share the final column */
+.inspector,
+.plugin-panel {
+  grid-column: 5;
+  background: var(--surface);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  height: calc(100vh - 64px - 44px - 24px);
+  /* Same height calculation */
+  width: 100%;
+  overflow-y: auto;
+}
+
+
+/* --- NEW RESIZER STYLES --- */
+.resizer {
+  background: transparent;
+  cursor: ew-resize;
+  /* East-West resize cursor */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background-color 0.1s;
+  user-select: none;
+  z-index: 10;
+  height: 100%;
+}
+
+.left-resizer {
+  grid-column: 2;
+  /* Positioned between browser and center-canvas */
+}
+
+.right-resizer {
+  grid-column: 4;
+  /* Positioned between center-canvas and inspector */
+}
+
+.resizer:hover {
+  background: rgba(79, 70, 229, 0.1);
+  /* Light primary hover */
+  color: var(--primary);
+}
+
+
+/* Responsive - Adjustments for panel hiding and grid changes */
+@media (max-width:1100px) {
+
+  /* Hide the browser panel and its resizer */
+  .session-browser,
+  .left-resizer {
+    display: none
+  }
+
+  /* Change grid layout to account for hidden panels */
+  .daw-main {
+    grid-template-columns: 1fr 6px var(--inspector-width);
+  }
+
+  .center-canvas {
+    grid-column: 1;
+    margin-left: 0;
+  }
+
+  .right-resizer {
+    grid-column: 2;
+  }
+
+  .inspector,
+  .plugin-panel {
+    grid-column: 3;
+  }
+}
+
+@media (max-width:900px) {
+
+  /* Hide the inspector/plugin panel and its resizer */
+  .inspector,
+  .plugin-panel,
+  .right-resizer {
+    display: none
+  }
+
+  /* Change grid layout to only show center canvas */
+  .daw-main {
+    grid-template-columns: 1fr;
+  }
+
+  .center-canvas {
+    grid-column: 1;
+    margin: 0;
+  }
+}
+
+/* Draggable Window Styles */
+.draggable-window {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.window-header {
+  background: #1e1e1e;
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  min-height: 24px;
+  height: 24px;
+}
+
+.window-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: #d0d0d0;
+}
+
+/* Window Controls & Maximize Styles */
+.draggable-window.maximized {
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  overflow: visible;
+}
+
+.draggable-window.maximized .window-header {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.window-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.window-control-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.window-control-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d0d0d0;
+}
+
+.window-control-btn[title="Close"]:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.window-content {
+  flex: 1;
+  overflow: hidden;
+  background: #1e1e1e;
+  /* Darker background for "internal" content */
+  position: relative;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Piano roll specific - ensure dark header and window */
+.draggable-window .piano-roll-window {
+  background-color: #1e1e1e !important;
+}
+
+.draggable-window .piano-roll-window .piano-header {
+  background-color: #1e1e1e !important;
+}
+
+.window-content .piano-roll-window .piano-header {
+  background-color: #1e1e1e !important;
+}
+
+/* Resize Handles */
+.draggable-window {
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle-n,
+.resize-handle-s {
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  cursor: ns-resize;
+}
+
+.resize-handle-n {
+  top: 0;
+}
+
+.resize-handle-s {
+  bottom: 0;
+}
+
+.resize-handle-e,
+.resize-handle-w {
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.resize-handle-e {
+  right: 0;
+}
+
+.resize-handle-w {
+  left: 0;
+}
+
+.resize-handle-ne,
+.resize-handle-nw,
+.resize-handle-se,
+.resize-handle-sw {
+  width: 8px;
+  height: 8px;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 222, 128, 0.3);
+}
+
+/* Specific component styles */
+.piano-keys {
+  margin-top: 10px;
+}
+
+/* Clip Context Menu */
+.clip-menu {
+  position: fixed;
+  background: #3e3e3e;
+  /* FL menu bg */
+  border: 1px solid #111;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.6);
+  min-width: 180px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-size: 11px;
+  color: #d0d0d0;
+  border-radius: 4px;
+}
+
+.clip-menu-header {
+  padding: 6px 10px;
+  background: #505050;
+  color: #cca;
+  /* Pinkish/tan for header */
+  font-weight: bold;
+  border-bottom: 1px solid #222;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+
+.clip-menu-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.15s ease;
+  border-radius: 2px;
+}
+
+.clip-menu-item:hover {
+  background: #2d4f68;
+  /* Selection highlight */
+  color: #fff;
+}
+
+.clip-menu-separator {
+  height: 1px;
+  background: #555;
+  margin: 4px 8px;
+  border-bottom: 1px solid #222;
+}
+
+.clip-menu-arrow {
+  margin-left: auto;
+  font-size: 9px;
+  color: #888;
+}
+
+/* Updated Clip Header for Menu Button */
+.clip-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.clip-menu-btn {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  margin-left: 4px;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.clip-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* ... (Rest of original daw.css styles) ... */

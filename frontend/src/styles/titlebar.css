@@ -1,0 +1,85 @@
+/* Custom Titlebar Styles - Blender-style Dark UI */
+
+.custom-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: #1a1a1a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  z-index: 10000;
+  -webkit-app-region: drag; /* Allow dragging the window */
+  user-select: none;
+}
+
+.titlebar-title {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding-left: 12px;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar-controls {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  -webkit-app-region: no-drag; /* Prevent dragging on buttons */
+}
+
+.titlebar-button {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+  margin: 0;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e5e7eb;
+}
+
+.titlebar-button-minimize:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar-button-maximize:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.titlebar-button-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.titlebar-button:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.titlebar-button-close:active {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+/* Ensure titlebar is always on top */
+/* Adjust app-container to account for titlebar height */
+body:has(.custom-titlebar) .app-container {
+  padding-top: 32px;
+  height: calc(100vh - 32px);
+}
+

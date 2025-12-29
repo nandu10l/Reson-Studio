@@ -1,0 +1,185 @@
+/* butterDAWg Header.css (essential parts) */
+.header_top,
+.header_bottom {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+}
+
+.header_panel {
+    padding: 3px 2px;
+    height: 34px;
+    background-color: #596267;
+    border: 1px solid var(--bg-medium);
+    display: flex;
+    align-items: center;
+}
+
+.header_panel_handle_wrapper {
+    height: inherit;
+    width: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.header_panel_handle {
+    width: 8px;
+    height: 50px;
+    background-color: var(--bg-dark);
+    clip-path: url(#handle_path);
+    transform: scaleY(0.7) scaleX(0.9);
+}
+
+.player_controls {
+    display: flex;
+    align-items: center;
+    height: 35px;
+}
+
+.player_controls>div {
+    margin: 0 6px;
+}
+
+.play {
+    width: 35px;
+    height: inherit;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.reset {
+    width: 40px;
+    height: inherit;
+    border-radius: 0 20px 20px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.header_button {
+    margin-left: 4px;
+    cursor: default;
+    display: flex;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 3px;
+}
+
+.unclicked {
+    border: 2px solid #00000069;
+    background: #4d585c;
+}
+
+.bpm {
+    display: flex;
+    align-items: center;
+    margin-left: 8px;
+}
+
+.bpm #bpm_count {
+    margin: 0;
+    font-weight: 700;
+    color: var(--bg-light);
+}
+
+.header_waveview {
+    width: 150px;
+    height: inherit;
+    background-color: #3e464b;
+    border: 1px solid var(--bg-dark);
+}
+
+.header_help {
+    width: 300px;
+    height: inherit;
+    background-color: var(--bg-medium);
+    border: 1px solid var(--bg-dark);
+    padding-right: 3px;
+}
+
+.header_help>p {
+    margin: 0;
+    color: #b1b1b1;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    height: 50%;
+}
+
+/* small responsive tweaks */
+.header_top {
+    gap: 8px;
+    padding: 4px;
+}
+
+/* Menu Bar Styles */
+.menu-container {
+    display: flex;
+    gap: 2px;
+}
+
+.menu-wrapper {
+    position: relative;
+}
+
+.menu-button {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #b3b3b3;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s ease;
+}
+
+.menu-button:hover {
+    color: #d0d0d0;
+}
+
+.menu-button.active {
+    color: #4ade80;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #2a2a2a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 180px;
+    z-index: 999999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    padding: 6px 0;
+    display: flex;
+    flex-direction: column;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+.dropdown-item {
+    padding: 8px 14px;
+    color: #b3b3b3;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.15s ease;
+    letter-spacing: 0.01em;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 6px 8px;
+}
