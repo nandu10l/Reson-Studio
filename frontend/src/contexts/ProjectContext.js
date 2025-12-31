@@ -120,8 +120,18 @@ export const ProjectProvider = ({ children }) => {
     const addNoteToActivePattern = useCallback((note) => {
         setPatterns(prev => prev.map(p => {
             if (p.id === activePatternId) {
+                // Check if we need to extend pattern
+                const noteEnd = note.startStep + note.length;
+                let newLength = p.length;
+
+                if (noteEnd > p.length) {
+                    // Expand to next full bar (multiple of 16)
+                    newLength = Math.ceil(noteEnd / 16) * 16;
+                }
+
                 return {
                     ...p,
+                    length: newLength,
                     data: {
                         ...p.data,
                         notes: [...p.data.notes, note]
@@ -179,12 +189,26 @@ export const ProjectProvider = ({ children }) => {
     const updateNote = useCallback((noteId, changes) => {
         setPatterns(prev => prev.map(p => {
             if (p.id === activePatternId) {
+                // Calculate potential new length requirement
+                // We need to find the specific note being updated to know its new position
+                const note = p.data.notes.find(n => n.id === noteId);
+                if (!note) return p;
+
+                const updatedNote = { ...note, ...changes };
+                const noteEnd = updatedNote.startStep + updatedNote.length;
+
+                let newLength = p.length;
+                if (noteEnd > p.length) {
+                    newLength = Math.ceil(noteEnd / 16) * 16;
+                }
+
                 return {
                     ...p,
+                    length: newLength,
                     data: {
                         ...p.data,
                         notes: p.data.notes.map(n =>
-                            n.id === noteId ? { ...n, ...changes } : n
+                            n.id === noteId ? updatedNote : n
                         )
                     }
                 };

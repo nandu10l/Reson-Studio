@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './PianoRoll.css';
 import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit } from './icons/BlenderIcons';
 import Playhead from './Playhead';
@@ -30,7 +30,7 @@ const PianoRoll = () => {
     const [selection, setSelection] = useState([]); // Array of note IDs
     const [hoveredKey, setHoveredKey] = useState(null); // Currently hovered key fullName
     const [currentStep, setCurrentStep] = useState(0); // Current playback step for pulse animation
-    
+
     // New tool states
     const [snapEnabled, setSnapEnabled] = useState(true);
     const [snapStrength, setSnapStrength] = useState(4); // 1, 2, 4, 8, 16
@@ -51,80 +51,91 @@ const PianoRoll = () => {
     const stepsPerBar = 16;
     const keyHeight = 24;
 
+    const scrollContainerRef = useRef(null);
     const pianoKeysRef = useRef(null);
     const gridAreaRef = useRef(null);
     const mainAreaRef = useRef(null);
 
-    // Generate keys
-    const allKeys = [];
-    for (let o = startOctave; o >= 1; o--) {
-        KEYS.forEach(key => {
-            allKeys.push({
-                note: key,
-                octave: o,
-                isBlack: key.includes('#'),
-                fullName: key + o
-            });
-        });
-    }
+    const KEYS_WIDTH = 100; // Must match CSS .piano-keys-column width
 
-    // Scroll to C5 on mount and sync vertical scrolling
+    // Generate keys
+    // Generate keys
+    const allKeys = useMemo(() => {
+        const keys = [];
+        for (let o = startOctave; o >= 1; o--) {
+            KEYS.forEach(key => {
+                keys.push({
+                    note: key,
+                    octave: o,
+                    isBlack: key.includes('#'),
+                    fullName: key + o
+                });
+            });
+        }
+        return keys;
+    }, []);
+
+    // Scroll to C5 on mount
     useEffect(() => {
         const rowC5 = allKeys.findIndex(k => k.note === 'C' && k.octave === 5);
         if (rowC5 !== -1) {
-            const scrollTop = (rowC5 * keyHeight) - ((pianoKeysRef.current?.clientHeight || 400) / 2) + (keyHeight / 2);
-            if (pianoKeysRef.current) {
-                pianoKeysRef.current.scrollTop = scrollTop;
-            }
-            if (gridAreaRef.current) {
-                gridAreaRef.current.scrollTop = scrollTop;
+            const scrollTop = (rowC5 * keyHeight) - ((scrollContainerRef.current?.clientHeight || 400) / 2) + (keyHeight / 2);
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = scrollTop;
             }
         }
     }, [allKeys, keyHeight]);
 
-    // Auto-scroll to keep playhead visible during playback (only grid area scrolls)
+    // Auto-scroll to keep playhead visible
     useEffect(() => {
-        if (!gridAreaRef.current || !isPlaying) return;
-        
-        const scrollContainer = gridAreaRef.current;
-        const playheadPixelX = playheadPosition * pixelsPerStep * 4; // 4 steps per beat, no piano keys offset
-        
-        // Get viewport bounds
+        if (!scrollContainerRef.current || !isPlaying) return;
+
+        const scrollContainer = scrollContainerRef.current;
+        // pixelX relative to grid start
+        // pixelX relative to grid start
+        const playheadPixelX = playheadPosition * pixelsPerStep * 4;
+
+        // Target scroll position would be playhead X + keys offset
+        const targetX = playheadPixelX;
+
+        // Use scrollLeft of the container
         const scrollLeft = scrollContainer.scrollLeft;
         const viewportWidth = scrollContainer.clientWidth;
+
+        const absolutePlayheadX = KEYS_WIDTH + playheadPixelX;
+
         const visibleStart = scrollLeft;
         const visibleEnd = scrollLeft + viewportWidth;
-        
-        // Calculate margins (keep playhead centered with some padding)
-        const margin = viewportWidth * 0.2; // 20% margin on each side
-        
-        // Check if playhead is outside visible area
-        if (playheadPixelX < visibleStart + margin) {
-            // Scroll left to show playhead
-            scrollContainer.scrollLeft = Math.max(0, playheadPixelX - margin);
-        } else if (playheadPixelX > visibleEnd - margin) {
-            // Scroll right to show playhead
-            scrollContainer.scrollLeft = playheadPixelX - viewportWidth + margin;
+
+        // Calculate margins
+        const margin = viewportWidth * 0.2;
+
+        // Check bounds
+        if (absolutePlayheadX < visibleStart + KEYS_WIDTH + margin) {
+            // Scroll left
+            scrollContainer.scrollLeft = Math.max(0, absolutePlayheadX - KEYS_WIDTH - margin);
+        } else if (absolutePlayheadX > visibleEnd - margin) {
+            // Scroll right
+            scrollContainer.scrollLeft = absolutePlayheadX - viewportWidth + margin;
         }
     }, [playheadPosition, pixelsPerStep, isPlaying]);
 
     // --- Helpers ---
     const getStepFromX = (x) => {
-        // x is relative to grid area (no piano keys offset needed)
-        if (gridAreaRef.current) {
-            const rect = gridAreaRef.current.getBoundingClientRect();
-            const gridX = x - rect.left + gridAreaRef.current.scrollLeft;
-            const step = Math.floor(gridX / pixelsPerStep);
-            return Math.max(0, step);
-        }
-        return 0;
+        // x is passed from handleMouseDown which already calculates it relative to Grid Content Start
+        const step = Math.floor(x / pixelsPerStep);
+        return Math.max(0, step);
     };
+
     const getKeyFromY = (y) => {
-        // y is already in content coordinates (includes scrollTop)
+        // y is content offset in container
+        // Since we are using a unified container, y is just scrollTop + clientY relative to container top?
+        // handleMouseDown will pass the correct Y relative to content top
         const index = Math.floor(y / keyHeight);
         if (index < 0 || index >= allKeys.length) return null;
         return allKeys[index] ? allKeys[index].fullName : null;
     };
+
     const getYFromKey = (noteName) => {
         const index = allKeys.findIndex(k => k.fullName === noteName);
         return index * keyHeight;
@@ -141,16 +152,35 @@ const PianoRoll = () => {
         // Allow Left (0) and Right (2) clicks
         if (e.button !== 0 && e.button !== 2) return;
 
-        if (!mainAreaRef.current || !gridAreaRef.current) return;
+        if (!scrollContainerRef.current) return;
 
-        const scrollRect = gridAreaRef.current.getBoundingClientRect();
-        // Calculate coordinates relative to the grid area viewport
+        const scrollRect = scrollContainerRef.current.getBoundingClientRect();
+        // Calculate coordinates relative to the scroll container viewport
         const viewportX = e.clientX - scrollRect.left;
         const viewportY = e.clientY - scrollRect.top;
-        
+
         // Add scroll offsets to get content coordinates
-        const x = viewportX + gridAreaRef.current.scrollLeft;
-        const y = viewportY + gridAreaRef.current.scrollTop;
+        const globalX = viewportX + scrollContainerRef.current.scrollLeft;
+        const globalY = viewportY + scrollContainerRef.current.scrollTop;
+
+        // Check if clicked ON keys (sticky)
+        if (viewportX < KEYS_WIDTH) {
+            // Clicked on Keys - potentially preview note sound? 
+            // Logic for that is not fully detailed in original code other than ignore creation
+            // Original logic: "if (x < 300) return;" (Wait, 300? CSS says 100px width ?)
+            // Previous code: "Adjust selection box coordinates... offset (300px)" and "if (x < 300) return;"
+            // But CSS says `.piano-keys-column { width: 100px; ... }`
+            // Why did the JS say 300? 
+            // Line 247 original JS: "if (x < 300) return;" 
+            // Maybe legacy code or I misread? 
+            // Let's stick to using the `keysWidth` variable defined as 100 for accuracy with current CSS.
+
+            // Wait, if sticky, visual clicking is viewport dependent.
+            return;
+        }
+
+        const gridX = globalX - KEYS_WIDTH; // Coordinate relative to grid start
+        const gridY = globalY; // Coordinate relative to content top
 
         const targetIsNote = e.target.closest('.piano-note');
         const targetIsResize = e.target.classList.contains('piano-note-resize');
@@ -160,12 +190,7 @@ const PianoRoll = () => {
             if (targetIsNote) {
                 const noteId = parseInt(e.target.closest('.piano-note').dataset.id);
                 removeNoteFromActivePattern(noteId);
-                // If it was selected, remove from selection too
                 setSelection(prev => prev.filter(id => id !== noteId));
-            } else {
-                // Right click on background to delete? 
-                // Enhanced logic: Find note under cursor and delete it (like FL eraser)
-                // For now, simpler: specific click delete.
             }
             return;
         }
@@ -178,7 +203,6 @@ const PianoRoll = () => {
             const note = activePattern.data.notes.find(n => n.id === noteId);
             if (!note) return;
 
-            // If resizing a note outside selection, select only it
             if (!selection.includes(noteId)) {
                 setSelection([noteId]);
             }
@@ -199,7 +223,7 @@ const PianoRoll = () => {
         if (targetIsNote) {
             const noteId = parseInt(e.target.closest('.piano-note').dataset.id);
 
-            // Eraser Tool (Left Click)
+            // Eraser Tool
             if (selectedTool === 'eraser') {
                 removeNoteFromActivePattern(noteId);
                 return;
@@ -207,18 +231,17 @@ const PianoRoll = () => {
 
             e.stopPropagation();
 
-            // Toggle Selection if Ctrl/Shift
+            // Toggle Selection
             if (e.ctrlKey || e.shiftKey) {
                 setSelection(prev =>
                     prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]
                 );
-                return; // Don't move immediately on multi-select click
+                return;
             }
 
             // Normal Click
             if (!selection.includes(noteId)) {
                 setSelection([noteId]);
-                // Start Move for this single note
                 setDragState({
                     type: 'MOVE',
                     notes: [noteId],
@@ -227,7 +250,6 @@ const PianoRoll = () => {
                     initialData: { [noteId]: activePattern.data.notes.find(n => n.id === noteId) }
                 });
             } else {
-                // Moving existing selection
                 setDragState({
                     type: 'MOVE',
                     notes: selection,
@@ -243,16 +265,12 @@ const PianoRoll = () => {
         }
 
         // 3. Background Interactions
-        // Only create notes if clicking in the grid area (not on piano keys)
-        if (x < 300) return; // Clicked on piano keys, ignore
-        
-        const step = getStepFromX(x);
-        const noteName = getKeyFromY(y);
+        const step = getStepFromX(gridX);
+        const noteName = getKeyFromY(gridY);
 
-        if (!noteName) return; // Invalid key position
+        if (!noteName) return;
 
         if (selectedTool === 'pencil') {
-            // Create Note
             const newNote = {
                 id: Date.now(),
                 noteName,
@@ -260,16 +278,15 @@ const PianoRoll = () => {
                 length: 4
             };
             addNoteToActivePattern(newNote);
-            // Immediately start moving/resizing? For now just create.
         } else {
             // Box Selection
-            setSelection([]); // Clear selection
+            setSelection([]);
             setDragState({
                 type: 'SELECT',
-                startX: x, // Relative to container content
-                startY: y,
-                currentX: x,
-                currentY: y
+                startX: gridX,
+                startY: gridY,
+                currentX: gridX,
+                currentY: gridY
             });
         }
     };
@@ -277,7 +294,9 @@ const PianoRoll = () => {
     const handleMouseMove = (e) => {
         if (!dragState) return;
 
-        const rect = mainAreaRef.current.getBoundingClientRect();
+        // Note: dragState operations largely depend on deltas (clientX changes), 
+        // which don't technically care about scroll container refs unless we recalc absolutes.
+        // But SELECT box does need absolute grid coordinates.
 
         if (dragState.type === 'MOVE') {
             const dxPixels = e.clientX - dragState.startX;
@@ -317,12 +336,17 @@ const PianoRoll = () => {
         }
 
         if (dragState.type === 'SELECT') {
-            if (!gridAreaRef.current) return;
-            const scrollRect = gridAreaRef.current.getBoundingClientRect();
+            if (!scrollContainerRef.current) return;
+            const scrollRect = scrollContainerRef.current.getBoundingClientRect();
             const viewportX = e.clientX - scrollRect.left;
             const viewportY = e.clientY - scrollRect.top;
-            const x = viewportX + gridAreaRef.current.scrollLeft;
-            const y = viewportY + gridAreaRef.current.scrollTop;
+
+            const globalX = viewportX + scrollContainerRef.current.scrollLeft;
+            const globalY = viewportY + scrollContainerRef.current.scrollTop;
+
+            // Convert to grid coordinates
+            const x = globalX - KEYS_WIDTH;
+            const y = globalY; // Relative to content top
 
             setDragState(prev => ({ ...prev, currentX: x, currentY: y }));
         }
@@ -338,11 +362,10 @@ const PianoRoll = () => {
             const y1 = Math.min(dragState.startY, dragState.currentY);
             const y2 = Math.max(dragState.startY, dragState.currentY);
 
+            // Bounds check not strictly needed as overlap logic handles it, but good to know
+            // Note: startX etc are already grid-relative in my updated handleMouseDown
+
             // Find overlapping notes
-            // Adjust selection box coordinates to account for piano key offset (300px)
-            const adjustedX1 = Math.max(0, x1 - 300);
-            const adjustedX2 = Math.max(0, x2 - 300);
-            
             const selectedIds = activePattern.data.notes.filter(n => {
                 const noteY = getYFromKey(n.noteName);
                 const noteX = n.startStep * pixelsPerStep;
@@ -350,7 +373,7 @@ const PianoRoll = () => {
                 const noteH = keyHeight;
 
                 // Simple AABB collision
-                return (noteX < adjustedX2 && noteX + noteW > adjustedX1 &&
+                return (noteX < x2 && noteX + noteW > x1 &&
                     noteY < y2 && noteY + noteH > y1);
             }).map(n => n.id);
 
@@ -470,7 +493,7 @@ const PianoRoll = () => {
                                 className="pattern-name-input"
                             />
                         ) : (
-                            <span 
+                            <span
                                 className="pattern-name-text"
                                 onClick={handleNameClick}
                                 title="Click to rename"
@@ -544,10 +567,10 @@ const PianoRoll = () => {
                 {/* Link Group */}
                 <div className="toolbar-separator"></div>
                 <div className="tool-group">
-                    <button 
-                        className="tool-btn" 
+                    <button
+                        className="tool-btn"
                         title="Link Notes"
-                        onClick={() => {/* TODO: Implement link notes */}}
+                        onClick={() => {/* TODO: Implement link notes */ }}
                     >
                         <Link2 size={16} className="blender-icon" />
                     </button>
@@ -608,7 +631,7 @@ const PianoRoll = () => {
                 <div className="tool-group">
                     <button
                         className="tool-btn"
-                        onClick={() => {/* TODO: Implement quantize */}}
+                        onClick={() => {/* TODO: Implement quantize */ }}
                         title="Quantize Selected Notes">
                         <AlignCenter size={16} className="blender-icon" />
                     </button>
@@ -637,19 +660,20 @@ const PianoRoll = () => {
                     <button className="tool-btn" onClick={() => setZoom(z => Math.max(10, z - 5))} title="Zoom Out">
                         <ZoomOut size={16} className="blender-icon" />
                     </button>
-                <button className="tool-btn" onClick={() => setZoom(z => Math.min(100, z + 5))} title="Zoom In">
-                    <ZoomIn size={16} className="blender-icon" />
-                </button>
+                    <button className="tool-btn" onClick={() => setZoom(z => Math.min(100, z + 5))} title="Zoom In">
+                        <ZoomIn size={16} className="blender-icon" />
+                    </button>
                 </div>
             </div>
 
             {/* Main Scrollable Area */}
             <div
                 className="piano-main-area"
+                ref={scrollContainerRef}
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
             >
-                {/* Piano Keys Column - Fixed, no horizontal scroll */}
+                {/* Piano Keys Column - Fixed via sticky */}
                 <div className="piano-keys-column" ref={pianoKeysRef}>
                     {allKeys.map((k) => {
                         const keyNotes = getNotesForKey(k.fullName);
@@ -658,7 +682,7 @@ const PianoRoll = () => {
                         const isHovered = hoveredKey === k.fullName;
 
                         return (
-                            <div 
+                            <div
                                 className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
                                 key={k.fullName}
                                 style={{ height: `${keyHeight}px` }}
@@ -673,9 +697,9 @@ const PianoRoll = () => {
                     })}
                 </div>
 
-                {/* Grid Area - Scrollable horizontally */}
+                {/* Grid Area - Flows naturally now */}
                 <div className="piano-grid-area" ref={gridAreaRef}>
-                    <div ref={mainAreaRef} style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
                         {/* Playhead for piano roll */}
                         <Playhead
                             mode="smooth"
@@ -688,8 +712,8 @@ const PianoRoll = () => {
                             const isPlayingNote = keyNotes.some(note => isNotePlaying(note));
 
                             return (
-                                <div 
-                                    className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`} 
+                                <div
+                                    className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`}
                                     key={k.fullName}
                                     style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}
                                 >
@@ -707,7 +731,7 @@ const PianoRoll = () => {
                                     })}
                                 </div>
                             );
-                        }                        )}
+                        })}
 
                         {/* Render Notes Layer Overlay */}
                         <div className="piano-notes-overlay" style={{
@@ -747,7 +771,7 @@ const PianoRoll = () => {
                             {dragState && dragState.type === 'SELECT' && (
                                 <div style={{
                                     position: 'absolute',
-                                    left: Math.min(dragState.startX, dragState.currentX), // No piano key offset needed
+                                    left: Math.min(dragState.startX, dragState.currentX),
                                     top: Math.min(dragState.startY, dragState.currentY),
                                     width: Math.abs(dragState.currentX - dragState.startX),
                                     height: Math.abs(dragState.currentY - dragState.startY),

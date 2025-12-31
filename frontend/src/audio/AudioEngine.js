@@ -165,7 +165,13 @@ class AudioEngine {
         // Clear previous schedule
         Tone.Transport.cancel();
 
-        const loopLength = "1m"; // Assuming 16 steps = 1 measure
+        // Calculate loop length based on pattern length (in steps)
+        // Default to 16 if not defined (1 bar)
+        const patternSteps = pattern.length || 16;
+        const stepsPerBar = 16;
+        const bars = Math.ceil(patternSteps / stepsPerBar);
+        const loopLength = `${bars}m`;
+
         Tone.Transport.loop = true;
         Tone.Transport.loopEnd = loopLength;
 

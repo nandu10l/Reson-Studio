@@ -12,6 +12,10 @@
     box-sizing: border-box;
 }
 
+.piano-roll-window * {
+    box-sizing: border-box;
+}
+
 /* Header - Blender-style context area */
 .piano-header {
     height: 28px;
@@ -232,48 +236,40 @@
     color: #60a5fa;
 }
 
-/* Main Scrolling Area */
+/* Main Scrolling Area - Modified for Unified Scroll */
 .piano-main-area {
     flex: 1;
     display: flex;
     flex-direction: row;
-    overflow: hidden;
+    overflow: scroll;
+    /* Allow both vertical and horizontal scroll */
     background: #14181C;
     position: relative;
+    /* Hide scrollbar but keep functionality if desired, or custom scrollbar */
+    /* For now, standard scrollbars are better for usability in desktop app */
 }
 
-/* Piano keys column - fixed, no horizontal scroll */
+/* Piano keys column - Sticky within the main area */
 .piano-keys-column {
     width: 100px;
     min-width: 100px;
     flex-shrink: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    position: sticky;
+    left: 0;
+    z-index: 50;
+    /* Higher than grid content */
     background: #14181C;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    /* Hide scrollbar */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
 }
 
-.piano-keys-column::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
-}
-
-/* Grid area - scrollable horizontally */
+/* Grid area - No independent scroll, flows within main area */
 .piano-grid-area {
     flex: 1;
-    overflow: auto;
+    /* overflow: visible; */
     background: #14181C;
     position: relative;
-    scroll-behavior: smooth;
-    /* Hide scrollbar */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
-}
-
-.piano-grid-area::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: block;
+    /* Ensure block layout */
 }
 
 .piano-row {
@@ -359,9 +355,11 @@
     0% {
         box-shadow: 0 0 0 rgba(74, 222, 128, 0);
     }
+
     50% {
         box-shadow: 0 0 12px rgba(74, 222, 128, 0.8), 2px 0 4px rgba(0, 0, 0, 0.3);
     }
+
     100% {
         box-shadow: 0 0 0 rgba(74, 222, 128, 0);
     }
@@ -434,7 +432,7 @@
     background: linear-gradient(to bottom, #4ade80, #22c55e);
     border: 1px solid rgba(34, 197, 94, 0.4);
     border-radius: 4px;
-    box-shadow: 
+    box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.2),
         inset 0 -1px 1px rgba(0, 0, 0, 0.2),
         0 1px 3px rgba(0, 0, 0, 0.3);
@@ -447,7 +445,7 @@
 .piano-note:hover {
     background: linear-gradient(to bottom, #86efac, #4ade80);
     border-color: rgba(34, 197, 94, 0.6);
-    box-shadow: 
+    box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.25),
         inset 0 -1px 1px rgba(0, 0, 0, 0.2),
         0 2px 6px rgba(0, 0, 0, 0.4);
@@ -474,7 +472,7 @@
 .piano-note.selected {
     background: linear-gradient(to bottom, #60a5fa, #3b82f6);
     border: 2px solid #60a5fa;
-    box-shadow: 
+    box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.3),
         inset 0 -1px 1px rgba(0, 0, 0, 0.2),
         0 0 0 1px rgba(96, 165, 250, 0.5),
@@ -484,7 +482,7 @@
 
 .piano-note.selected:hover {
     background: linear-gradient(to bottom, #93c5fd, #60a5fa);
-    box-shadow: 
+    box-shadow:
         inset 0 1px 2px rgba(255, 255, 255, 0.35),
         inset 0 -1px 1px rgba(0, 0, 0, 0.2),
         0 0 0 1px rgba(96, 165, 250, 0.6),
