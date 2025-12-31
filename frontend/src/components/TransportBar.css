@@ -4,7 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 28px; /* Low-profile height */
+  height: 28px;
+  /* Low-profile height */
   background: #1a1a1a;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding: 0 8px;
@@ -13,10 +14,59 @@
 }
 
 /* Left Section: Pattern Navigation */
+/* Left Section: Pattern Navigation & Tools */
 .transport-left {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  gap: 12px;
+}
+
+/* Tools Toolbar */
+.transport-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  padding: 2px;
+}
+
+.transport-tool-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 1px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  color: #9ca3af;
+}
+
+.transport-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #b3b3b3;
+}
+
+.transport-tool-btn.active {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.transport-tool-btn.active .blender-icon {
+  color: #60a5fa;
+}
+
+.transport-separator {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 4px;
 }
 
 /* Center Section: Primary Transport Controls */
@@ -67,7 +117,8 @@
 }
 
 .transport-btn-play.active {
-  background: #60a5fa; /* Single accent color */
+  background: #60a5fa;
+  /* Single accent color */
   color: #1a1a1a;
 }
 
@@ -86,7 +137,8 @@
 }
 
 .transport-btn-record.recording {
-  background: #ef4444; /* Red only for active recording */
+  background: #ef4444;
+  /* Red only for active recording */
   color: #fff;
 }
 
@@ -100,7 +152,8 @@
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   font-size: 12px;
   font-weight: 600;
-  color: #60a5fa; /* Accent color for prominence */
+  color: #60a5fa;
+  /* Accent color for prominence */
   letter-spacing: 0.1em;
   min-width: 60px;
   text-align: center;
@@ -242,4 +295,3 @@
 .transport-view-btn:hover .blender-icon {
   color: #b3b3b3;
 }
-

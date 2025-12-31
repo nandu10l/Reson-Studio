@@ -62,6 +62,15 @@ export const Volume2 = (props) => <BlenderIcon icon={LucideIcons.Volume2} {...pr
 export const VolumeX = (props) => <BlenderIcon icon={LucideIcons.VolumeX} {...props} />;
 export const Headphones = (props) => <BlenderIcon icon={LucideIcons.Headphones} {...props} />;
 
+// New Tool Icons
+export const Brush = (props) => <BlenderIcon icon={LucideIcons.Brush} {...props} />;
+export const Ban = (props) => <BlenderIcon icon={LucideIcons.Ban} {...props} />;
+export const MoveHorizontal = (props) => <BlenderIcon icon={LucideIcons.MoveHorizontal} {...props} />;
+export const ArrowRightLeft = (props) => <BlenderIcon icon={LucideIcons.ArrowRightLeft} {...props} />;
+export const BoxSelect = (props) => <BlenderIcon icon={LucideIcons.BoxSelect} {...props} />;
+export const Speaker = (props) => <BlenderIcon icon={LucideIcons.Speaker} {...props} />;
+export const MousePointer = (props) => <BlenderIcon icon={LucideIcons.MousePointer} {...props} />;
+
 // Window Controls
 export const Maximize = (props) => <BlenderIcon icon={LucideIcons.Maximize} {...props} />;
 export const Minimize = (props) => <BlenderIcon icon={LucideIcons.Minimize2} {...props} />;
@@ -111,5 +120,12 @@ export default {
   Search,
   Filter,
   MoreHorizontal,
-  MoreVertical
+  MoreVertical,
+  Brush,
+  Ban,
+  MoveHorizontal,
+  ArrowRightLeft,
+  BoxSelect,
+  Speaker,
+  MousePointer
 };

@@ -69,6 +69,10 @@ export const ProjectProvider = ({ children }) => {
     // 6. Loading State
     const [isImportingAudio, setIsImportingAudio] = useState(false);
 
+    // 7. Tools State
+    const [activeTool, setActiveTool] = useState('pencil'); // 'magnet', 'pencil', 'brush', 'eraser', 'mute', 'slip', 'slice', 'select', 'zoom', 'playback'
+
+
     // --- Actions ---
 
     const createPattern = useCallback(() => {
@@ -470,7 +474,10 @@ export const ProjectProvider = ({ children }) => {
         setPickerTab,
 
         // Loading State
-        isImportingAudio
+        isImportingAudio,
+
+        // Tools
+        activeTool, setActiveTool
     };
 
     return (

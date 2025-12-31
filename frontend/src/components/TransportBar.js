@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ListMusic, Grid, LayoutGrid, Sliders, Play, Pause, Stop, Circle } from './icons/BlenderIcons';
+import {
+  ListMusic, Grid, LayoutGrid, Sliders, Play, Pause, Stop, Circle,
+  Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2
+} from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
@@ -8,7 +11,11 @@ import './TransportBar.css';
 
 // Professional DAW Transport Bar Component
 function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
-  const { isPlaying, togglePlayback, bpm, updateBpm, stopPlayback, playheadPosition, playbackMode, setPlaybackMode, isRecording, setIsRecording } = useProject();
+  const {
+    isPlaying, togglePlayback, bpm, updateBpm, stopPlayback, playheadPosition,
+    playbackMode, setPlaybackMode, isRecording, setIsRecording,
+    activeTool, setActiveTool
+  } = useProject();
 
   const { useGuideHandlers } = useGuide();
 
@@ -17,11 +24,11 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
     const beatsPerBar = 4;
     const sixteenthsPerBeat = 4;
     const totalSixteenths = Math.floor(beats * sixteenthsPerBeat);
-    
+
     const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
     const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
     const sixteenth = totalSixteenths % sixteenthsPerBeat;
-    
+
     return `${bar}:${beat}:${sixteenth}`;
   };
 
@@ -41,10 +48,95 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
 
   return (
     <div className="transport-bar">
-      {/* Left: Pattern Navigation */}
+      {/* Left: Pattern Navigation & Tools */}
       <div className="transport-left">
         <div {...useGuideHandlers('Pattern Selector')}>
           <PatternSelector />
+        </div>
+
+        {/* Tools Toolbar */}
+        <div className="transport-tools">
+          <button
+            className={`transport-tool-btn ${activeTool === 'magnet' ? 'active' : ''}`}
+            onClick={() => setActiveTool(activeTool === 'magnet' ? 'pencil' : 'magnet')}
+            title="Snap to Grid"
+          >
+            <Magnet size={16} className="blender-icon" />
+          </button>
+
+          <div className="transport-separator"></div>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'pencil' ? 'active' : ''}`}
+            onClick={() => setActiveTool('pencil')}
+            title="Draw (Pencil)"
+          >
+            <Pencil size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'brush' ? 'active' : ''}`}
+            onClick={() => setActiveTool('brush')}
+            title="Paint (Brush)"
+          >
+            <Brush size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'delete' ? 'active' : ''}`}
+            onClick={() => setActiveTool('delete')}
+            title="Delete"
+          >
+            <Ban size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'mute' ? 'active' : ''}`}
+            onClick={() => setActiveTool('mute')}
+            title="Mute"
+          >
+            <VolumeX size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'slip' ? 'active' : ''}`}
+            onClick={() => setActiveTool('slip')}
+            title="Slip Edit"
+          >
+            <ArrowRightLeft size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'slice' ? 'active' : ''}`}
+            onClick={() => setActiveTool('slice')}
+            title="Slice"
+          >
+            <Scissors size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'select' ? 'active' : ''}`}
+            onClick={() => setActiveTool('select')}
+            title="Select"
+          >
+            <BoxSelect size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'zoom' ? 'active' : ''}`}
+            onClick={() => setActiveTool('zoom')}
+            title="Zoom"
+          >
+            <Search size={16} className="blender-icon" />
+          </button>
+
+          <button
+            className={`transport-tool-btn ${activeTool === 'playback' ? 'active' : ''}`}
+            onClick={() => setActiveTool('playback')}
+            title="Playback (Scrub)"
+          >
+            <Volume2 size={16} className="blender-icon" />
+          </button>
         </div>
       </div>
 
@@ -63,7 +155,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
               <Play size={16} className="blender-icon" />
             )}
           </button>
-          
+
           <button
             className="transport-btn transport-btn-stop"
             onClick={stopPlayback}
@@ -71,7 +163,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           >
             <Stop size={14} className="blender-icon" />
           </button>
-          
+
           <button
             className={`transport-btn transport-btn-record ${isRecording ? 'recording' : ''}`}
             onClick={() => setIsRecording(prev => !prev)}

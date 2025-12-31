@@ -440,6 +440,21 @@
     z-index: 5;
     overflow: hidden;
     transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    padding-left: 4px;
+}
+
+.piano-note-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .piano-note:hover {

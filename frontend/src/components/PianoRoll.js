@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './PianoRoll.css';
-import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit } from './icons/BlenderIcons';
+import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit, Brush, Scissors } from './icons/BlenderIcons';
 import Playhead from './Playhead';
 import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
@@ -229,6 +229,32 @@ const PianoRoll = () => {
                 return;
             }
 
+            // Slice Tool
+            if (selectedTool === 'slice') {
+                const note = activePattern.data.notes.find(n => n.id === noteId);
+                if (!note) return;
+
+                // Calculate split point based on click
+                const clickStep = getStepFromX(gridX);
+                const relStep = clickStep - note.startStep;
+
+                if (relStep > 0 && relStep < note.length) {
+                    // Valid split point
+                    // 1. Shorten original note
+                    updateNote(noteId, { length: relStep });
+
+                    // 2. Create new note remainder
+                    const newNote = {
+                        id: Date.now(),
+                        noteName: note.noteName,
+                        startStep: clickStep,
+                        length: note.length - relStep
+                    };
+                    addNoteToActivePattern(newNote);
+                }
+                return;
+            }
+
             e.stopPropagation();
 
             // Toggle Selection
@@ -270,7 +296,7 @@ const PianoRoll = () => {
 
         if (!noteName) return;
 
-        if (selectedTool === 'pencil') {
+        if (selectedTool === 'pencil' || selectedTool === 'brush') {
             const newNote = {
                 id: Date.now(),
                 noteName,
@@ -551,6 +577,18 @@ const PianoRoll = () => {
                         title="Select Tool">
                         <MousePointer2 size={16} className="blender-icon" />
                     </button>
+                    <button
+                        className={`tool-btn ${selectedTool === 'brush' ? 'active' : ''}`}
+                        onClick={() => setSelectedTool('brush')}
+                        title="Paint Tool">
+                        <Brush size={16} className="blender-icon" />
+                    </button>
+                    <button
+                        className={`tool-btn ${selectedTool === 'slice' ? 'active' : ''}`}
+                        onClick={() => setSelectedTool('slice')}
+                        title="Slice Tool">
+                        <Scissors size={16} className="blender-icon" />
+                    </button>
                 </div>
 
                 {/* Erase Group */}
@@ -762,6 +800,7 @@ const PianoRoll = () => {
                                             pointerEvents: 'auto'
                                         }}
                                     >
+                                        <span className="piano-note-label">{note.noteName}</span>
                                         <div className="piano-note-resize"></div>
                                     </div>
                                 );
