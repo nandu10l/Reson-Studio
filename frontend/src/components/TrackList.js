@@ -524,7 +524,8 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
                 filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
                 position: 'absolute',
-                top: '4px',
+                top: '50%',
+                transform: 'translateY(-50%)',
                 height: '52px',
                 zIndex: isClipSelected ? 10 : 1
               }}
