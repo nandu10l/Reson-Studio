@@ -8,7 +8,7 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack }) {
+function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -483,6 +483,17 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
                 onOpenMenu={(menuData) => setMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
                 isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
+                activeTool={activeTool}
+                onSlice={(rawSplitPoint) => {
+                  // Calculate correct split point based on raw click or handle in AudioClip
+                  // AudioClip passes relative click? No, we need logic.
+                  // Actually, let's pass the raw handler and let AudioClip determine position if needed?
+                  // Or passing (trackId, clipIndex, splitPoint) is standard.
+                  // Allow AudioClip to compute splitPoint or pass event.
+                  // Let's rely on AudioClip calling this with simple event or calculated point.
+                  // Implementation choice: Pass specific handler for this clip index.
+                  onSlice(track.id, idx, rawSplitPoint);
+                }}
               />
             );
           }
@@ -522,16 +533,24 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
                 opacity: isClipSelected ? 1 : isClipHovered ? 0.95 : 0.85,
                 transition: 'all 0.2s ease',
                 filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
-                filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
                 position: 'absolute',
                 top: '50%',
                 transform: 'translateY(-50%)',
                 height: '52px',
-                zIndex: isClipSelected ? 10 : 1
+                zIndex: isClipSelected ? 10 : 1,
+                cursor: activeTool === 'slice' ? 'url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTggNiAyMiAzIDIyIDMgMTkgNyAxNSI+PC9wb2x5bGluZT48cGF0aCBkPSJNMjEgNGwtOSA5Ij48L3BhdGg+PHBhdGggZD0iTTE1IDdsNiA2Ij48L3BhdGg+PC9zdmc+") 12 12, crosshair' : 'default'
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect(clip);
+                if (activeTool === 'slice') {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const beatOffset = x / pixelsPerBeat; // Relative beats
+                  const splitPoint = clip.offset + beatOffset;
+                  onSlice(track.id, idx, splitPoint);
+                } else {
+                  onSelect(clip);
+                }
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -597,7 +616,11 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 
               {/* Pattern Preview Area */}
               <div className="clip-content" style={{ flex: 1, position: 'relative', opacity: 0.8, padding: '4px' }}>
-                {pattern && <PatternClipPreview pattern={pattern} />}
+                {pattern && <PatternClipPreview
+                  pattern={pattern}
+                  startStep={(clip.startOffset || 0) * 4}
+                  lengthStep={clip.length * 4}
+                />}
               </div>
 
               {/* Resize Handle */}
@@ -656,7 +679,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 }
 
 export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Local UI state for mute/solo/arm
@@ -794,6 +817,44 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       if (t.id !== trackId) return t;
       const newClips = t.clips.slice();
       newClips.splice(clipIndex, 1);
+      return { ...t, clips: newClips };
+    }));
+  };
+
+  const handleSlice = (trackId, clipIndex, splitPointBeats) => {
+    setPlaylistTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+
+      const clip = t.clips[clipIndex];
+      // Check if split point is valid (inside clip, with buffer)
+      if (splitPointBeats <= clip.offset + 0.01 || splitPointBeats >= clip.offset + clip.length - 0.01) {
+        return t;
+      }
+
+      // 1. Calculate split details
+      const splitOffset = splitPointBeats - clip.offset; // Relative to clip start
+      const originalLength = clip.length;
+
+      // 2. Modify original clip (First Half)
+      const firstHalf = {
+        ...clip,
+        length: splitOffset
+      };
+
+      // 3. Create new clip (Second Half)
+      const secondHalf = {
+        ...clip,
+        id: Date.now(), // New unique ID
+        offset: clip.offset + splitOffset, // Starts at split point
+        length: originalLength - splitOffset, // Remaining length
+        startOffset: (clip.startOffset || 0) + splitOffset // Offset into the underlying pattern/audio
+      };
+
+      // 4. Update track clips
+      const newClips = [...t.clips];
+      newClips[clipIndex] = firstHalf;
+      newClips.splice(clipIndex + 1, 0, secondHalf); // Insert second half after first
+
       return { ...t, clips: newClips };
     }));
   };
@@ -1020,6 +1081,8 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           onOpenMenu={setMenu}
           onRenameTrack={renameTrack}
           onDeleteTrack={deleteTrack}
+          activeTool={activeTool}
+          onSlice={handleSlice}
         />
       ))}
 

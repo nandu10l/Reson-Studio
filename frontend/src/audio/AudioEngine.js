@@ -115,7 +115,7 @@ class AudioEngine {
             // Pause Transport - this pauses scheduled events and synced players
             Tone.Transport.pause();
 
-            // Release all active synth notes (these should stop immediately as they aren't fully synced in the same way)
+            // Release all active synth notes
             this.sources.forEach((source) => {
                 try {
                     if (source && typeof source.releaseAll === 'function') {
@@ -136,8 +136,15 @@ class AudioEngine {
                     console.warn('Error releasing preview synth:', error);
                 }
             }
+
+            // Stop all audio players so they don't ring out (Unsynced players need explicit stop)
+            this.audioPlayers.forEach(player => {
+                try { player.stop(); } catch (e) { }
+            });
         }
     }
+
+
 
     stop() {
         // Stop Transport
@@ -164,6 +171,11 @@ class AudioEngine {
     schedulePattern(pattern) {
         // Clear previous schedule
         Tone.Transport.cancel();
+
+        // Stop any active audio players (from Song mode)
+        this.audioPlayers.forEach(player => {
+            try { player.stop(); } catch (e) { }
+        });
 
         // Calculate loop length based on pattern length (in steps)
         // Default to 16 if not defined (1 bar)
@@ -220,21 +232,21 @@ class AudioEngine {
                     }
                 }, time);
             }
+
         });
 
         console.log('Scheduled pattern:', pattern.id);
     }
 
-    schedulePlaylist(tracks, patterns, audioClips = []) {
-        Tone.Transport.cancel();
-        console.log("Scheduling Playlist (Song Mode) with Sync...");
+    schedulePlaylist(tracks, patterns, audioClips = [], startTime = 0) {
+        Tone.Transport.cancel(0);
+        console.log(`Scheduling Playlist (Song Mode) from ${startTime}s...`);
 
         Tone.Transport.loop = false;
 
-        // Cleanup: Unsync all existing players before rescheduling
+        // Cleanup: Stop all existing players to prevent overlap/duplication
         this.audioPlayers.forEach(player => {
             try {
-                player.unsync();
                 player.stop();
             } catch (e) { }
         });
@@ -250,61 +262,100 @@ class AudioEngine {
                     }
 
                     // Convert offset from beats to time
+                    // clipStartTime: when in the playlist it starts
                     const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
                     const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
+                    const clipEndTime = clipStartTime + clipDuration;
+                    const startOffset = clip.startOffset ? Tone.Time(`${clip.startOffset}q`).toSeconds() : 0;
 
                     // Get or create audio player
+                    // Key by audioClipId (Source File ID) to reuse the same player instance for multiple slices
                     let player = this.audioPlayers.get(clip.audioClipId);
-                    if (!player && audioClip.url) {
-                        player = new Tone.Player({
-                            url: audioClip.url,
-                            volume: -6
-                        });
-                        // Connect to master gain if available, otherwise to destination
-                        if (this.masterGain) {
-                            player.connect(this.masterGain);
-                        } else {
-                            player.toDestination();
+
+                    if (!player) {
+                        // Create new player using the pre-decoded buffer if available
+                        if (audioClip.audioBuffer) {
+                            player = new Tone.Player(audioClip.audioBuffer);
+                        } else if (audioClip.url) {
+                            player = new Tone.Player(audioClip.url);
                         }
-                        this.audioPlayers.set(clip.audioClipId, player);
+
+                        if (player) {
+                            player.volume.value = -6;
+
+                            if (this.masterGain) {
+                                player.connect(this.masterGain);
+                            } else {
+                                player.toDestination();
+                            }
+                            // Store by Source ID
+                            this.audioPlayers.set(clip.audioClipId, player);
+                        }
                     }
 
                     if (player && player.loaded) {
                         try {
-                            // Sync the player to the Transport
-                            // start(startTime, offset, duration)
-                            // startTime: When in the Transport timeline to start playing
-                            // offset: Where in the audio file to start (0 for beginning)
-                            // duration: How long to play
-                            player.sync().start(clipStartTime, 0, clipDuration);
-                            console.log(`Synced Clip ${clip.name} at ${clipStartTime}s, Dur: ${clipDuration}s`);
+                            // Logic for Resume/Seek behavior with unsynced players:
+
+                            // 1. Overlap Check: Are we starting IN THE MIDDLE of this clip?
+                            if (startTime >= clipStartTime && startTime < clipEndTime) {
+                                // Calculate where in the file we should be
+                                const timeSinceStart = startTime - clipStartTime;
+                                const currentOffset = startOffset + timeSinceStart;
+                                const remainingDuration = clipDuration - timeSinceStart;
+
+                                // Schedule to play immediately at the transport's start time
+                                Tone.Transport.scheduleOnce((t) => {
+                                    player.start(t, currentOffset, remainingDuration);
+                                }, startTime);
+                            }
+
+                            // 2. Future Check: Is this clip in the future?
+                            if (clipStartTime > startTime) {
+                                Tone.Transport.schedule((time) => {
+                                    player.start(time, startOffset, clipDuration);
+                                }, clipStartTime);
+                            }
+
                         } catch (err) {
-                            console.error(`Failed to sync player for clip ${clip.name}:`, err);
+                            console.error(`Failed to schedule player for clips ${clip.name}: `, err);
                         }
                     } else if (player) {
-                        // If not loaded yet, wait for load? optimize later.
-                        console.warn(`Player for ${clip.name} not loaded/ready.`);
+                        console.warn(`Player for ${clip.name} not loaded / ready.`);
                     }
                     return;
                 }
 
-                // Handle pattern clips (existing code)
+                // Handle pattern clips
                 const pattern = patterns.find(p => p.id === clip.patternId);
                 if (!pattern) return;
 
-                // clip.offset is in BEATS (quarters). Convert to STEPS (sixteenths).
-                const clipStartStep = (clip.offset || 0) * 4;
+                // Pattern Offset Support
+                // clip.offset: Start position in Playlist (in Beats)
+                // clip.length: Duration in Playlist (in Beats)
+                // clip.startOffset: Start position within the Pattern (in Beats)
+
+                const clipPlaylistStartStep = (clip.offset || 0) * 4; // Playlist start in 16ths
+                const clipInnerStartStep = (clip.startOffset || 0) * 4; // Pattern start offset in 16ths
+                const clipLengthSteps = (clip.length || 0) * 4; // Duration in 16ths
 
                 // 1. Schedule Steps (Drums)
                 Object.entries(pattern.data.steps).forEach(([channelId, steps]) => {
                     const id = parseInt(channelId);
                     steps.forEach((isActive, index) => {
-                        if (isActive && index < pattern.length) { // Respect pattern length
-                            const absStep = clipStartStep + index;
-                            const bar = Math.floor(absStep / 16);
-                            const beat = Math.floor((absStep % 16) / 4);
-                            const sixteen = absStep % 4;
-                            const time = `${bar}:${beat}:${sixteen}`;
+                        // 'index' is the step position in the pattern (0, 1, 2...)
+
+                        // Check if this step is within the visible slice of the pattern
+                        if (isActive && index >= clipInnerStartStep && index < (clipInnerStartStep + clipLengthSteps)) {
+                            // Calculate where this step falls in the playlist
+                            // (Playlist Start) + (Step Position - Pattern Offset)
+                            const relativeStepIndex = index - clipInnerStartStep;
+                            const playlistStepIndex = clipPlaylistStartStep + relativeStepIndex;
+
+                            const bar = Math.floor(playlistStepIndex / 16);
+                            const beat = Math.floor((playlistStepIndex % 16) / 4);
+                            const sixteen = playlistStepIndex % 4;
+                            const time = `${bar}:${beat}:${sixteen} `;
 
                             Tone.Transport.schedule((t) => {
                                 this.previewSound(id, t);
@@ -317,23 +368,39 @@ class AudioEngine {
                 pattern.data.notes.forEach(note => {
                     if (!note.noteName) return;
 
-                    const absStep = clipStartStep + note.startStep;
-                    const bar = Math.floor(absStep / 16);
-                    const beat = Math.floor((absStep % 16) / 4);
-                    const sixteen = absStep % 4;
-                    const time = `${bar}:${beat}:${sixteen}`;
+                    // note.startStep is in 16ths within the pattern
 
-                    const durationStep = note.length;
-                    const dBar = Math.floor(durationStep / 16);
-                    const dBeat = Math.floor((durationStep % 16) / 4);
-                    const dSixteen = durationStep % 4;
-                    const duration = `${dBar}:${dBeat}:${dSixteen}`;
+                    // Check intersection: Does the note start within our slice?
+                    // (Simplification: We trigger the note if its start is within the slice. 
+                    // Handling long notes that started before the slice but sustain into it is harder with basic scheduling, 
+                    // effectively "slicing" the note itself requires synth manipulation. 
+                    // For now, we only trigger notes that START in the visible region.)
 
-                    Tone.Transport.schedule((t) => {
-                        if (this.previewSynth && note.noteName) {
-                            this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
-                        }
-                    }, time);
+                    if (note.startStep >= clipInnerStartStep && note.startStep < (clipInnerStartStep + clipLengthSteps)) {
+                        const relativeStepIndex = note.startStep - clipInnerStartStep;
+                        const playlistStepIndex = clipPlaylistStartStep + relativeStepIndex;
+
+                        const bar = Math.floor(playlistStepIndex / 16);
+                        const beat = Math.floor((playlistStepIndex % 16) / 4);
+                        const sixteen = playlistStepIndex % 4;
+                        const time = `${bar}:${beat}:${sixteen} `;
+
+                        // Clamp duration to the end of the clip
+                        // This ensures notes don't play past the cut point if the second half is deleted
+                        const stepsUntilClipEnd = (clipInnerStartStep + clipLengthSteps) - note.startStep;
+                        const durationStep = Math.min(note.length, stepsUntilClipEnd);
+
+                        const dBar = Math.floor(durationStep / 16);
+                        const dBeat = Math.floor((durationStep % 16) / 4);
+                        const dSixteen = durationStep % 4;
+                        const duration = `${dBar}:${dBeat}:${dSixteen} `;
+
+                        Tone.Transport.schedule((t) => {
+                            if (this.previewSynth && note.noteName) {
+                                this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                            }
+                        }, time);
+                    }
                 });
             });
         });

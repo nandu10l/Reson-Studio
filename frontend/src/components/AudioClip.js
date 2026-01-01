@@ -14,7 +14,9 @@ export default function AudioClip({
   onStartDrag,
   onResizeStart,
   onOpenMenu,
-  isSelected = false
+  isSelected = false,
+  activeTool,
+  onSlice
 }) {
   const canvasRef = useRef(null);
   const clipRef = useRef(null);
@@ -26,7 +28,7 @@ export default function AudioClip({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const clipWidth = clip.length * pixelsPerBeat;
-    const width = Math.max(clipWidth, 100);
+    const width = Math.max(clipWidth, 10); // Minimum width safety
     const height = 44;
     const centerY = height / 2;
 
@@ -48,9 +50,24 @@ export default function AudioClip({
     const peaks = clip.waveform;
     if (peaks.length === 0) return;
 
-    // Use all available peaks for maximum detail
-    // Calculate spacing to make lines appear connected
-    const samplesToDisplay = peaks.length;
+    // Calculate visible window of the waveform
+    // peaks represents the FULL audio file
+    const totalDurationBeats = clip.durationBeats || clip.length; // fallback
+    const startOffset = clip.startOffset || 0;
+
+    // Calculate indices
+    const samplesPerBeat = peaks.length / totalDurationBeats;
+    const startIndex = Math.floor(startOffset * samplesPerBeat);
+    const endIndex = Math.min(peaks.length, Math.floor((startOffset + clip.length) * samplesPerBeat));
+
+    // Get visible peaks
+    // Note: slice might return empty array if offsets are wrong, handle safety
+    const visiblePeaks = peaks.slice(Math.max(0, startIndex), Math.max(0, endIndex));
+
+    if (visiblePeaks.length === 0) return;
+
+    // Draw visible peaks
+    const samplesToDisplay = visiblePeaks.length;
     const lineSpacing = width / samplesToDisplay;
     const maxBarHeight = centerY * 0.9; // Use 90% of available height
 
@@ -59,32 +76,26 @@ export default function AudioClip({
     ctx.lineCap = 'round';
 
     // Draw waveform lines that correspond to the audio
-    // Draw them close together so they appear connected
     for (let i = 0; i < samplesToDisplay; i++) {
-      const peak = peaks[i];
+      const peak = visiblePeaks[i];
       if (!peak) continue;
 
-      // Position lines very close together (overlapping slightly for connected look)
+      // Position lines
       const x = i * lineSpacing;
 
       // Peaks are normalized (0-1 range)
-      // Calculate heights extending both up and down from center
       const topHeight = Math.abs(peak.max) * maxBarHeight;
       const bottomHeight = Math.abs(peak.min) * maxBarHeight;
 
       // Draw vertical line extending both upward and downward from center
       ctx.beginPath();
-
-      // Draw line from bottom peak to top peak
       const startY = centerY + bottomHeight;
       const endY = centerY - topHeight;
-
       ctx.moveTo(x, startY);
       ctx.lineTo(x, endY);
-
       ctx.stroke();
     }
-  }, [clip.waveform, clip.length, pixelsPerBeat, isSelected]);
+  }, [clip.waveform, clip.length, clip.startOffset, clip.durationBeats, pixelsPerBeat, isSelected]);
 
   const clipWidth = clip.length * pixelsPerBeat;
   const clipName = clip.name || clip.fileName || 'Audio Clip';
@@ -127,11 +138,20 @@ export default function AudioClip({
             : 'inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.2)',
         opacity: isSelected ? 1 : isHovered ? 0.9 : 0.75,
         transition: 'all 0.2s ease',
-        filter: isHovered && !isSelected ? 'brightness(1.15)' : 'brightness(1)'
+        filter: isHovered && !isSelected ? 'brightness(1.15)' : 'brightness(1)',
+        cursor: activeTool === 'slice' ? 'url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTggNiAyMiAzIDIyIDMgMTkgNyAxNSI+PC9wb2x5bGluZT48cGF0aCBkPSJNMjEgNGwtOSA5Ij48L3BhdGg+PHBhdGggZD0iTTE1IDdsNiA2Ij48L3BhdGg+PC9zdmc+") 12 12, crosshair' : 'default'
       }}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(clip);
+        if (activeTool === 'slice') {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const beatOffset = x / pixelsPerBeat; // Relative beats
+          const splitPoint = clip.offset + beatOffset;
+          onSlice(splitPoint);
+        } else {
+          onSelect(clip);
+        }
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -140,10 +160,12 @@ export default function AudioClip({
       }}
       onPointerDown={(e) => {
         e.stopPropagation();
-        // Don't start drag if clicking on resize handle or menu button
+        // Don't start drag if clicking on resize handle or menu button or if slicing
         if (e.target.closest('.resize-handle') || e.target.closest('.clip-menu-btn')) {
           return;
         }
+        if (activeTool === 'slice') return;
+
         onStartDrag(e, clip);
       }}
     >

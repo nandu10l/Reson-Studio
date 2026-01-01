@@ -236,6 +236,14 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
+    // Optimization: Track if scheduling is needed
+    const needsScheduling = useRef(true);
+
+    // Mark scheduling needed when data changes
+    useEffect(() => {
+        needsScheduling.current = true;
+    }, [playlistTracks, patterns, audioClips, bpm, activePatternId, playbackMode]);
+
     // Transport Actions
     const togglePlayback = useCallback(async () => {
         await audioEngine.init();
@@ -245,35 +253,77 @@ export const ProjectProvider = ({ children }) => {
             setIsPlaying(false);
         } else {
             // Start or resume playback from current playhead position
-            const wasPaused = Tone.Transport.state === 'paused';
-            const wasStopped = Tone.Transport.state === 'stopped';
+            const transportState = Tone.Transport.state;
+            const isPaused = transportState === 'paused';
 
             // Seek Transport to current playhead position (in seconds)
             const beatsPerSecond = bpm / 60;
             const currentTimeSeconds = playheadPosition / beatsPerSecond;
             Tone.Transport.seconds = currentTimeSeconds;
 
-            // Always reschedule from current position (whether paused or stopped)
+            // Always reschedule to ensure audio (which is un-synced) restarts correctly
+            // even after a Pause. 
             if (playbackMode === 'SONG') {
-                // Reschedule playlist from current playhead position
-                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips);
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, currentTimeSeconds);
             } else if (playbackMode === 'PAT') {
-                // Reschedule pattern from current playhead position
                 const activePattern = patterns.find(p => p.id === activePatternId);
                 if (activePattern) {
                     audioEngine.schedulePattern(activePattern);
                 }
             }
+            needsScheduling.current = false;
 
             audioEngine.start();
             setIsPlaying(true);
         }
     }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm]);
 
+    const seek = useCallback((beats) => {
+        const safeBeats = Math.max(0, beats);
+        setPlayheadPosition(safeBeats);
+
+        const seconds = safeBeats * (60 / bpm);
+
+
+        if (isPlaying) {
+            // Robust Scrubbing: Pause -> Move -> Schedule -> Resume
+            // This prevents Tone.js from getting confused with immediate scheduling events during playback
+            const wasPlaying = Tone.Transport.state === 'started';
+
+            if (wasPlaying) {
+                Tone.Transport.pause();
+            }
+
+            Tone.Transport.seconds = seconds;
+            if (playbackMode === 'SONG') {
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, seconds);
+            } else if (playbackMode === 'PAT') {
+                // In Pattern mode, we just ensure the pattern is scheduled and loop is active
+                // We don't need manual audio clip handling, but we should ensure synth scheduling
+                const activePattern = patterns.find(p => p.id === activePatternId);
+                if (activePattern) {
+                    audioEngine.schedulePattern(activePattern);
+                }
+            }
+
+            if (wasPlaying) {
+                Tone.Transport.start();
+            }
+        } else {
+            // If paused, ensure we reschedule on next Play
+            needsScheduling.current = true;
+            // Stop engine first (which resets Transport to 0)
+            audioEngine.stop();
+            // THEN set the correct position
+            Tone.Transport.seconds = seconds;
+        }
+    }, [bpm, isPlaying, playlistTracks, patterns, audioClips, playbackMode, activePatternId]);
+
     const stopPlayback = useCallback(() => {
         audioEngine.stop();
         setIsPlaying(false);
         setPlayheadPosition(0);
+        Tone.Transport.seconds = 0; // Ensure transport resets
     }, []);
 
     // Track playhead position during playback
@@ -462,7 +512,9 @@ export const ProjectProvider = ({ children }) => {
         isRecording,
         setIsRecording,
         playheadPosition,
+        playheadPosition,
         setPlayheadPosition,
+        seek,
 
         // Audio Clips
         audioClips,

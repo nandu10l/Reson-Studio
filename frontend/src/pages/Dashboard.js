@@ -21,7 +21,7 @@ import ChannelRack from '../components/ChannelRack';
 // Mixer is already imported
 
 function Dashboard() {
-  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks } = useProject();
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek } = useProject();
 
   // Window states
   const [activeWindows, setActiveWindows] = useState({
@@ -237,13 +237,7 @@ function Dashboard() {
                     playheadPosition={playheadPosition}
                     isPlaying={isPlaying}
                     bpm={bpm}
-                    onSeek={(beats) => {
-                      setPlayheadPosition(beats);
-                      // Seek Tone.js Transport to the new position
-                      const beatsPerSecond = bpm / 60;
-                      const seconds = beats / beatsPerSecond;
-                      Tone.Transport.seconds = seconds;
-                    }}
+                    onSeek={seek}
                   />
                   <TrackList
                     measures={64}

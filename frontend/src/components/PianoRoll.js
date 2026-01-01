@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import './PianoRoll.css';
+import * as Tone from 'tone';
 import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit, Brush, Scissors } from './icons/BlenderIcons';
 import Playhead from './Playhead';
 import '../styles/blender-icons.css';
@@ -87,38 +88,52 @@ const PianoRoll = () => {
     }, [allKeys, keyHeight]);
 
     // Auto-scroll to keep playhead visible
+    // Auto-scroll to keep playhead visible - 60FPS Smooth Version
     useEffect(() => {
         if (!scrollContainerRef.current || !isPlaying) return;
 
-        const scrollContainer = scrollContainerRef.current;
-        // pixelX relative to grid start
-        // pixelX relative to grid start
-        const playheadPixelX = playheadPosition * pixelsPerStep * 4;
+        let animationFrameId;
 
-        // Target scroll position would be playhead X + keys offset
-        const targetX = playheadPixelX;
+        const animateScroll = () => {
+            const scrollContainer = scrollContainerRef.current;
+            if (!scrollContainer) return;
 
-        // Use scrollLeft of the container
-        const scrollLeft = scrollContainer.scrollLeft;
-        const viewportWidth = scrollContainer.clientWidth;
+            // Direct access to Transport time for smoothness
+            const seconds = Tone.Transport.seconds;
+            const beats = seconds * (bpm / 60);
 
-        const absolutePlayheadX = KEYS_WIDTH + playheadPixelX;
+            // pixelX relative to grid start
+            const playheadPixelX = beats * pixelsPerStep * 4;
 
-        const visibleStart = scrollLeft;
-        const visibleEnd = scrollLeft + viewportWidth;
+            // Target scroll position would be playhead X + keys offset
+            // Use scrollLeft of the container
+            const scrollLeft = scrollContainer.scrollLeft;
+            const viewportWidth = scrollContainer.clientWidth;
 
-        // Calculate margins
-        const margin = viewportWidth * 0.2;
+            const absolutePlayheadX = KEYS_WIDTH + playheadPixelX;
 
-        // Check bounds
-        if (absolutePlayheadX < visibleStart + KEYS_WIDTH + margin) {
-            // Scroll left
-            scrollContainer.scrollLeft = Math.max(0, absolutePlayheadX - KEYS_WIDTH - margin);
-        } else if (absolutePlayheadX > visibleEnd - margin) {
-            // Scroll right
-            scrollContainer.scrollLeft = absolutePlayheadX - viewportWidth + margin;
-        }
-    }, [playheadPosition, pixelsPerStep, isPlaying]);
+            const visibleStart = scrollLeft;
+            const visibleEnd = scrollLeft + viewportWidth;
+
+            // Calculate margins
+            const margin = viewportWidth * 0.2;
+
+            // Check bounds
+            if (absolutePlayheadX < visibleStart + KEYS_WIDTH + margin) {
+                // Scroll left
+                scrollContainer.scrollLeft = Math.max(0, absolutePlayheadX - KEYS_WIDTH - margin);
+            } else if (absolutePlayheadX > visibleEnd - margin) {
+                // Scroll right
+                scrollContainer.scrollLeft = absolutePlayheadX - viewportWidth + margin;
+            }
+
+            animationFrameId = requestAnimationFrame(animateScroll);
+        };
+
+        animationFrameId = requestAnimationFrame(animateScroll);
+
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [isPlaying, bpm, pixelsPerStep]); // Removed playheadPosition dependency
 
     // --- Helpers ---
     const getStepFromX = (x) => {
@@ -231,27 +246,14 @@ const PianoRoll = () => {
 
             // Slice Tool
             if (selectedTool === 'slice') {
-                const note = activePattern.data.notes.find(n => n.id === noteId);
-                if (!note) return;
-
-                // Calculate split point based on click
-                const clickStep = getStepFromX(gridX);
-                const relStep = clickStep - note.startStep;
-
-                if (relStep > 0 && relStep < note.length) {
-                    // Valid split point
-                    // 1. Shorten original note
-                    updateNote(noteId, { length: relStep });
-
-                    // 2. Create new note remainder
-                    const newNote = {
-                        id: Date.now(),
-                        noteName: note.noteName,
-                        startStep: clickStep,
-                        length: note.length - relStep
-                    };
-                    addNoteToActivePattern(newNote);
-                }
+                // Start Slice Drag
+                setDragState({
+                    type: 'SLICE',
+                    startX: gridX, // Relative to grid start
+                    startY: gridY, // Relative to content top
+                    currentX: gridX,
+                    currentY: gridY
+                });
                 return;
             }
 
@@ -376,6 +378,22 @@ const PianoRoll = () => {
 
             setDragState(prev => ({ ...prev, currentX: x, currentY: y }));
         }
+
+        if (dragState.type === 'SLICE') {
+            if (!scrollContainerRef.current) return;
+            const scrollRect = scrollContainerRef.current.getBoundingClientRect();
+            const viewportX = e.clientX - scrollRect.left;
+            const viewportY = e.clientY - scrollRect.top;
+
+            const globalX = viewportX + scrollContainerRef.current.scrollLeft;
+            const globalY = viewportY + scrollContainerRef.current.scrollTop;
+
+            // Convert to grid coordinates
+            const x = globalX - KEYS_WIDTH;
+            const y = globalY; // Relative to content top
+
+            setDragState(prev => ({ ...prev, currentX: x, currentY: y }));
+        }
     };
 
     const handleMouseUp = (e) => {
@@ -404,6 +422,127 @@ const PianoRoll = () => {
             }).map(n => n.id);
 
             setSelection(selectedIds);
+        }
+
+        if (dragState.type === 'SLICE') {
+            const { startX, startY, currentX, currentY } = dragState;
+
+            // Helper to check line segment intersection with rectangle
+            // Line: (x1,y1) to (x2,y2)
+            // Rect: (rx, ry, rw, rh)
+            const lineIntersectsRect = (x1, y1, x2, y2, rx, ry, rw, rh) => {
+                // Liang-Barsky algorithm or checking intersection with each side
+                // Simplified: Check if line crosses vertical boundaries within horizontal range?
+                // Actually, for Piano Roll, valid split is mostly about X-coordinate crossing. 
+                // But FL Studio allows diagonal slicing.
+                // We need to find the X where the line crosses the Y-center or Y-range of the note.
+
+                // Note Rect is [rx, rx+rw] x [ry, ry+rh]
+                // Line equation: y - y1 = m * (x - x1)
+                // m = (y2-y1)/(x2-x1)
+
+                // Quick envelope check
+                const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+                const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+
+                if (maxX < rx || minX > rx + rw || maxY < ry || minY > ry + rh) return null;
+
+                // If line is vertical
+                if (x1 === x2) {
+                    if (x1 >= rx && x1 <= rx + rw) return x1; // Intersection X
+                    return null;
+                }
+
+                // Calculate intersection with note's top/center/bottom? 
+                // A note is hit if the line passes through it.
+                // We want the X coordinate of the cut.
+                // Let's take the intersection point within the Y-bounds of the note.
+
+                const m = (y2 - y1) / (x2 - x1);
+                const c = y1 - m * x1;
+
+                // y = mx + c  =>  x = (y - c) / m
+
+                // Check if line crosses the note logic: 
+                // Does the segment intersect the rect?
+                // Let's compute Y for the note's mid-point? No, line might clip corner.
+                // Let's check intersection with Top (y=ry) and Bottom (y=ry+rh)
+                // Or Left/Right?
+                // Usually slicing cuts vertically. So we want to know, for a given note Y, what is the Line X?
+
+                // Average Y of the note = ry + rh/2
+                const noteMidY = ry + rh / 2;
+
+                // Find X on the line at noteMidY
+                // x = (noteMidY - c) / m
+
+                // Handle horizontal line case (m=0) -> No clean cut usually, ignore or cut everywhere? FL ignores horizontal cuts usually.
+                if (Math.abs(m) < 0.001) return null;
+
+                const cutX = (noteMidY - c) / m;
+
+                // Check if this cutX is within the note's X range AND within the line segment's X bounds
+                if (cutX >= rx && cutX <= rx + rw &&
+                    cutX >= minX && cutX <= maxX &&
+                    noteMidY >= minY && noteMidY <= maxY) {
+                    return cutX;
+                }
+
+                return null;
+            };
+
+            // Process all notes
+            const notesToUpdate = [];
+            const newNotesToAdd = [];
+
+            // To avoid modifying array while iterating, calculate all changes first
+            activePattern.data.notes.forEach(note => {
+                const noteY = getYFromKey(note.noteName);
+                const noteX = note.startStep * pixelsPerStep;
+                const noteW = note.length * pixelsPerStep;
+                const noteH = keyHeight;
+
+                const cutX = lineIntersectsRect(startX, startY, currentX, currentY, noteX, noteY, noteW, noteH);
+
+                if (cutX !== null) {
+                    // Calculate step from cutX
+                    const splitStep = getStepFromX(cutX);
+                    const relStep = splitStep - note.startStep;
+
+                    if (relStep > 0 && relStep < note.length) {
+                        // Valid split
+                        notesToUpdate.push({ id: note.id, length: relStep });
+                        newNotesToAdd.push({
+                            id: Date.now() + Math.random(), // Ensure unique ID
+                            noteName: note.noteName,
+                            startStep: splitStep,
+                            length: note.length - relStep
+                        });
+                    }
+                }
+            });
+
+            // Apply batches
+            if (notesToUpdate.length > 0 || newNotesToAdd.length > 0) {
+                // We need a batch update method or loop. 
+                // Since we don't have batch update in context, we'll do it sequentially or use setPatterns callback manually if performance issues arise.
+                // Ideally ProjectContext should expose `updatePattern(id, { data: ... })` which allows full overwrite.
+                // Let's use `updatePattern` with full data replacement for atomicity.
+
+                const updatedNotes = activePattern.data.notes.map(n => {
+                    const update = notesToUpdate.find(u => u.id === n.id);
+                    return update ? { ...n, length: update.length } : n;
+                });
+
+                const finalNotes = [...updatedNotes, ...newNotesToAdd];
+
+                updatePattern(activePatternId, {
+                    data: {
+                        ...activePattern.data,
+                        notes: finalNotes
+                    }
+                });
+            }
         }
 
         setDragState(null);
@@ -819,6 +958,29 @@ const PianoRoll = () => {
                                     pointerEvents: 'none',
                                     borderRadius: '2px'
                                 }}></div>
+                            )}
+
+                            {/* Slice Line */}
+                            {dragState && dragState.type === 'SLICE' && (
+                                <svg style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    pointerEvents: 'none',
+                                    zIndex: 100
+                                }}>
+                                    <line
+                                        x1={dragState.startX}
+                                        y1={dragState.startY}
+                                        x2={dragState.currentX}
+                                        y2={dragState.currentY}
+                                        stroke="#ef4444"
+                                        strokeWidth="2"
+                                        strokeDasharray="4"
+                                    />
+                                </svg>
                             )}
                         </div>
                     </div>
