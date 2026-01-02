@@ -252,6 +252,7 @@ class AudioEngine {
         });
 
         tracks.forEach(track => {
+            if (track.muted) return; // Skip muted tracks
             track.clips.forEach(clip => {
                 // Handle audio clips with Sync
                 if (clip.type === 'audio') {

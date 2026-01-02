@@ -8,7 +8,7 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) {
+function Track({ track, onSelect, trackState, onToggleMute, onToggleState, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -361,9 +361,9 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggleState('muted');
+            onToggleMute(track.id);
           }}
-          title={trackState.muted ? "Unmute" : "Mute"}
+          title={track.muted ? "Unmute" : "Mute"}
           style={{
             background: 'transparent',
             border: 'none',
@@ -386,7 +386,7 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
             e.currentTarget.style.background = 'transparent';
           }}
         >
-          {trackState.muted ? (
+          {track.muted ? (
             <VolumeX
               size={13}
               className="blender-icon"
@@ -679,10 +679,10 @@ function Track({ track, onSelect, trackState, onToggleState, onAddClip, onRemove
 }
 
 export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute } = useProject();
   const [selected, setSelected] = useState(null);
 
-  // Local UI state for mute/solo/arm
+  // Local UI state for solo/arm (mute is global)
   const [trackStates, setTrackStates] = useState({});
 
   // Menu State
@@ -758,10 +758,10 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
     if (!trackStates[trackId]) {
       setTrackStates(prev => ({
         ...prev,
-        [trackId]: { muted: false, soloed: false, armed: false }
+        [trackId]: { soloed: false, armed: false }
       }));
     }
-    return trackStates[trackId] || { muted: false, soloed: false, armed: false };
+    return trackStates[trackId] || { soloed: false, armed: false };
   };
 
   const addClip = (trackId, offset, specificPatternId = null, specificType = null) => {
@@ -1065,6 +1065,7 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
           key={track.id}
           track={track}
           trackState={ensureTrackState(track.id)}
+          onToggleMute={toggleTrackMute}
           onToggleState={(state) => toggleTrackState(track.id, state)}
           onAddClip={addClip}
           onAddAudioClip={onAddAudioClip}
