@@ -11,17 +11,9 @@ const KEYS = ['B', 'A#', 'A', 'G#', 'G', 'F#', 'F', 'E', 'D#', 'D', 'C#', 'C'];
 const PianoRoll = () => {
     // Context
     const {
-        activePattern,
-        addNoteToActivePattern,
-        removeNoteFromActivePattern,
-        updateNote,
-        deleteNotes,
-        isPlaying,
-        togglePlayback,
-        bpm,
-        updatePattern,
-        activePatternId,
-        playheadPosition
+        activePattern, activePatternId, updatePattern, addNoteToActivePattern, removeNoteFromActivePattern,
+        isPlaying, playheadPosition, setPlayheadPosition, updateNote, setActiveTool, activeTool, bpm,
+        previewPianoNote, deleteNotes, togglePlayback, channels // Added channels
     } = useProject();
 
     // Local State
@@ -29,6 +21,8 @@ const PianoRoll = () => {
     const pixelsPerStep = zoom;
     const [selectedTool, setSelectedTool] = useState('pencil'); // pencil, eraser, select
     const [selection, setSelection] = useState([]); // Array of note IDs
+    const [selectedChannelId, setSelectedChannelId] = useState(channels.length > 0 ? channels[0].id : 1);
+
     const [hoveredKey, setHoveredKey] = useState(null); // Currently hovered key fullName
     const [currentStep, setCurrentStep] = useState(0); // Current playback step for pulse animation
 
@@ -55,11 +49,10 @@ const PianoRoll = () => {
     const scrollContainerRef = useRef(null);
     const pianoKeysRef = useRef(null);
     const gridAreaRef = useRef(null);
-    const mainAreaRef = useRef(null);
+    const playheadRef = useRef(null); // Added
 
     const KEYS_WIDTH = 100; // Must match CSS .piano-keys-column width
 
-    // Generate keys
     // Generate keys
     const allKeys = useMemo(() => {
         const keys = [];
@@ -127,13 +120,28 @@ const PianoRoll = () => {
                 scrollContainer.scrollLeft = absolutePlayheadX - viewportWidth + margin;
             }
 
+            // Sync Playhead Position Visually
+            if (playheadRef.current) {
+                playheadRef.current.style.left = `${playheadPixelX}px`;
+            }
+
             animationFrameId = requestAnimationFrame(animateScroll);
         };
 
         animationFrameId = requestAnimationFrame(animateScroll);
 
         return () => cancelAnimationFrame(animationFrameId);
-    }, [isPlaying, bpm, pixelsPerStep]); // Removed playheadPosition dependency
+    }, [isPlaying, bpm, pixelsPerStep]);
+
+    // Update playhead position when NOT playing (Seeking)
+    useEffect(() => {
+        if (!isPlaying && playheadRef.current) {
+            const playheadPixelX = playheadPosition * pixelsPerStep * 4; // 4 steps per beat
+            playheadRef.current.style.left = `${playheadPixelX}px`;
+        }
+    }, [isPlaying, playheadPosition, pixelsPerStep]);
+
+
 
     // --- Helpers ---
     const getStepFromX = (x) => {
@@ -299,9 +307,13 @@ const PianoRoll = () => {
         if (!noteName) return;
 
         if (selectedTool === 'pencil' || selectedTool === 'brush') {
+            // Preview sound
+            previewPianoNote(noteName, selectedChannelId);
+
             const newNote = {
                 id: Date.now(),
                 noteName,
+                channelId: selectedChannelId, // Associate note with channel
                 startStep: step,
                 length: 4
             };
@@ -668,6 +680,29 @@ const PianoRoll = () => {
                         )}
                     </div>
 
+                    {/* Channel Selector */}
+                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', marginLeft: '12px', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#888' }}>Channel:</span>
+                        <select
+                            value={selectedChannelId}
+                            onChange={(e) => setSelectedChannelId(parseInt(e.target.value))}
+                            style={{
+                                background: '#333',
+                                color: '#eee',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                padding: '2px 4px',
+                                outline: 'none',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {channels.map(ch => (
+                                <option key={ch.id} value={ch.id}>{ch.id}. {ch.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     {/* Context indicators */}
                     <div className="context-indicators">
                         {snapEnabled && (
@@ -865,6 +900,7 @@ const PianoRoll = () => {
                                 style={{ height: `${keyHeight}px` }}
                                 onMouseEnter={() => setHoveredKey(k.fullName)}
                                 onMouseLeave={() => setHoveredKey(null)}
+                                onMouseDown={() => previewPianoNote(k.note + k.octave, selectedChannelId)}
                             >
                                 {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
                                 {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.4 }}>{k.note}</span>}
@@ -877,12 +913,36 @@ const PianoRoll = () => {
                 {/* Grid Area - Flows naturally now */}
                 <div className="piano-grid-area" ref={gridAreaRef}>
                     <div style={{ position: 'relative' }}>
-                        {/* Playhead for piano roll */}
-                        <Playhead
-                            mode="smooth"
-                            pixelsPerBeat={pixelsPerStep * 4} // 4 steps per beat
-                            headerOffset={0} // No header offset in grid area
-                        />
+                        {/* Playhead for piano roll - Local High-Perf Render */}
+                        <div
+                            ref={playheadRef}
+                            className="piano-playhead"
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                width: '2px',
+                                background: '#ef4444',
+                                zIndex: 100,
+                                pointerEvents: 'none',
+                                left: '0px' // Initial
+                            }}
+                        >
+                            <div className="playhead-time-label" style={{
+                                position: 'absolute',
+                                top: '0px',
+                                left: '4px',
+                                backgroundColor: '#2a2a2a',
+                                color: '#ef4444',
+                                fontSize: '10px',
+                                padding: '2px 4px',
+                                borderRadius: '3px',
+                                pointerEvents: 'none',
+                                whiteSpace: 'nowrap'
+                            }}>
+                                {/* Time label could be updated via ref too if needed, or omitted for speed */}
+                            </div>
+                        </div>
                         {allKeys.map((k) => {
                             const keyNotes = getNotesForKey(k.fullName);
                             const hasNotes = keyNotes.length > 0;
@@ -919,31 +979,39 @@ const PianoRoll = () => {
                             height: `${allKeys.length * keyHeight}px`,
                             pointerEvents: 'none' // Let clicks pass through to rows unless on a note
                         }}>
-                            {activePattern.data.notes.map(note => {
-                                const top = getYFromKey(note.noteName);
-                                const left = note.startStep * pixelsPerStep;
-                                const width = note.length * pixelsPerStep;
-                                const isSelected = selection.includes(note.id);
+                            {activePattern.data.notes
+                                .filter(note => {
+                                    // Show note if it matches selected channel
+                                    // OR if it has no channelId (legacy) and we are on channel 0 (Grand Piano)
+                                    // Default undefined channelId to 0 (Grand Piano)
+                                    const noteChannelId = note.channelId !== undefined ? note.channelId : 0;
+                                    return noteChannelId === selectedChannelId;
+                                })
+                                .map(note => {
+                                    const top = getYFromKey(note.noteName);
+                                    const left = note.startStep * pixelsPerStep;
+                                    const width = note.length * pixelsPerStep;
+                                    const isSelected = selection.includes(note.id);
 
-                                return (
-                                    <div
-                                        key={note.id}
-                                        data-id={note.id}
-                                        className={`piano-note ${isSelected ? 'selected' : ''}`}
-                                        style={{
-                                            position: 'absolute',
-                                            top: `${top}px`,
-                                            left: `${left}px`,
-                                            width: `${width}px`,
-                                            height: `${keyHeight}px`,
-                                            pointerEvents: 'auto'
-                                        }}
-                                    >
-                                        <span className="piano-note-label">{note.noteName}</span>
-                                        <div className="piano-note-resize"></div>
-                                    </div>
-                                );
-                            })}
+                                    return (
+                                        <div
+                                            key={note.id}
+                                            data-id={note.id}
+                                            className={`piano-note ${isSelected ? 'selected' : ''}`}
+                                            style={{
+                                                position: 'absolute',
+                                                top: `${top}px`,
+                                                left: `${left}px`,
+                                                width: `${width}px`,
+                                                height: `${keyHeight}px`,
+                                                pointerEvents: 'auto'
+                                            }}
+                                        >
+                                            <span className="piano-note-label">{note.noteName}</span>
+                                            <div className="piano-note-resize"></div>
+                                        </div>
+                                    );
+                                })}
 
                             {/* Selection Box */}
                             {dragState && dragState.type === 'SELECT' && (

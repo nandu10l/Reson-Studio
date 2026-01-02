@@ -396,8 +396,16 @@ class AudioEngine {
                         const duration = `${dBar}:${dBeat}:${dSixteen} `;
 
                         Tone.Transport.schedule((t) => {
-                            if (this.previewSynth && note.noteName) {
-                                this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                            if (note.noteName) {
+                                // If note has a channelId, play on that channel
+                                if (note.channelId) {
+                                    this.previewChannelNote(note.channelId, note.noteName, duration, t);
+                                } else {
+                                    // Fallback for legacy notes without channelId
+                                    if (this.previewSynth) {
+                                        this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                                    }
+                                }
                             }
                         }, time);
                     }
@@ -441,6 +449,44 @@ class AudioEngine {
                 frequency: 200, harmonicity: 5.1, modulationIndex: 32,
                 envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
                 volume: -10
+            }).connect(channel);
+        } else if (n.includes('piano')) {
+            // Grand Piano - Real Samples (Salamander)
+            source = new Tone.Sampler({
+                urls: {
+                    "A0": "A0.mp3",
+                    "C1": "C1.mp3",
+                    "D#1": "Ds1.mp3",
+                    "F#1": "Fs1.mp3",
+                    "A1": "A1.mp3",
+                    "C2": "C2.mp3",
+                    "D#2": "Ds2.mp3",
+                    "F#2": "Fs2.mp3",
+                    "A2": "A2.mp3",
+                    "C3": "C3.mp3",
+                    "D#3": "Ds3.mp3",
+                    "F#3": "Fs3.mp3",
+                    "A3": "A3.mp3",
+                    "C4": "C4.mp3",
+                    "D#4": "Ds4.mp3",
+                    "F#4": "Fs4.mp3",
+                    "A4": "A4.mp3",
+                    "C5": "C5.mp3",
+                    "D#5": "Ds5.mp3",
+                    "F#5": "Fs5.mp3",
+                    "A5": "A5.mp3",
+                    "C6": "C6.mp3",
+                    "D#6": "Ds6.mp3",
+                    "F#6": "Fs6.mp3",
+                    "A6": "A6.mp3",
+                    "C7": "C7.mp3",
+                    "D#7": "Ds7.mp3",
+                    "F#7": "Fs7.mp3",
+                    "A7": "A7.mp3",
+                    "C8": "C8.mp3"
+                },
+                release: 1,
+                baseUrl: "https://tonejs.github.io/audio/salamander/",
             }).connect(channel);
         } else if (n.includes('bass')) {
             source = new Tone.PolySynth(Tone.MonoSynth, {
@@ -492,6 +538,24 @@ class AudioEngine {
             } else {
                 // PolySynth or other instruments expecting a note
                 source.triggerAttackRelease("C2", "8n", time);
+            }
+        }
+    }
+
+    previewNote(noteName, duration = "8n", time) {
+        if (this.previewSynth && noteName) {
+            this.previewSynth.triggerAttackRelease(noteName, duration, time || Tone.now());
+        }
+    }
+
+    previewChannelNote(channelId, noteName, duration = "8n", time) {
+        const source = this.sources.get(channelId);
+        if (source) {
+            if (source instanceof Tone.NoiseSynth) {
+                // Noise synths don't use pitch
+                source.triggerAttackRelease(duration, time || Tone.now());
+            } else {
+                source.triggerAttackRelease(noteName, duration, time || Tone.now());
             }
         }
     }

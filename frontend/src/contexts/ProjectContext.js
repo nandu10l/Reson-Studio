@@ -14,6 +14,7 @@ export const useProject = () => {
 };
 
 const INITIAL_CHANNELS = [
+    { id: 0, name: 'Grand Piano', vol: 78, pan: 50 },
     { id: 1, name: '808 Kick', vol: 78, pan: 50 },
     { id: 2, name: '808 Clap', vol: 78, pan: 50 },
     { id: 3, name: '808 HiHat', vol: 78, pan: 50 },
@@ -383,6 +384,15 @@ export const ProjectProvider = ({ children }) => {
         audioEngine.previewSound(channelId);
     }, []);
 
+    const previewPianoNote = useCallback(async (noteName, channelId) => {
+        await audioEngine.init();
+        if (channelId !== null && channelId !== undefined) {
+            audioEngine.previewChannelNote(channelId, noteName);
+        } else {
+            audioEngine.previewNote(noteName);
+        }
+    }, []);
+
     // Audio Import Action
     const importAudioFile = useCallback(async () => {
         try {
@@ -495,7 +505,10 @@ export const ProjectProvider = ({ children }) => {
         setPlaylistTracks,
         updateChannelVolume,
         updateChannelPan,
+        updateChannelVolume,
+        updateChannelPan,
         previewChannelSound,
+        previewPianoNote,
 
         // New Actions
         updateNote,
