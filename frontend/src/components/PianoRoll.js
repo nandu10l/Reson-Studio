@@ -17,7 +17,7 @@ const PianoRoll = () => {
     } = useProject();
 
     // Local State
-    const [zoom, setZoom] = useState(30); // pixels per step
+    const [zoom, setZoom] = useState(40); // pixels per step (bigger UI)
     const pixelsPerStep = zoom;
     const [selectedTool, setSelectedTool] = useState('pencil'); // pencil, eraser, select
     const [selection, setSelection] = useState([]); // Array of note IDs
@@ -44,14 +44,14 @@ const PianoRoll = () => {
     const startOctave = 8;
     const totalBars = 8;
     const stepsPerBar = 16;
-    const keyHeight = 24;
+    const keyHeight = 32; // increased row height for bigger UI
 
     const scrollContainerRef = useRef(null);
     const pianoKeysRef = useRef(null);
     const gridAreaRef = useRef(null);
     const playheadRef = useRef(null); // Added
 
-    const KEYS_WIDTH = 100; // Must match CSS .piano-keys-column width
+    const KEYS_WIDTH = 140; // Must match CSS .piano-keys-column width (bigger UI)
 
     // Generate keys
     const allKeys = useMemo(() => {

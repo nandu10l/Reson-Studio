@@ -19,9 +19,11 @@ import DraggableWindow from '../components/DraggableWindow';
 import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
 // Mixer is already imported
+import WelcomeModal from '../components/WelcomeModal';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek } = useProject();
+  const [showWelcome, setShowWelcome] = useState(true);
 
   // Window states
   const [activeWindows, setActiveWindows] = useState({
@@ -283,14 +285,27 @@ function Dashboard() {
         </DraggableWindow>
       )}
 
-      {/* Mixer as a floating window if enabled (overriding the fixed one currently in arrange view?) 
-          For now, I'll just add it as floating and maybe hide the one in renderView if needed, or just let them coexist/user choice.
-          Actually, the user asked for FL style where these pop out.
-      */}
       {activeWindows.mixer && (
         <DraggableWindow title="Mixer" onClose={() => toggleWindow('mixer')} initialPosition={{ x: 100, y: 150 }} width={1120} height={400}>
           <Mixer />
         </DraggableWindow>
+      )}
+
+      {/* Welcome Screen Overlay */}
+      {showWelcome && (
+        <WelcomeModal
+          onClose={() => setShowWelcome(false)}
+          onNewProject={(type) => {
+            console.log("Creating new project:", type);
+            // Here you would handle template creation logic
+            setShowWelcome(false);
+          }}
+          onLoadProject={(proj) => {
+            console.log("Loading project:", proj);
+            // Here you would handle loading logic
+            setShowWelcome(false);
+          }}
+        />
       )}
     </div>
   );
