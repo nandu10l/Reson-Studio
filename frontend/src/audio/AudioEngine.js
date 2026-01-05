@@ -251,8 +251,12 @@ class AudioEngine {
             } catch (e) { }
         });
 
+        const isAnySolo = tracks.some(t => t.solo);
+
         tracks.forEach(track => {
             if (track.muted) return; // Skip muted tracks
+            if (isAnySolo && !track.solo) return; // Skip non-solo tracks if any track is soloed
+
             track.clips.forEach(clip => {
                 // Handle audio clips with Sync
                 if (clip.type === 'audio') {

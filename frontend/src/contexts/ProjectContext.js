@@ -54,7 +54,7 @@ export const ProjectProvider = ({ children }) => {
 
     // 3. Playlist / Arrangement
     const [playlistTracks, setPlaylistTracks] = useState(
-        Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [], muted: false }))
+        Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [], muted: false, solo: false }))
     );
 
     // 4. Audio Clips (imported audio files)
@@ -241,6 +241,12 @@ export const ProjectProvider = ({ children }) => {
     const toggleTrackMute = useCallback((trackId) => {
         setPlaylistTracks(prev => prev.map(t =>
             t.id === trackId ? { ...t, muted: !t.muted } : t
+        ));
+    }, []);
+
+    const toggleTrackSolo = useCallback((trackId) => {
+        setPlaylistTracks(prev => prev.map(t =>
+            t.id === trackId ? { ...t, solo: !t.solo } : t
         ));
     }, []);
 
@@ -513,6 +519,7 @@ export const ProjectProvider = ({ children }) => {
         updateChannelVolume,
         updateChannelPan,
         toggleTrackMute,
+        toggleTrackSolo,
         previewChannelSound,
         previewPianoNote,
 

@@ -4,7 +4,7 @@ import { Settings, Music, RotateCcw, ChevronRight, MoreHorizontal, Plus } from '
 import { useProject } from '../contexts/ProjectContext';
 import { useGuide } from '../contexts/GuideContext';
 
-// Helper component for FL-style vertical drag knobs
+// Helper component for  vertical drag knobs
 const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, title, style, children, ...props }) => {
     const [isDragging, setIsDragging] = useState(false);
     const startY = useRef(0);
@@ -119,8 +119,8 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
             {/* Left Controls Group */}
             <div className="channel-controls-left">
                 {/* Color Indicator */}
-                <div 
-                    className="channel-color-indicator" 
+                <div
+                    className="channel-color-indicator"
                     style={{ backgroundColor: color || '#4C8DB0' }}
                     title="Channel Color"
                 />
@@ -193,7 +193,7 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
                     const isBeat = i % 4 === 0;
                     const isBar = i % 16 === 0;
                     const playing = isStepPlaying(i);
-                    
+
                     return (
                         <button
                             key={i}
