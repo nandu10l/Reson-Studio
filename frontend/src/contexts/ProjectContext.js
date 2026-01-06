@@ -70,8 +70,34 @@ export const ProjectProvider = ({ children }) => {
     // 6. Loading State
     const [isImportingAudio, setIsImportingAudio] = useState(false);
 
-    // 7. Tools State
-    const [activeTool, setActiveTool] = useState('pencil'); // 'magnet', 'pencil', 'brush', 'eraser', 'mute', 'slip', 'slice', 'select', 'zoom', 'playback'
+    const [activeTool, setActiveTool] = useState('pencil');
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [bpm, setBpm] = useState(120);
+    const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
+    const [isRecording, setIsRecording] = useState(false);
+    const [playheadPosition, setPlayheadPosition] = useState(0); // Position in beats
+    const playheadIntervalRef = useRef(null);
+    const [currentProjectPath, setCurrentProjectPath] = useState(null);
+    const needsScheduling = useRef(true);
+
+
+
+    const loadProject = useCallback((data) => {
+        if (!data) return;
+        try {
+            if (data.patterns) setPatterns(data.patterns);
+            if (data.channels) setChannels(data.channels);
+            if (data.playlistTracks) setPlaylistTracks(data.playlistTracks);
+            if (data.bpm) {
+                setBpm(data.bpm);
+                audioEngine.setBpm(data.bpm);
+            }
+            if (data.activePatternId) setActivePatternId(data.activePatternId);
+            console.log('Project loaded successfully');
+        } catch (error) {
+            console.error('Error loading project data:', error);
+        }
+    }, []);
 
 
     // --- Actions ---
@@ -177,17 +203,6 @@ export const ProjectProvider = ({ children }) => {
         initAudio();
     }, []);
 
-    // --- Project File State ---
-    const [currentProjectPath, setCurrentProjectPath] = useState(null);
-
-    // --- Transport State ---
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [bpm, setBpm] = useState(120);
-    const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
-    const [isRecording, setIsRecording] = useState(false);
-    const [playheadPosition, setPlayheadPosition] = useState(0); // Position in beats
-    const playheadIntervalRef = useRef(null);
-
     // --- Actions ---
 
     // Note Actions
@@ -251,7 +266,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     // Optimization: Track if scheduling is needed
-    const needsScheduling = useRef(true);
+    // (needsScheduling ref moved to top)
 
     // Mark scheduling needed when data changes
     useEffect(() => {
@@ -538,7 +553,6 @@ export const ProjectProvider = ({ children }) => {
         isRecording,
         setIsRecording,
         playheadPosition,
-        playheadPosition,
         setPlayheadPosition,
         seek,
 
@@ -555,7 +569,10 @@ export const ProjectProvider = ({ children }) => {
         isImportingAudio,
 
         // Tools
-        activeTool, setActiveTool
+        activeTool, setActiveTool,
+
+        // Persistence
+        loadProject
     };
 
     return (

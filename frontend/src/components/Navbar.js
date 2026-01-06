@@ -18,7 +18,8 @@ function Navbar({
     bpm,
     currentProjectPath,
     setCurrentProjectPath,
-    importAudioFile
+    importAudioFile,
+    loadProject
   } = useProject();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -109,10 +110,29 @@ function Navbar({
     if (action === 'save') handleSave();
     if (action === 'save_as') handleSaveAs();
     if (action === 'save_new_version') handleSaveNewVersion();
-    if (action === 'open' && window.electronAPI?.openFileDialog) {
-      window.electronAPI.openFileDialog().then(paths => {
-        if (paths && paths.length > 0) console.log('Selected:', paths[0]);
-      });
+    if (action === 'open') {
+      if (window.electronAPI?.openFileDialog && window.electronAPI?.readFile) {
+        const paths = await window.electronAPI.openFileDialog();
+        if (paths && paths.length > 0) {
+          const filePath = paths[0];
+          const result = await window.electronAPI.readFile(filePath);
+          if (result && result.success) {
+            try {
+              const projectData = JSON.parse(result.content);
+              loadProject(projectData);
+              setCurrentProjectPath(filePath);
+              document.title = `Reson Studio - ${filePath.split(/[\\/]/).pop()}`;
+            } catch (e) {
+              console.error("Failed to parse project file:", e);
+              alert("Error: Invalid project file format.");
+            }
+          }
+        }
+      } else {
+        // Fallback or Web implementation (optional)
+        console.warn("File opening is only supported in the desktop version.");
+        alert("File opening is only supported in the desktop version.");
+      }
     }
     if (action === 'add_audio_file') {
       if (importAudioFile) {

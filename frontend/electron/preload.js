@@ -1,15 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // Intercept and clean document.title to remove Electron symbols
-let originalTitleDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'title') || 
+let originalTitleDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'title') ||
     Object.getOwnPropertyDescriptor(HTMLDocument.prototype, 'title');
 
 if (originalTitleDescriptor) {
     Object.defineProperty(document, 'title', {
-        get: function() {
+        get: function () {
             return originalTitleDescriptor.get.call(this);
         },
-        set: function(value) {
+        set: function (value) {
             // Remove electron symbol (⚡) and clean the title
             const cleanTitle = value.replace(/⚡/g, '').replace(/\s+/g, ' ').trim() || 'Reson Studio';
             originalTitleDescriptor.set.call(this, cleanTitle);
@@ -41,12 +41,13 @@ if (document.readyState === 'loading') {
 }
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  minimize: () => ipcRenderer.invoke('window-minimize'),
-  maximize: () => ipcRenderer.invoke('window-toggle-maximize'),
-  close: () => ipcRenderer.invoke('window-close'),
-  isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
-  toTray: () => ipcRenderer.invoke('window-to-tray'),
-  openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
-  saveFile: (content) => ipcRenderer.invoke('save-file', content),
-  saveFileSilent: (path, content) => ipcRenderer.invoke('save-file-silent', path, content)
+    minimize: () => ipcRenderer.invoke('window-minimize'),
+    maximize: () => ipcRenderer.invoke('window-toggle-maximize'),
+    close: () => ipcRenderer.invoke('window-close'),
+    isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
+    toTray: () => ipcRenderer.invoke('window-to-tray'),
+    openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
+    saveFile: (content) => ipcRenderer.invoke('save-file', content),
+    saveFileSilent: (path, content) => ipcRenderer.invoke('save-file-silent', path, content),
+    readFile: (path) => ipcRenderer.invoke('read-file', path)
 });

@@ -152,6 +152,15 @@ ipcMain.handle('save-file-silent', async (event, filePath, content) => {
     }
 });
 
+ipcMain.handle('read-file', async (event, filePath) => {
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        return { success: true, content };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(() => {
