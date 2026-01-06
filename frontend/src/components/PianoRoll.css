@@ -266,7 +266,7 @@
 /* Grid area - No independent scroll, flows within main area */
 .piano-grid-area {
     flex: 1;
-    /* overflow: visible; */
+    overflow: visible;
     background: #14181C;
     position: relative;
     display: block;
@@ -468,6 +468,13 @@
     transform: translateY(-1px);
 }
 
+.piano-note.playing {
+    background: linear-gradient(to bottom, #a7f3d0, #4ade80);
+    box-shadow: 0 0 15px rgba(74, 222, 128, 0.8);
+    border-color: #fff;
+    z-index: 15;
+}
+
 .piano-note-resize,
 .piano-note-resize-left {
     position: absolute;
@@ -525,6 +532,19 @@
     background: #ef4444;
     z-index: 30;
     pointer-events: none;
+}
+
+.playhead-highlighter {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: #ff4d4d;
+    clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    box-shadow: 0 2px 8px rgba(255, 77, 77, 0.6);
+    z-index: 31;
 }
 
 /* Velocity Panel */

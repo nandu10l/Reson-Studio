@@ -936,8 +936,9 @@ const PianoRoll = () => {
                                 onMouseLeave={() => setHoveredKey(null)}
                                 onMouseDown={() => previewPianoNote(k.note + k.octave, selectedChannelId)}
                             >
-                                {k.note === 'C' && <span className="key-label">C{k.octave}</span>}
-                                {!k.isBlack && k.note !== 'C' && <span className="key-label" style={{ opacity: 0.4 }}>{k.note}</span>}
+                                <span className="key-label" style={{ opacity: k.note === 'C' ? 1 : 0.4 }}>
+                                    {k.note === 'C' ? `${k.note}${k.octave}` : k.note}
+                                </span>
                                 {hasNotes && <div className="key-note-indicator"></div>}
                             </div>
                         );
@@ -962,6 +963,7 @@ const PianoRoll = () => {
                                 left: '0px' // Initial
                             }}
                         >
+                            <div className="playhead-highlighter"></div>
                             <div className="playhead-time-label" style={{
                                 position: 'absolute',
                                 top: '0px',
@@ -1031,7 +1033,7 @@ const PianoRoll = () => {
                                         <div
                                             key={note.id}
                                             data-id={note.id}
-                                            className={`piano-note ${isSelected ? 'selected' : ''}`}
+                                            className={`piano-note ${isSelected ? 'selected' : ''} ${isNotePlaying(note) ? 'playing' : ''}`}
                                             style={{
                                                 position: 'absolute',
                                                 top: `${top}px`,
