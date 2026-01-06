@@ -230,13 +230,19 @@ const PianoRoll = () => {
                 setSelection([noteId]);
             }
 
+            const isLeft = e.target.classList.contains('piano-note-resize-left');
+
             setDragState({
                 type: 'RESIZE',
                 notes: selection.includes(noteId) ? selection : [noteId],
                 startX: e.clientX,
+                isLeft: isLeft,
                 initialLengths: selection.includes(noteId)
                     ? selection.reduce((acc, id) => ({ ...acc, [id]: activePattern.data.notes.find(n => n.id === id).length }), {})
-                    : { [noteId]: note.length }
+                    : { [noteId]: note.length },
+                initialSteps: selection.includes(noteId)
+                    ? selection.reduce((acc, id) => ({ ...acc, [id]: activePattern.data.notes.find(n => n.id === id).startStep }), {})
+                    : { [noteId]: note.startStep }
             });
             e.stopPropagation();
             return;
@@ -313,15 +319,25 @@ const PianoRoll = () => {
             // Calculate snapped start position and length based on snapStrength
             const finalStartStep = snapEnabled ? Math.floor(step / snapStrength) * snapStrength : step;
             const noteLength = snapEnabled ? snapStrength : 4;
+            const noteId = Date.now();
 
             const newNote = {
-                id: Date.now(),
+                id: noteId,
                 noteName,
                 channelId: selectedChannelId,
                 startStep: finalStartStep,
                 length: noteLength
             };
             addNoteToActivePattern(newNote);
+
+            // Start 'CREATE' drag to allow extending length immediately
+            setDragState({
+                type: 'CREATE',
+                noteId: noteId,
+                startX: e.clientX,
+                initialLength: noteLength,
+                initialStep: finalStartStep
+            });
         } else {
             // Box Selection
             setSelection([]);
@@ -371,9 +387,26 @@ const PianoRoll = () => {
 
             dragState.notes.forEach(id => {
                 const initLength = dragState.initialLengths[id];
-                const newLength = Math.max(1, initLength + dxSteps);
-                updateNote(id, { length: newLength });
+                const initStep = dragState.initialSteps[id];
+
+                if (dragState.isLeft) {
+                    const newStartStep = Math.max(0, initStep + dxSteps);
+                    const newLength = Math.max(1, initLength - (newStartStep - initStep));
+                    updateNote(id, { startStep: newStartStep, length: newLength });
+                } else {
+                    const newLength = Math.max(1, initLength + dxSteps);
+                    updateNote(id, { length: newLength });
+                }
             });
+        }
+
+        if (dragState.type === 'CREATE') {
+            const dxPixels = e.clientX - dragState.startX;
+            const rawDxSteps = Math.round(dxPixels / pixelsPerStep);
+            const dxSteps = snapEnabled ? Math.round(rawDxSteps / snapStrength) * snapStrength : rawDxSteps;
+
+            const newLength = Math.max(1, dragState.initialLength + dxSteps);
+            updateNote(dragState.noteId, { length: newLength });
         }
 
         if (dragState.type === 'SELECT') {
@@ -1009,6 +1042,7 @@ const PianoRoll = () => {
                                             }}
                                         >
                                             <span className="piano-note-label">{note.noteName}</span>
+                                            <div className="piano-note-resize-left"></div>
                                             <div className="piano-note-resize"></div>
                                         </div>
                                     );
