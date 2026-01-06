@@ -4,45 +4,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 28px;
-  /* Low-profile height */
+  height: 48px;
+  /* Increased height */
   background: #1a1a1a;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 0 8px;
-  gap: 12px;
-  /* Calm, hardware-inspired, instantly readable */
+  padding: 0 12px;
+  gap: 16px;
 }
 
-/* Left Section: Pattern Navigation */
 /* Left Section: Pattern Navigation & Tools */
 .transport-left {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  gap: 12px;
+  gap: 16px;
 }
 
 /* Tools Toolbar */
 .transport-tools {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
-  padding: 2px;
+  border-radius: 4px;
+  padding: 4px;
 }
 
 .transport-tool-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 1px;
+  border-radius: 2px;
   cursor: pointer;
   transition: all 0.1s ease;
   color: #9ca3af;
@@ -64,9 +62,9 @@
 
 .transport-separator {
   width: 1px;
-  height: 16px;
+  height: 24px;
   background: rgba(255, 255, 255, 0.1);
-  margin: 0 4px;
+  margin: 0 6px;
 }
 
 /* Center Section: Primary Transport Controls */
@@ -74,7 +72,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 20px;
   flex: 1;
   min-width: 0;
 }
@@ -83,27 +81,25 @@
 .transport-controls-cluster {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 3px;
-  padding: 2px 4px;
-  /* Subtle background separation */
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 
 .transport-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.1s ease;
-  /* Clear visual dominance */
 }
 
 .transport-btn:hover {
@@ -112,13 +108,12 @@
 
 .transport-btn-play {
   /* Slightly larger for prominence */
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
 }
 
 .transport-btn-play.active {
   background: #60a5fa;
-  /* Single accent color */
   color: #1a1a1a;
 }
 
@@ -126,19 +121,8 @@
   color: #1a1a1a;
 }
 
-.transport-btn-stop {
-  /* Standard size */
-}
-
-.transport-btn-record {
-  /* Record button - red only when active */
-  width: 22px;
-  height: 22px;
-}
-
 .transport-btn-record.recording {
   background: #ef4444;
-  /* Red only for active recording */
   color: #fff;
 }
 
@@ -150,14 +134,12 @@
 /* Time Position Display - Prominent */
 .transport-time-display {
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
   color: #60a5fa;
-  /* Accent color for prominence */
   letter-spacing: 0.1em;
-  min-width: 60px;
+  min-width: 80px;
   text-align: center;
-  /* Monospaced numerals, prominently displayed */
 }
 
 /* Right Section: Secondary Controls */
@@ -181,17 +163,16 @@
 }
 
 .transport-mode-btn {
-  padding: 3px 8px;
-  font-size: 9px;
+  padding: 6px 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #6b7280;
   background: transparent;
   border: none;
-  border-radius: 1px;
+  border-radius: 2px;
   cursor: pointer;
   transition: all 0.1s ease;
   letter-spacing: 0.02em;
-  /* Restrained, secondary */
 }
 
 .transport-mode-btn:hover {
@@ -218,17 +199,16 @@
 }
 
 .transport-bpm-input {
-  width: 36px;
+  width: 44px;
   background: transparent;
   border: none;
   color: #9ca3af;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   text-align: right;
   padding: 0;
   outline: none;
-  /* Monospaced for alignment */
 }
 
 .transport-bpm-input:focus {
@@ -236,12 +216,11 @@
 }
 
 .transport-bpm-label {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   color: #6b7280;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  /* Restrained label */
 }
 
 /* View Controls Cluster - Secondary */
@@ -257,18 +236,17 @@
 }
 
 .transport-view-btn {
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: none;
-  border-radius: 1px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.1s ease;
-  /* Minimal, secondary */
 }
 
 .transport-view-btn:hover {

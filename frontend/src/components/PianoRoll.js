@@ -310,12 +310,16 @@ const PianoRoll = () => {
             // Preview sound
             previewPianoNote(noteName, selectedChannelId);
 
+            // Calculate snapped start position and length based on snapStrength
+            const finalStartStep = snapEnabled ? Math.floor(step / snapStrength) * snapStrength : step;
+            const noteLength = snapEnabled ? snapStrength : 4;
+
             const newNote = {
                 id: Date.now(),
                 noteName,
-                channelId: selectedChannelId, // Associate note with channel
-                startStep: step,
-                length: 4
+                channelId: selectedChannelId,
+                startStep: finalStartStep,
+                length: noteLength
             };
             addNoteToActivePattern(newNote);
         } else {
@@ -334,15 +338,11 @@ const PianoRoll = () => {
     const handleMouseMove = (e) => {
         if (!dragState) return;
 
-        // Note: dragState operations largely depend on deltas (clientX changes), 
-        // which don't technically care about scroll container refs unless we recalc absolutes.
-        // But SELECT box does need absolute grid coordinates.
-
         if (dragState.type === 'MOVE') {
             const dxPixels = e.clientX - dragState.startX;
             const dyPixels = e.clientY - dragState.startY;
-
-            const dxSteps = Math.round(dxPixels / pixelsPerStep);
+            const rawDxSteps = Math.round(dxPixels / pixelsPerStep);
+            const dxSteps = snapEnabled ? Math.round(rawDxSteps / snapStrength) * snapStrength : rawDxSteps;
             const dyKeys = Math.round(dyPixels / keyHeight);
 
             // Apply delta to all dragged notes
@@ -366,7 +366,8 @@ const PianoRoll = () => {
 
         if (dragState.type === 'RESIZE') {
             const dxPixels = e.clientX - dragState.startX;
-            const dxSteps = Math.round(dxPixels / pixelsPerStep);
+            const rawDxSteps = Math.round(dxPixels / pixelsPerStep);
+            const dxSteps = snapEnabled ? Math.round(rawDxSteps / snapStrength) * snapStrength : rawDxSteps;
 
             dragState.notes.forEach(id => {
                 const initLength = dragState.initialLengths[id];
@@ -923,7 +924,7 @@ const PianoRoll = () => {
                                 bottom: 0,
                                 width: '2px',
                                 background: '#ef4444',
-                                zIndex: 100,
+                                zIndex: 30,
                                 pointerEvents: 'none',
                                 left: '0px' // Initial
                             }}

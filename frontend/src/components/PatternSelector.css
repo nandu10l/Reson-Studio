@@ -10,8 +10,8 @@
 
 /* Secondary Navigation Buttons - Minimal */
 .pattern-nav-btn {
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     display: flex;
     align-items: center;
@@ -40,15 +40,15 @@
 .pattern-capsule {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 22px;
-    padding: 0 8px;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 11px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s ease;
-    min-width: 100px;
-    max-width: 140px;
+    min-width: 120px;
+    max-width: 180px;
     position: relative;
 }
 
@@ -62,15 +62,15 @@
 
 /* Color Indicator - Integrated in Capsule */
 .pattern-color-indicator {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 2px;
     flex-shrink: 0;
 }
 
 /* Pattern Name Text */
 .pattern-name-text {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     color: #9ca3af;
     letter-spacing: 0.01em;
@@ -91,7 +91,7 @@
     border-radius: 2px;
     outline: none;
     color: #e5e7eb;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     padding: 2px 4px;
     font-family: inherit;
@@ -112,8 +112,8 @@
 
 /* Secondary: Add Button - Minimal */
 .pattern-add-btn {
-    width: 18px;
-    height: 18px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     display: flex;
     align-items: center;
@@ -123,7 +123,7 @@
     cursor: pointer;
     opacity: 0.5;
     transition: opacity 0.15s ease;
-    margin-left: 2px;
+    margin-left: 4px;
 }
 
 .pattern-add-btn:hover {
@@ -146,7 +146,7 @@
     padding: 4px 0;
     min-width: 160px;
     max-width: 220px;
-    max-height: 300px;
+    max-height: 400px;
     overflow-y: auto;
     z-index: 10000;
 }
@@ -155,10 +155,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 6px 10px;
+    padding: 8px 12px;
     cursor: pointer;
     transition: background 0.15s ease;
-    font-size: 11px;
+    font-size: 12px;
     color: #9ca3af;
 }
 
@@ -173,8 +173,8 @@
 }
 
 .pattern-dropdown-color {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     border-radius: 2px;
     flex-shrink: 0;
 }
@@ -187,6 +187,3 @@
     font-weight: 400;
     letter-spacing: 0.01em;
 }
-
-
-

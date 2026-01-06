@@ -16,36 +16,24 @@ const WelcomeModal = ({ onClose, onNewProject }) => {
 
         <div className="welcome-header">
           <div className="welcome-title">Welcome to Reson Studio</div>
-          <button className="close-btn" onClick={onClose}>
-            <X size={20} />
+          <button className="close-btn" onClick={onClose} aria-label="Close">
+            <X size={18} />
           </button>
         </div>
 
         <div className="welcome-body">
-
           <div className="welcome-column">
 
             {/* What's New Section */}
-            <div className="whats-new-section" style={{ marginBottom: '24px' }}>
-              <div className="column-header" style={{ color: '#fff' }}>What's New</div>
-              <div className="whats-new-card" style={{
-                background: 'linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-                padding: '16px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                display: 'flex',
-                gap: '12px'
-              }}>
-                <div style={{
-                  width: '40px', height: '40px',
-                  borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)',
-                  color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
+            <div className="whats-new-section">
+              <div className="column-header">What's New</div>
+              <div className="whats-new-card">
+                <div className="featured-icon-container">
                   <Zap size={20} />
                 </div>
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#fff' }}>Reson Update 2026.1</h4>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', lineHeight: '1.4' }}>
+                <div className="featured-text-content">
+                  <h4>Reson Update 2026.1</h4>
+                  <p>
                     Experience the new high-performance audio engine, improved mixer workflow, and enhanced plugin support.
                   </p>
                 </div>
@@ -65,10 +53,8 @@ const WelcomeModal = ({ onClose, onNewProject }) => {
                 </div>
               ))}
             </div>
+
           </div>
-
-          {/* Recent Projects Removed as requested */}
-
         </div>
       </div>
     </div>

@@ -114,11 +114,11 @@ const PatternSelector = () => {
                 className="pattern-nav-btn pattern-nav-prev"
                 title="Previous Pattern"
             >
-                <ChevronLeft size={12} className="blender-icon" />
+                <ChevronLeft size={16} className="blender-icon" />
             </button>
 
             {/* Primary: Pattern Name Capsule */}
-            <div 
+            <div
                 className="pattern-capsule"
                 onClick={handleCapsuleClick}
                 title="Click to select pattern, double-click to rename"
@@ -130,7 +130,7 @@ const PatternSelector = () => {
                         background: activePattern?.color || '#4C8DB0'
                     }}
                 />
-                
+
                 {/* Pattern Name - Inline Editable */}
                 {isEditing ? (
                     <input
@@ -153,7 +153,7 @@ const PatternSelector = () => {
                 )}
 
                 {/* Dropdown Indicator */}
-                <ChevronDown size={11} className="pattern-dropdown-icon" />
+                <ChevronDown size={14} className="pattern-dropdown-icon" />
             </div>
 
             {/* Secondary Navigation - Minimal */}
@@ -163,7 +163,7 @@ const PatternSelector = () => {
                 className="pattern-nav-btn pattern-nav-next"
                 title="Next Pattern"
             >
-                <ChevronRight size={12} className="blender-icon" />
+                <ChevronRight size={16} className="blender-icon" />
             </button>
 
             {/* Secondary: Add Button - Minimal */}
@@ -175,7 +175,7 @@ const PatternSelector = () => {
                 className="pattern-add-btn"
                 title="Create New Pattern"
             >
-                <Plus size={12} className="blender-icon" />
+                <Plus size={16} className="blender-icon" />
             </button>
 
             {/* Dropdown Menu */}

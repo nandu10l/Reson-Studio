@@ -61,7 +61,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool(activeTool === 'magnet' ? 'pencil' : 'magnet')}
             title="Snap to Grid"
           >
-            <Magnet size={16} className="blender-icon" />
+            <Magnet size={20} className="blender-icon" />
           </button>
 
           <div className="transport-separator"></div>
@@ -71,7 +71,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('pencil')}
             title="Draw (Pencil)"
           >
-            <Pencil size={16} className="blender-icon" />
+            <Pencil size={20} className="blender-icon" />
           </button>
 
           <button
@@ -79,7 +79,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('brush')}
             title="Paint (Brush)"
           >
-            <Brush size={16} className="blender-icon" />
+            <Brush size={20} className="blender-icon" />
           </button>
 
           <button
@@ -87,7 +87,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('delete')}
             title="Delete"
           >
-            <Ban size={16} className="blender-icon" />
+            <Ban size={20} className="blender-icon" />
           </button>
 
           <button
@@ -95,7 +95,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('mute')}
             title="Mute"
           >
-            <VolumeX size={16} className="blender-icon" />
+            <VolumeX size={20} className="blender-icon" />
           </button>
 
           <button
@@ -103,7 +103,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('slip')}
             title="Slip Edit"
           >
-            <ArrowRightLeft size={16} className="blender-icon" />
+            <ArrowRightLeft size={20} className="blender-icon" />
           </button>
 
           <button
@@ -111,7 +111,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('slice')}
             title="Slice"
           >
-            <Scissors size={16} className="blender-icon" />
+            <Scissors size={20} className="blender-icon" />
           </button>
 
           <button
@@ -119,7 +119,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('select')}
             title="Select"
           >
-            <BoxSelect size={16} className="blender-icon" />
+            <BoxSelect size={20} className="blender-icon" />
           </button>
 
           <button
@@ -127,7 +127,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('zoom')}
             title="Zoom"
           >
-            <Search size={16} className="blender-icon" />
+            <Search size={20} className="blender-icon" />
           </button>
 
           <button
@@ -135,7 +135,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setActiveTool('playback')}
             title="Playback (Scrub)"
           >
-            <Volume2 size={16} className="blender-icon" />
+            <Volume2 size={20} className="blender-icon" />
           </button>
         </div>
       </div>
@@ -150,9 +150,9 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (
-              <Pause size={16} className="blender-icon" />
+              <Pause size={22} className="blender-icon" />
             ) : (
-              <Play size={16} className="blender-icon" />
+              <Play size={22} className="blender-icon" />
             )}
           </button>
 
@@ -161,7 +161,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={stopPlayback}
             title="Stop"
           >
-            <Stop size={14} className="blender-icon" />
+            <Stop size={20} className="blender-icon" />
           </button>
 
           <button
@@ -169,7 +169,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             onClick={() => setIsRecording(prev => !prev)}
             title="Record"
           >
-            <Circle size={12} className="blender-icon" />
+            <Circle size={18} className="blender-icon" />
           </button>
         </div>
 
@@ -222,7 +222,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Playlist"
             {...useGuideHandlers('View Playlist')}
           >
-            <ListMusic size={16} className="blender-icon" />
+            <ListMusic size={20} className="blender-icon" />
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.pianoRoll ? 'active' : ''}`}
@@ -230,7 +230,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Piano Roll"
             {...useGuideHandlers('View Piano Roll')}
           >
-            <Grid size={16} className="blender-icon" />
+            <Grid size={20} className="blender-icon" />
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.channelRack ? 'active' : ''}`}
@@ -238,7 +238,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Channel Rack"
             {...useGuideHandlers('View Channel Rack')}
           >
-            <LayoutGrid size={16} className="blender-icon" />
+            <LayoutGrid size={20} className="blender-icon" />
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.mixer ? 'active' : ''}`}
@@ -246,7 +246,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Mixer"
             {...useGuideHandlers('View Mixer')}
           >
-            <Sliders size={16} className="blender-icon" />
+            <Sliders size={20} className="blender-icon" />
           </button>
         </div>
       </div>
