@@ -226,13 +226,14 @@ class AudioEngine {
                 const time = `0:0:${note.startStep}`;
 
                 Tone.Transport.schedule((t) => {
-                    // Use dedicated poly synth
-                    if (this.previewSynth && note.noteName) {
+                    // Use dedicated poly synth or channel instrument
+                    if (note.channelId !== undefined && note.channelId !== null) {
+                        this.previewChannelNote(note.channelId, note.noteName, duration, t);
+                    } else if (this.previewSynth && note.noteName) {
                         this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
                     }
                 }, time);
             }
-
         });
 
         console.log('Scheduled pattern:', pattern.id);
@@ -403,7 +404,7 @@ class AudioEngine {
                         Tone.Transport.schedule((t) => {
                             if (note.noteName) {
                                 // If note has a channelId, play on that channel
-                                if (note.channelId) {
+                                if (note.channelId !== undefined && note.channelId !== null) {
                                     this.previewChannelNote(note.channelId, note.noteName, duration, t);
                                 } else {
                                     // Fallback for legacy notes without channelId
@@ -445,7 +446,7 @@ class AudioEngine {
         if (n.includes('kick')) {
             source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
         } else if (n.includes('snare') || n.includes('clap')) {
-            source = new Tone.PolySynth(Tone.NoiseSynth, {
+            source = new Tone.NoiseSynth({
                 noise: { type: 'white' },
                 envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
             }).connect(channel);
@@ -539,7 +540,11 @@ class AudioEngine {
         if (source) {
             // PolySynth handles monophonic voices (like NoiseSynth) by ignoring the pitch
             // but we provide a dummy pitch to satisfy the PolySynth signature.
-            source.triggerAttackRelease("C2", "8n", time);
+            if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
+                source.triggerAttackRelease("8n", time);
+            } else {
+                source.triggerAttackRelease("C2", "8n", time);
+            }
         }
     }
 
@@ -553,7 +558,11 @@ class AudioEngine {
         const source = this.sources.get(channelId);
         if (source) {
             // Harmonized trigger for PolySynth instruments
-            source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now());
+            if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
+                source.triggerAttackRelease(duration, time || Tone.now());
+            } else {
+                source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now());
+            }
         }
     }
 }
