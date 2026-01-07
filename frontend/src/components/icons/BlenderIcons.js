@@ -75,6 +75,35 @@ export const MousePointer = (props) => <BlenderIcon icon={LucideIcons.MousePoint
 export const Maximize = (props) => <BlenderIcon icon={LucideIcons.Maximize} {...props} />;
 export const Minimize = (props) => <BlenderIcon icon={LucideIcons.Minimize2} {...props} />;
 
+// Custom Piano Icon
+const PianoCustom = ({ size = 24, strokeWidth = 1.5, ...props }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    {/* White key separators */}
+    <path d="M6 4v16" />
+    <path d="M10 4v16" />
+    <path d="M14 4v16" />
+    <path d="M18 4v16" />
+    {/* Black keys - C#, D#, F# */}
+    <path d="M6 4v10" strokeWidth="3" />
+    <path d="M10 4v10" strokeWidth="3" />
+    <path d="M18 4v10" strokeWidth="3" />
+  </svg>
+);
+
+export const Piano = (props) => <BlenderIcon icon={PianoCustom} {...props} />;
+
 // Additional icons as needed
 export const FolderTree = (props) => <BlenderIcon icon={LucideIcons.FolderTree} {...props} />;
 export const Settings = (props) => <BlenderIcon icon={LucideIcons.Settings} {...props} />;
@@ -127,5 +156,6 @@ export default {
   ArrowRightLeft,
   BoxSelect,
   Speaker,
-  MousePointer
+  MousePointer,
+  Piano
 };

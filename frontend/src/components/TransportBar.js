@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ListMusic, Grid, LayoutGrid, Sliders, Play, Pause, Stop, Circle,
+  ListMusic, Piano, LayoutGrid, Sliders, Play, Pause, Stop, Circle,
   Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2
 } from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
@@ -230,7 +230,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Piano Roll"
             {...useGuideHandlers('View Piano Roll')}
           >
-            <Grid size={20} className="blender-icon" />
+            <Piano size={20} className="blender-icon" />
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.channelRack ? 'active' : ''}`}
