@@ -80,6 +80,11 @@ export const ProjectProvider = ({ children }) => {
     const [currentProjectPath, setCurrentProjectPath] = useState(null);
     const needsScheduling = useRef(true);
 
+    // Audio Recording Refs
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const recordingStartTimeRef = useRef(0);
+
 
 
     const loadProject = useCallback((data) => {
@@ -375,6 +380,93 @@ export const ProjectProvider = ({ children }) => {
 
         return () => clearInterval(syncInterval);
     }, [isPlaying, bpm, playheadPosition]);
+
+    // --- Audio Recording Logic ---
+    useEffect(() => {
+        const startRecording = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorderRef.current = mediaRecorder;
+                audioChunksRef.current = [];
+                recordingStartTimeRef.current = playheadPosition;
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunksRef.current.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                    const extension = mimeType.includes('wav') ? 'wav' : (mimeType.includes('mp4') ? 'm4a' : 'webm');
+                    const file = new File([audioBlob], `Recording_${Date.now()}.${extension}`, { type: mimeType });
+
+                    try {
+                        const audioBuffer = await decodeAudioFile(file);
+                        const waveform = generateWaveform(audioBuffer, 2000);
+                        const durationBeats = audioDurationToBeats(audioBuffer, bpm);
+
+                        const audioClip = {
+                            id: Date.now(),
+                            fileName: file.name,
+                            name: `Rec ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+                            file: file,
+                            audioBuffer: audioBuffer,
+                            waveform: waveform,
+                            duration: audioBuffer.duration,
+                            durationBeats: durationBeats,
+                            sampleRate: audioBuffer.sampleRate,
+                            url: URL.createObjectURL(file)
+                        };
+
+                        setAudioClips(prev => [...prev, audioClip]);
+
+                        // Add to playlist
+                        const startPos = recordingStartTimeRef.current;
+                        const targetTrack = playlistTracks.find(t => t.clips.length === 0) || playlistTracks[0];
+
+                        if (targetTrack) {
+                            const newClip = {
+                                id: Date.now() + 1,
+                                type: 'audio',
+                                audioClipId: audioClip.id,
+                                offset: startPos,
+                                length: durationBeats,
+                                name: audioClip.name
+                            };
+
+                            setPlaylistTracks(prev => prev.map(t =>
+                                t.id === targetTrack.id
+                                    ? { ...t, clips: [...t.clips, newClip] }
+                                    : t
+                            ));
+                        }
+                    } catch (err) {
+                        console.error("Error processing recorded audio:", err);
+                    }
+
+                    // Stop all tracks in the stream
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                console.log("Recording started...");
+            } catch (err) {
+                console.error("Failed to start recording:", err);
+                setIsRecording(false);
+                alert("Microphone access denied or error occurred.");
+            }
+        };
+
+        if (isRecording) {
+            startRecording();
+        } else if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+            console.log("Recording stopped.");
+        }
+    }, [isRecording]);
 
     const updateBpm = useCallback((newBpm) => {
         setBpm(newBpm);
