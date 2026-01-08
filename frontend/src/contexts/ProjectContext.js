@@ -153,6 +153,37 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
+    const resizeActivePattern = useCallback((newLength) => {
+        setPatterns(prev => prev.map(p => {
+            if (p.id === activePatternId) {
+                if (p.length === newLength) return p;
+
+                // Create new step arrays for each channel
+                const newSteps = {};
+                INITIAL_CHANNELS.forEach(ch => {
+                    const currentChannelSteps = p.data.steps[ch.id] || [];
+                    const newChannelSteps = Array(newLength).fill(false);
+
+                    // Copy existing steps
+                    for (let i = 0; i < Math.min(currentChannelSteps.length, newLength); i++) {
+                        newChannelSteps[i] = currentChannelSteps[i];
+                    }
+                    newSteps[ch.id] = newChannelSteps;
+                });
+
+                return {
+                    ...p,
+                    length: newLength,
+                    data: {
+                        ...p.data,
+                        steps: newSteps
+                    }
+                };
+            }
+            return p;
+        }));
+    }, [activePatternId]);
+
     const addNoteToActivePattern = useCallback((note) => {
         setPatterns(prev => prev.map(p => {
             if (p.id === activePatternId) {
@@ -607,6 +638,111 @@ export const ProjectProvider = ({ children }) => {
         }
     }, [activePattern, playbackMode, patterns, playlistTracks, audioClips]);
 
+    // Template Creation
+    const createTemplateProject = useCallback((templateType) => {
+        if (templateType === 'chord') {
+            // Target: 8 seconds at 120 BPM
+            // 120 BPM = 2 beats per second. 
+            // 8 seconds * 2 = 16 beats.
+            // 16 beats * 4 steps/beat = 64 steps.
+            const PATTERN_LENGTH = 64;
+
+            // 1. Create Patterns
+            const newPatterns = [
+                { id: 1, name: 'Chords', color: '#4C8DB0', length: PATTERN_LENGTH, data: { steps: createEmptySteps(PATTERN_LENGTH), notes: [] } },
+                { id: 2, name: 'Leads', color: '#B04C4C', length: PATTERN_LENGTH, data: { steps: createEmptySteps(PATTERN_LENGTH), notes: [] } },
+                { id: 3, name: 'Bass', color: '#4CB080', length: PATTERN_LENGTH, data: { steps: createEmptySteps(PATTERN_LENGTH), notes: [] } },
+                {
+                    id: 4, name: 'Drums', color: '#B0AA4C', length: PATTERN_LENGTH, data: {
+                        steps: createEmptySteps(PATTERN_LENGTH),
+                        notes: []
+                    }
+                }
+            ];
+
+            // 2. Add Sample Notes to Drums (Pattern 4)
+            const drumSteps = createEmptySteps(PATTERN_LENGTH);
+            const drumNotes = [];
+
+            const addDrumNote = (channelId, step) => {
+                drumNotes.push({
+                    id: Date.now() + Math.random(),
+                    noteName: 'C5',
+                    channelId: channelId,
+                    startStep: step,
+                    length: 1
+                });
+            };
+
+            // Repeat the 1-bar pattern 4 times
+            for (let bar = 0; bar < 4; bar++) {
+                const offset = bar * 16;
+                // Kick (1) - 4-to-the-floor
+                [0, 4, 8, 12].forEach(s => {
+                    const step = offset + s;
+                    drumSteps[1][step] = true;
+                    addDrumNote(1, step);
+                });
+
+                // Clap (2) - Backbeat
+                [4, 12].forEach(s => {
+                    const step = offset + s;
+                    drumSteps[2][step] = true;
+                    addDrumNote(2, step);
+                });
+
+                // HiHat (3) - 8th notes
+                [0, 2, 4, 6, 8, 10, 12, 14].forEach(s => {
+                    const step = offset + s;
+                    drumSteps[3][step] = true;
+                    addDrumNote(3, step);
+                });
+            }
+
+            newPatterns[3].data.steps = drumSteps;
+            newPatterns[3].data.notes = drumNotes;
+
+            setPatterns(newPatterns);
+            setActivePatternId(1); // Start with Chords
+
+            // 3. Setup Playlist Tracks
+            const newTracks = Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [], muted: false, solo: false }));
+
+            // Assign Patterns to Tracks 1-4
+            newPatterns.forEach((pat, index) => {
+                newTracks[index].name = pat.name;
+                newTracks[index].clips.push({
+                    id: Date.now() + index,
+                    type: 'pattern',
+                    patternId: pat.id,
+                    offset: 0,
+                    length: 16 // 16 beats = 4 bars = 64 steps
+                });
+            });
+
+            setPlaylistTracks(newTracks);
+
+        } else if (templateType === 'empty') {
+            // Reset to default
+            setPatterns([
+                {
+                    id: 1,
+                    name: 'Pattern 1',
+                    color: '#4C8DB0',
+                    length: 16,
+                    data: {
+                        steps: createEmptySteps(16),
+                        notes: []
+                    }
+                }
+            ]);
+            setActivePatternId(1);
+            setPlaylistTracks(
+                Array(10).fill(null).map((_, i) => ({ id: i + 1, name: `Track ${i + 1}`, clips: [], muted: false, solo: false }))
+            );
+        }
+    }, []);
+
     const value = {
         patterns,
         activePatternId, setActivePatternId,
@@ -618,6 +754,7 @@ export const ProjectProvider = ({ children }) => {
 
         // Actions
         createPattern,
+        createTemplateProject,
         updatePattern,
         toggleStepInActivePattern,
         addNoteToActivePattern,
@@ -629,6 +766,7 @@ export const ProjectProvider = ({ children }) => {
         toggleTrackSolo,
         previewChannelSound,
         previewPianoNote,
+        resizeActivePattern,
 
         // New Actions
         updateNote,

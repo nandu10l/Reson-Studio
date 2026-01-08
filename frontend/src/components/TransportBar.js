@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as Tone from 'tone';
 import {
   ListMusic, Piano, LayoutGrid, Sliders, Play, Pause, Stop, Circle,
   Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2
@@ -18,18 +19,48 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
   } = useProject();
 
   const { useGuideHandlers } = useGuide();
+  const [displayBeats, setDisplayBeats] = useState(playheadPosition);
 
-  // Format time position from playhead (in beats) to bar:beat:sixteenth
+  // Sync display with playheadPosition when NOT playing (seeking/stopped)
+  useEffect(() => {
+    if (!isPlaying) {
+      setDisplayBeats(playheadPosition);
+    }
+  }, [playheadPosition, isPlaying]);
+
+  // Real-time update loop during playback
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let rAF;
+    const loop = () => {
+      const seconds = Tone.Transport.seconds;
+      const beats = seconds * (bpm / 60);
+      setDisplayBeats(beats);
+      rAF = requestAnimationFrame(loop);
+    };
+
+    loop();
+    return () => cancelAnimationFrame(rAF);
+  }, [isPlaying, bpm]);
+
+  // Format time position from playhead (in beats) to MM:SS:ms
   const formatTimePosition = (beats) => {
-    const beatsPerBar = 4;
-    const sixteenthsPerBeat = 4;
-    const totalSixteenths = Math.floor(beats * sixteenthsPerBeat);
+    // Convert beats to seconds: beats / (BPM / 60)
+    const currentBpm = bpm || 120;
+    const totalSeconds = beats / (currentBpm / 60);
 
-    const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
-    const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
-    const sixteenth = totalSixteenths % sixteenthsPerBeat;
+    // Calculate parts
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const milliseconds = Math.floor((totalSeconds % 1) * 100);
 
-    return `${bar}:${beat}:${sixteenth}`;
+    // Pad with zeros
+    const m = minutes.toString().padStart(2, '0');
+    const s = seconds.toString().padStart(2, '0');
+    const ms = milliseconds.toString().padStart(2, '0');
+
+    return `${m}:${s}:${ms}`;
   };
 
   const handleBpmChange = (e) => {
@@ -175,7 +206,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
 
         {/* Time Position - Prominent */}
         <div className="transport-time-display">
-          {formatTimePosition(playheadPosition)}
+          {formatTimePosition(displayBeats)}
         </div>
       </div>
 

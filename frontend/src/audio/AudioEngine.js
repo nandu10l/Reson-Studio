@@ -541,7 +541,25 @@ class AudioEngine {
             // PolySynth handles monophonic voices (like NoiseSynth) by ignoring the pitch
             // but we provide a dummy pitch to satisfy the PolySynth signature.
             if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
-                source.triggerAttackRelease("8n", time);
+                // Protect against "Start time must be strictly greater than previous start time"
+                // by ensuring we don't trigger at the exact same time as the last one.
+                const lastTime = source._lastTriggerTime || 0;
+                const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
+
+                // If attempting to play at the same time (or in the past relative to last trigger), 
+                // add a tiny offset.
+                let safeTime = scheduleTime;
+                if (safeTime <= lastTime) {
+                    safeTime = lastTime + 0.001; // 1ms offset
+                }
+                source._lastTriggerTime = safeTime;
+
+                // Try-catch for extra safety
+                try {
+                    source.triggerAttackRelease("8n", safeTime);
+                } catch (e) {
+                    console.warn("NoiseSynth trigger prevented:", e);
+                }
             } else {
                 source.triggerAttackRelease("C2", "8n", time);
             }
@@ -559,7 +577,20 @@ class AudioEngine {
         if (source) {
             // Harmonized trigger for PolySynth instruments
             if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
-                source.triggerAttackRelease(duration, time || Tone.now());
+                const lastTime = source._lastTriggerTime || 0;
+                const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
+
+                let safeTime = scheduleTime;
+                if (safeTime <= lastTime) {
+                    safeTime = lastTime + 0.001;
+                }
+                source._lastTriggerTime = safeTime;
+
+                try {
+                    source.triggerAttackRelease(duration, safeTime);
+                } catch (e) {
+                    console.warn("NoiseSynth channel trigger prevented:", e);
+                }
             } else {
                 source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now());
             }

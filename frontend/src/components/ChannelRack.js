@@ -238,6 +238,62 @@ const ChannelRack = () => {
         return () => clearInterval(interval);
     }, [isPlaying, bpm, activePattern.length]);
 
+    // Added Logic: Dynamic Pattern Resizing based on Window Width
+    const { resizeActivePattern } = useProject();
+
+    useEffect(() => {
+        if (!rackRef.current) return;
+
+        const handleResize = (entries) => {
+            for (const entry of entries) {
+                const width = entry.contentRect.width;
+                // Constants based on CSS:
+                // Channel controls (left): 80px + padding/gap approx 10px -> let's say 90px reserved
+                // Channel Name: 100px + padding -> 110px
+                // Total fixed width approx: 80 + 100 + margins/padding = ~190px
+                // Step button width: 16px + 1px gap = 17px
+
+                const fixedWidth = 200; // Left controls + Channel Name + padding
+                const availableForSteps = width - fixedWidth;
+
+                if (availableForSteps > 0) {
+                    const stepWidth = 17;
+                    const possibleSteps = Math.floor(availableForSteps / stepWidth);
+                    const currentLength = activePattern.length;
+
+                    // Only resize if we have SIGNIFICANTLY more space to avoid jitter
+                    // And only expand if we are larger than current, OR fit strictly if requested.
+                    // User request: "no of step sequencers... should increase so that the length of the pattern can be extended"
+                    // We will only INCREASE size to avoid destroying data on shrink.
+
+                    if (possibleSteps > currentLength) {
+                        // Snap to multiples of 4 for cleaner musical structure, or at least multiples of 4
+                        // actually user just wants to extend.
+                        // Let's ensure we at least fill the view.
+
+                        // Debounce slightly or just do it? 
+                        // Doing it directly might call many state updates. 
+                        // But ResizeObserver callback is usually efficient.
+
+                        // To be safe, let's max it out but maybe align to 4
+                        const newLength = Math.floor(possibleSteps / 4) * 4;
+
+                        if (newLength > currentLength) {
+                            resizeActivePattern(newLength);
+                        }
+                    }
+                }
+            }
+        };
+
+        const observer = new ResizeObserver(handleResize);
+        observer.observe(rackRef.current);
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [activePattern.length, resizeActivePattern]);
+
     return (
         <div className="channel-rack-window" ref={rackRef}>
             {/* Header */}

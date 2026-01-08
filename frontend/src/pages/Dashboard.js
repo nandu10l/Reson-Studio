@@ -22,7 +22,7 @@ import ChannelRack from '../components/ChannelRack';
 import WelcomeModal from '../components/WelcomeModal';
 
 function Dashboard() {
-  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek } = useProject();
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek, createTemplateProject } = useProject();
   const [showWelcome, setShowWelcome] = useState(true);
 
   // Window states
@@ -297,7 +297,8 @@ function Dashboard() {
           onClose={() => setShowWelcome(false)}
           onNewProject={(type) => {
             console.log("Creating new project:", type);
-            // Here you would handle template creation logic
+            // Handle template creation logic
+            createTemplateProject(type);
             setShowWelcome(false);
           }}
           onLoadProject={(proj) => {
