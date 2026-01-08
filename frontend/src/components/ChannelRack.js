@@ -62,7 +62,7 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
     );
 };
 
-const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying }) => {
+const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }) => {
     const { toggleStepInActivePattern, updateChannelVolume, updateChannelPan, previewChannelSound } = useProject();
     const { useGuideHandlers } = useGuide();
     const [isEditingName, setIsEditingName] = useState(false);
@@ -107,11 +107,6 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
 
     const getVolText = (val) => {
         return `Channel volume: ${Math.round(val)}%`;
-    };
-
-    // Determine if step is playing
-    const isStepPlaying = (stepIndex) => {
-        return isPlaying && currentStep === stepIndex;
     };
 
     return (
@@ -192,12 +187,12 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
                     const isEvenGroup = Math.floor(i / 4) % 2 === 1;
                     const isBeat = i % 4 === 0;
                     const isBar = i % 16 === 0;
-                    const playing = isStepPlaying(i);
 
                     return (
                         <button
                             key={i}
-                            className={`step-btn ${isEvenGroup ? 'group-even' : ''} ${active ? 'active' : ''} ${playing ? 'playing' : ''} ${isBeat ? 'beat' : ''} ${isBar ? 'bar' : ''}`}
+                            data-step={i}
+                            className={`step-btn ${isEvenGroup ? 'group-even' : ''} ${active ? 'active' : ''} ${isBeat ? 'beat' : ''} ${isBar ? 'bar' : ''}`}
                             onClick={() => handleToggleStep(i)}
                             {...useGuideHandlers(`Step ${i + 1}`)}
                         />
@@ -206,32 +201,45 @@ const Channel = ({ id, name, vol, pan, steps = [], color, currentStep, isPlaying
             </div>
         </div>
     );
-};
+});
 
 const ChannelRack = () => {
     const { channels, activePattern, isPlaying, togglePlayback, bpm } = useProject();
-    const [currentStep, setCurrentStep] = useState(0);
+    const rackRef = useRef(null);
 
-    // Track current playback step
+    // Track current playback step with direct DOM manipulation
     useEffect(() => {
         if (!isPlaying) {
-            setCurrentStep(0);
+            // Clear highlights if stopped
+            if (rackRef.current) {
+                const playingSteps = rackRef.current.querySelectorAll('.step-btn.playing');
+                playingSteps.forEach(el => el.classList.remove('playing'));
+            }
             return;
         }
 
+        let currentStepLocal = 0;
         const stepInterval = (60 / (bpm || 120)) * 250; // 16th note interval
         const interval = setInterval(() => {
-            setCurrentStep(prev => {
-                const next = prev + 1;
-                return next >= activePattern.length ? 0 : next;
-            });
+            if (rackRef.current) {
+                // Remove previous playing class
+                const playingSteps = rackRef.current.querySelectorAll('.step-btn.playing');
+                playingSteps.forEach(el => el.classList.remove('playing'));
+
+                // Add to current step
+                const nextStep = currentStepLocal % activePattern.length;
+                const newPlayingSteps = rackRef.current.querySelectorAll(`.step-btn[data-step="${nextStep}"]`);
+                newPlayingSteps.forEach(el => el.classList.add('playing'));
+
+                currentStepLocal = (currentStepLocal + 1) % activePattern.length;
+            }
         }, stepInterval);
 
         return () => clearInterval(interval);
     }, [isPlaying, bpm, activePattern.length]);
 
     return (
-        <div className="channel-rack-window">
+        <div className="channel-rack-window" ref={rackRef}>
             {/* Header */}
             <div className="rack-header">
                 <div className="header-controls">
@@ -272,7 +280,6 @@ const ChannelRack = () => {
                         pan={ch.pan}
                         color={activePattern.color}
                         steps={activePattern.data.steps[ch.id] || Array(activePattern.length).fill(false)}
-                        currentStep={currentStep}
                         isPlaying={isPlaying}
                     />
                 ))}
@@ -288,4 +295,4 @@ const ChannelRack = () => {
     );
 };
 
-export default ChannelRack;
+export default React.memo(ChannelRack);

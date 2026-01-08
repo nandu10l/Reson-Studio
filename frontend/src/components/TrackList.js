@@ -8,7 +8,7 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 
 // Update Track signature to include onResizeStart
-function Track({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -676,9 +676,9 @@ function Track({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemov
       </div>
     </div>
   );
-}
+});
 
-export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) {
+const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
   const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo } = useProject();
   const [selected, setSelected] = useState(null);
 
@@ -1167,4 +1167,6 @@ export default function TrackList({ onSelectClip, pixelsPerBeat = 60, measures =
       </div>
     </div>
   );
-}
+});
+
+export default TrackList;

@@ -26,125 +26,115 @@ const Playhead = ({
   className = '',
   style = {}
 }) => {
-  const { playheadPosition, isPlaying, bpm, playbackMode } = useProject();
-
-  // Local state for smooth animation
-  const [visualPosition, setVisualPosition] = React.useState(playheadPosition);
-
-  // Sync visual position with context when not playing or seeking
-  useEffect(() => {
-    if (!isPlaying) {
-      setVisualPosition(playheadPosition);
-    }
-  }, [playheadPosition, isPlaying]);
+  const { playheadPosition, isPlaying, bpm } = useProject();
+  const playheadRef = React.useRef(null);
+  const timeLabelRef = React.useRef(null);
 
   // Animation Loop checking Tone.Transport
   useEffect(() => {
-    if (!isPlaying) return;
-
     let rAF;
     const animate = () => {
       const seconds = Tone.Transport.seconds;
       const beats = seconds * (bpm / 60);
-      setVisualPosition(beats);
+
+      let pos = beats;
+      // Handle looping logic in the animation loop
+      if (loopStart !== null && loopEnd !== null && pos >= loopEnd) {
+        const loopLength = loopEnd - loopStart;
+        pos = ((pos - loopStart) % loopLength) + loopStart;
+      }
+
+      // Calculate pixel position
+      let pixelPos = 0;
+      if (mode === 'quantized') {
+        pixelPos = Math.floor(pos) * pixelsPerStep;
+      } else {
+        pixelPos = pos * pixelsPerBeat;
+      }
+
+      // Direct DOM Update for visual smoothness
+      if (playheadRef.current) {
+        playheadRef.current.style.transform = `translateX(${headerOffset + pixelPos}px)`;
+      }
+
+      // Update time label
+      if (timeLabelRef.current) {
+        const sixteenthsPerBeat = 4;
+        const totalSixteenths = Math.floor(pos * sixteenthsPerBeat);
+        const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
+        const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
+        const sixteenth = totalSixteenths % sixteenthsPerBeat;
+        timeLabelRef.current.textContent = `${bar}:${beat}:${sixteenth}`;
+      }
+
       rAF = requestAnimationFrame(animate);
     };
-    rAF = requestAnimationFrame(animate);
 
-    return () => cancelAnimationFrame(rAF);
-  }, [isPlaying, bpm]);
-
-  // Calculate display position based on mode
-  const displayPosition = useMemo(() => {
-    // Use visualPosition instead of context playheadPosition for render
-    const pos = isPlaying ? visualPosition : playheadPosition;
-
-    if (mode === 'quantized') {
-      // Quantized mode: snap to steps
-      const step = Math.floor(pos);
-      return step * pixelsPerStep;
+    if (isPlaying) {
+      rAF = requestAnimationFrame(animate);
     } else {
-      // Smooth mode: continuous movement
-      return pos * pixelsPerBeat;
+      // Static update when seeking/stopped
+      animate();
     }
-  }, [mode, visualPosition, playheadPosition, isPlaying, pixelsPerBeat, pixelsPerStep]);
 
-  // Handle looping: if position exceeds loop end, wrap to loop start
-  const finalPosition = useMemo(() => {
-    const pos = isPlaying ? visualPosition : playheadPosition;
+    return () => {
+      if (rAF) cancelAnimationFrame(rAF);
+    };
+  }, [isPlaying, bpm, mode, pixelsPerBeat, pixelsPerStep, headerOffset, loopStart, loopEnd, beatsPerBar]);
 
-    if (loopStart !== null && loopEnd !== null && pos >= loopEnd) {
-      const loopLength = loopEnd - loopStart;
-      const positionInLoop = ((pos - loopStart) % loopLength) + loopStart;
-      return mode === 'quantized'
-        ? Math.floor(positionInLoop) * pixelsPerStep
-        : positionInLoop * pixelsPerBeat;
+  // Handle case where playheadPosition changes while paused (Seeking)
+  useEffect(() => {
+    if (!isPlaying && playheadRef.current) {
+      let pos = playheadPosition;
+      if (loopStart !== null && loopEnd !== null && pos >= loopEnd) {
+        const loopLength = loopEnd - loopStart;
+        pos = ((pos - loopStart) % loopLength) + loopStart;
+      }
+      const pixelPos = mode === 'quantized' ? Math.floor(pos) * pixelsPerStep : pos * pixelsPerBeat;
+      playheadRef.current.style.transform = `translateX(${headerOffset + pixelPos}px)`;
+
+      if (timeLabelRef.current) {
+        const sixteenthsPerBeat = 4;
+        const totalSixteenths = Math.floor(pos * sixteenthsPerBeat);
+        const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
+        const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
+        const sixteenth = totalSixteenths % sixteenthsPerBeat;
+        timeLabelRef.current.textContent = `${bar}:${beat}:${sixteenth}`;
+      }
     }
-    return displayPosition;
-  }, [displayPosition, loopStart, loopEnd, visualPosition, playheadPosition, isPlaying, mode, pixelsPerBeat, pixelsPerStep]);
-
-  // Calculate current step for quantized mode highlighting
-  const currentStep = useMemo(() => {
-    if (mode === 'quantized') {
-      return Math.floor(playheadPosition);
-    }
-    return null;
-  }, [mode, playheadPosition]);
-
-  // Format time as bar:beat:sixteenth
-  const formattedTime = useMemo(() => {
-    const beats = playheadPosition;
-    const sixteenthsPerBeat = 4;
-    const totalSixteenths = Math.floor(beats * sixteenthsPerBeat);
-
-    const bar = Math.floor(totalSixteenths / (beatsPerBar * sixteenthsPerBeat));
-    const beat = Math.floor((totalSixteenths % (beatsPerBar * sixteenthsPerBeat)) / sixteenthsPerBeat);
-    const sixteenth = totalSixteenths % sixteenthsPerBeat;
-
-    return `${bar}:${beat}:${sixteenth}`;
-  }, [playheadPosition, beatsPerBar]);
+  }, [playheadPosition, isPlaying, mode, pixelsPerBeat, pixelsPerStep, headerOffset, loopStart, loopEnd, beatsPerBar]);
 
   return (
     <div
+      ref={playheadRef}
       className={`playhead playhead-${mode} ${className}`}
       style={{
         position: 'absolute',
-        left: `${headerOffset + finalPosition}px`,
+        left: 0, // We use translateX for position
         top: 0,
         height: '100%',
         minHeight: '100%',
         width: '1px',
         zIndex: 30,
         pointerEvents: 'none',
+        willChange: 'transform',
         ...style
       }}
     >
-      {/* Time label at the top */}
       <div
+        ref={timeLabelRef}
         className="playhead-time-label"
         style={{
-          color: '#60a5fa' // Explicitly set playhead color
+          color: '#60a5fa'
         }}
       >
-        {formattedTime}
+        0:0:0
       </div>
 
       <div className="playhead-line" style={{ height: '100%', minHeight: '100%' }} />
-      {mode === 'quantized' && currentStep !== null && (
-        <div
-          className="playhead-step-highlight"
-          style={{
-            position: 'absolute',
-            left: `${-pixelsPerStep / 2}px`,
-            width: `${pixelsPerStep}px`,
-            top: 0,
-            bottom: 0
-          }}
-        />
-      )}
     </div>
   );
 };
 
-export default Playhead;
+export default React.memo(Playhead);
 

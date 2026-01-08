@@ -4,24 +4,30 @@ import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import { VolumeX, Volume2, Headphones } from './icons/BlenderIcons';
 
-function MixerChannel({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false }) {
+const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false }) => {
   const [muted, setMuted] = useState(false);
   const [soloed, setSoloed] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState(name);
-  const [level, setLevel] = useState(0); // Simulated level for meter
+  const meterFillRef = useRef(null);
   const nameInputRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
-  // Simulate level meter (in real app, this would come from audio engine)
+  // Simulate level meter with direct DOM manipulation
   useEffect(() => {
     if (!muted && !soloed) {
       const interval = setInterval(() => {
-        setLevel(Math.random() * 100);
+        const level = Math.random() * 100;
+        if (meterFillRef.current) {
+          meterFillRef.current.style.height = `${level}%`;
+          meterFillRef.current.style.backgroundColor = level > 80 ? '#f44336' : level > 60 ? '#ffeb3b' : '#4ade80';
+        }
       }, 100);
       return () => clearInterval(interval);
     } else {
-      setLevel(0);
+      if (meterFillRef.current) {
+        meterFillRef.current.style.height = `0%`;
+      }
     }
   }, [muted, soloed]);
 
@@ -88,13 +94,14 @@ function MixerChannel({ id, name, vol, pan, onVolChange, onPanChange, isMaster =
       </div>
 
       {/* Level Meter */}
-      <div className="level-meter" {...useGuideHandlers(`Level: ${Math.round(level)}%`)}>
+      <div className="level-meter" {...useGuideHandlers(`Level Meter`)}>
         <div className="meter-track">
           <div
+            ref={meterFillRef}
             className="meter-fill"
             style={{
-              height: `${level}%`,
-              backgroundColor: level > 80 ? '#f44336' : level > 60 ? '#ffeb3b' : '#4ade80'
+              height: `0%`,
+              backgroundColor: '#4ade80'
             }}
           />
         </div>
@@ -163,9 +170,9 @@ function MixerChannel({ id, name, vol, pan, onVolChange, onPanChange, isMaster =
       </div>
     </div>
   );
-}
+});
 
-export default function Mixer() {
+function Mixer() {
   const { channels, updateChannelVolume, updateChannelPan } = useProject();
 
   return (
@@ -176,8 +183,8 @@ export default function Mixer() {
         isMaster={true}
         vol={80}
         pan={0}
-        onVolChange={() => {}}
-        onPanChange={() => {}}
+        onVolChange={() => { }}
+        onPanChange={() => { }}
       />
 
       <div className="mixer-divider"></div>
@@ -200,3 +207,5 @@ export default function Mixer() {
     </div>
   );
 }
+
+export default React.memo(Mixer);

@@ -36,8 +36,8 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
     }
   };
 
-  const renderTicks = () => {
-    const ticks = [];
+  const ticks = React.useMemo(() => {
+    const items = [];
     const totalBeats = measures * beatsPerBar;
     const sixteenthsPerBeat = 4; // 4 sixteenth notes per beat
     const totalSixteenths = totalBeats * sixteenthsPerBeat;
@@ -47,14 +47,13 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
       const sixteenthInBeat = sixteenth % sixteenthsPerBeat;
       const bar = Math.floor(beat / beatsPerBar);
       const beatInBar = (beat % beatsPerBar);
-      
+
       const isDownbeat = beatInBar === 0 && sixteenthInBeat === 0;
       const isBeat = sixteenthInBeat === 0 && !isDownbeat;
-      const isSixteenth = !isBeat && !isDownbeat;
 
       const position = (sixteenth / sixteenthsPerBeat) * pixelsPerBeat;
 
-      ticks.push(
+      items.push(
         <div
           key={`tick-${sixteenth}`}
           className={`timeline-tick ${isDownbeat ? 'downbeat' : isBeat ? 'beat' : 'sixteenth'}`}
@@ -72,8 +71,8 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
         </div>
       );
     }
-    return ticks;
-  };
+    return items;
+  }, [measures, beatsPerBar, pixelsPerBeat]);
 
   return (
     <div className="timeline">
@@ -85,17 +84,17 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
         height: '100%',
         borderRight: '1px solid rgba(255, 255, 255, 0.08)'
       }}>
-        <div className="timeline-controls" style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div className="timeline-controls" style={{
+          display: 'flex',
+          alignItems: 'center',
           gap: '4px',
           height: '100%'
         }}>
-          <button 
-            className="timeline-btn" 
+          <button
+            className="timeline-btn"
             onClick={handleZoomOut}
             title="Zoom Out"
-            style={{ 
+            style={{
               width: '24px',
               height: '24px',
               padding: '0',
@@ -117,10 +116,10 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
           >
             <ZoomOut size={18} color="#b3b3b3" className="blender-icon" />
           </button>
-          
-          <span className="zoom-level" style={{ 
-            padding: '0 8px', 
-            minWidth: '48px', 
+
+          <span className="zoom-level" style={{
+            padding: '0 8px',
+            minWidth: '48px',
             textAlign: 'center',
             fontSize: '12px',
             color: '#b3b3b3',
@@ -130,12 +129,12 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
           }}>
             {Math.round(zoom * 100)}%
           </span>
-          
-          <button 
-            className="timeline-btn" 
+
+          <button
+            className="timeline-btn"
             onClick={handleZoomIn}
             title="Zoom In"
-            style={{ 
+            style={{
               width: '24px',
               height: '24px',
               padding: '0',
@@ -171,7 +170,7 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
         }}
       >
         <div className="timeline-grid">
-          {renderTicks()}
+          {ticks}
         </div>
 
         {/* Playhead is rendered in track-area to span both timeline and tracks */}
@@ -193,4 +192,4 @@ function Timeline({ measures = 16, beatsPerBar = 4, bpm = 120, playheadPosition 
   );
 }
 
-export default Timeline;
+export default React.memo(Timeline);

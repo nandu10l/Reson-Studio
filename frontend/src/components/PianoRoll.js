@@ -24,7 +24,7 @@ const PianoRoll = () => {
     const [selectedChannelId, setSelectedChannelId] = useState(channels.length > 0 ? channels[0].id : 1);
 
     const [hoveredKey, setHoveredKey] = useState(null); // Currently hovered key fullName
-    const [currentStep, setCurrentStep] = useState(0); // Current playback step for pulse animation
+    const lastStepRef = useRef(-1); // Pulse animation step tracker (Ref-based)
 
     // New tool states
     const [snapEnabled, setSnapEnabled] = useState(true);
@@ -123,6 +123,42 @@ const PianoRoll = () => {
             // Sync Playhead Position Visually
             if (playheadRef.current) {
                 playheadRef.current.style.left = `${playheadPixelX}px`;
+            }
+
+            // Sync Note/Key Highlights Visually (High Performance)
+            const currentStep = Math.floor(beats * 4); // 16th note step
+            if (currentStep !== lastStepRef.current) {
+                lastStepRef.current = currentStep;
+
+                if (gridAreaRef.current) {
+                    // 1. Update Notes - Single pass
+                    const playingNoteNames = new Set();
+                    const notes = gridAreaRef.current.querySelectorAll('.piano-note');
+                    notes.forEach(note => {
+                        const start = parseInt(note.dataset.startStep);
+                        const end = start + parseInt(note.dataset.len);
+                        if (currentStep >= start && currentStep < end) {
+                            note.classList.add('playing');
+                            // Find the key name from parent or data
+                            const row = note.closest('.piano-grid-row');
+                            if (row) playingNoteNames.add(row.dataset.key);
+                        } else {
+                            note.classList.remove('playing');
+                        }
+                    });
+
+                    // 2. Update Keys based on playingNoteNames
+                    if (scrollContainerRef.current) {
+                        const keys = scrollContainerRef.current.querySelectorAll('.piano-key-sticky');
+                        keys.forEach(key => {
+                            if (playingNoteNames.has(key.dataset.key)) {
+                                key.classList.add('playing');
+                            } else {
+                                key.classList.remove('playing');
+                            }
+                        });
+                    }
+                }
             }
 
             animationFrameId = requestAnimationFrame(animateScroll);
@@ -620,34 +656,14 @@ const PianoRoll = () => {
         return () => window.removeEventListener('keydown', handleDelete);
     }, [handleDelete]);
 
-    // Track current playback step for pulse animation
-    useEffect(() => {
-        if (!isPlaying) {
-            setCurrentStep(0);
-            return;
-        }
-
-        const interval = setInterval(() => {
-            setCurrentStep(prev => {
-                const next = prev + 1;
-                return next >= totalBars * stepsPerBar ? 0 : next;
-            });
-        }, (60 / (bpm || 120)) * 250); // 16th note interval
-
-        return () => clearInterval(interval);
-    }, [isPlaying, bpm, totalBars, stepsPerBar]);
+    // Track current playback step for pulse animation (REMOVED - now handled in animateScroll)
 
     // Get notes for each key
     const getNotesForKey = (keyFullName) => {
         return activePattern.data.notes.filter(n => n.noteName === keyFullName);
     };
 
-    // Check if a note is currently playing
-    const isNotePlaying = (note) => {
-        if (!isPlaying) return false;
-        const noteEnd = note.startStep + note.length;
-        return currentStep >= note.startStep && currentStep < noteEnd;
-    };
+    // Check if a note is currently playing (REMOVED - now handled in animateScroll)
 
     // Pattern name editing
     useEffect(() => {
@@ -924,13 +940,11 @@ const PianoRoll = () => {
                     {allKeys.map((k) => {
                         const keyNotes = getNotesForKey(k.fullName);
                         const hasNotes = keyNotes.length > 0;
-                        const isPlayingNote = keyNotes.some(note => isNotePlaying(note));
-                        const isHovered = hoveredKey === k.fullName;
-
                         return (
                             <div
-                                className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${isHovered ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''} ${isPlayingNote ? 'playing' : ''}`}
+                                className={`piano-key-sticky ${k.isBlack ? 'black' : 'white'} ${hoveredKey === k.fullName ? 'hovered' : ''} ${hasNotes ? 'has-notes' : ''}`}
                                 key={k.fullName}
+                                data-key={k.fullName}
                                 style={{ height: `${keyHeight}px` }}
                                 onMouseEnter={() => setHoveredKey(k.fullName)}
                                 onMouseLeave={() => setHoveredKey(null)}
@@ -980,14 +994,11 @@ const PianoRoll = () => {
                             </div>
                         </div>
                         {allKeys.map((k) => {
-                            const keyNotes = getNotesForKey(k.fullName);
-                            const hasNotes = keyNotes.length > 0;
-                            const isPlayingNote = keyNotes.some(note => isNotePlaying(note));
-
                             return (
                                 <div
                                     className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`}
                                     key={k.fullName}
+                                    data-key={k.fullName}
                                     style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}
                                 >
                                     {/* Render Grid Background Cells */}
@@ -1033,7 +1044,9 @@ const PianoRoll = () => {
                                         <div
                                             key={note.id}
                                             data-id={note.id}
-                                            className={`piano-note ${isSelected ? 'selected' : ''} ${isNotePlaying(note) ? 'playing' : ''}`}
+                                            data-start-step={note.startStep}
+                                            data-len={note.length}
+                                            className={`piano-note ${isSelected ? 'selected' : ''}`}
                                             style={{
                                                 position: 'absolute',
                                                 top: `${top}px`,
@@ -1095,4 +1108,4 @@ const PianoRoll = () => {
     );
 };
 
-export default PianoRoll;
+export default React.memo(PianoRoll);
