@@ -6,9 +6,10 @@ import { useProject } from '../contexts/ProjectContext';
 
 import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
+import AutomationClip from './AutomationClip';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -425,6 +426,12 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
               const x = e.clientX - rect.left;
               const offset = Math.floor(x / pixelsPerBeat);
               onAddAudioClip(track.id, offset, data.audioClipId);
+            } else if (data.type === 'automation') {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const offset = Math.floor(x / pixelsPerBeat);
+              // We need onAddAutomationClip prop.
+              if (onAddAutomationClip) onAddAutomationClip(track.id, offset, data.automationId);
             }
           } catch (err) {
             console.error("Drop failed", err);
@@ -481,9 +488,10 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 onRemove={(c) => onRemoveClip(track.id, idx)}
                 onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
-                onOpenMenu={(menuData) => setMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
+                onOpenMenu={(menuData) => onOpenMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
                 isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
                 activeTool={activeTool}
+                automation={automations ? automations.find(a => a.targetClipId === clip.id && a.type === 'volume') : null}
                 onSlice={(rawSplitPoint) => {
                   // Calculate correct split point based on raw click or handle in AudioClip
                   // AudioClip passes relative click? No, we need logic.
@@ -494,6 +502,24 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                   // Implementation choice: Pass specific handler for this clip index.
                   onSlice(track.id, idx, rawSplitPoint);
                 }}
+              />
+            );
+          } else if (clip.type === 'automation') {
+            const automationData = automations ? automations.find(a => a.id === clip.automationId) : null;
+
+            return (
+              <AutomationClip
+                key={clip.id || idx}
+                clip={clip}
+                automation={automationData}
+                pixelsPerBeat={pixelsPerBeat}
+                onSelect={(c) => onSelect({ ...c, trackId: track.id, clipIndex: idx })}
+                onRemove={(c) => onRemoveClip(track.id, idx)}
+                onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
+                onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
+                onOpenMenu={(menuData) => onOpenMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
+                isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
+                activeTool={activeTool}
               />
             );
           }
@@ -679,11 +705,12 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
   const [menu, setMenu] = useState(null); // { trackId, clipIndex, x, y, patternId }
+  const [activeSubmenu, setActiveSubmenu] = useState(null);
   const menuRef = useRef(null);
 
   // Close menu on click outside
@@ -704,47 +731,81 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   // Menu Handlers
   const handleMenuAction = (action) => {
     if (!menu) return;
-    const { trackId, clipIndex, patternId } = menu;
+    const { trackId, clipIndex, patternId, type, clip } = menu;
 
     if (action === 'delete') {
       removeClip(trackId, clipIndex);
+    } else if (action === 'toggle_mute') {
+      // Ideally we update the clip in state to have muted: true/false.
+      // Current clip structure might not have it, but we can add it.
+      setPlaylistTracks(prev => prev.map(t => {
+        if (t.id !== trackId) return t;
+        const newClips = [...t.clips];
+        const c = newClips[clipIndex];
+        if (c) {
+          newClips[clipIndex] = { ...c, muted: !c.muted };
+        }
+        return { ...t, clips: newClips };
+      }));
+    } else if (action === 'preview') {
+      // Find audio buffer and play it?
+      // Need access to audioBuffers or similar context. 
+      // For now, log it.
+      console.log('Preview audio clip');
+      if (clip && clip.audioClipId) {
+        // Maybe trigger a preview in context?
+        // activeAudioClipId is for painting.
+        alert("Preview: " + clip.name);
+      }
     } else if (action === 'make_unique') {
-      // 1. Find original pattern data
-      const originalPattern = patterns.find(p => p.id === patternId);
-      if (originalPattern) {
-        // We can't really "createPattern" with data cleanly via context usually without a custom func, 
-        // but `createPattern` creates a NEW empty one typically. 
-        // Logic to CLONE would need a new context function or we assume `createPattern` helps? 
-        // Detailed clone logic requires context support, for now I will simulate by creating new and let user know.
-        // Ideally: const newId = duplicatePattern(patternId);
-
-        // For now, let's just create a new empty pattern and switch the clip to it, 
-        // to demonstrate the "Make Unique" flow mechanics, even if data isn't perfectly cloned yet without context update.
-        createPattern();
-        // Wait, createPattern is async/state based. We can't get ID back easily here without refactoring context.
-        // Alternative: Let's assume we modify `onAddClip` or similar. 
-        // Simpler approach for demo: Just Alert.
-        console.log("Make Unique triggered - creates new pattern");
-
-        // In a real app, I'd ask user to refactor Context to support `clonePattern(id)`. 
-        // I'll leave a placeholder.
-        alert("Make Unique: Creates a new pattern (Simulated). In full version this clones notes.");
+      if (type === 'audio') {
+        alert("Make Unique (Audio): Creates a new unique instance of this sample.");
+      } else {
+        // Pattern logic
+        const originalPattern = patterns.find(p => p.id === patternId);
+        if (originalPattern) {
+          createPattern();
+          console.log("Make Unique triggered - creates new pattern");
+          alert("Make Unique: Creates a new pattern (Simulated). In full version this clones notes.");
+        }
       }
     } else if (action === 'rename') {
-      const newName = prompt("Rename Pattern:", "");
+      const currentName = clip ? (clip.name || 'Clip') : 'Pattern';
+      const newName = prompt("Rename Clip:", currentName);
       if (newName) {
-        // Context needs `updatePattern(id, { name: newName })`
-        // I'll check if context has this. It has `updateActivePattern`.
-        // So we must set active then update.
-        setActivePatternId(patternId);
-        // Small timeout to ensure state update? Or just call directly if it references activePatternId ref?
-        // The `updateActivePattern` uses current `activePatternId` state... might be race condition if not strictly sequential.
-        // Safe bet: just suggest user to use Inspector for now or implement global update function.
-        alert(`Renaming to ${newName} (Requires updatePattern context method)`);
+        if (type === 'audio') {
+          // Update clip name in track
+          setPlaylistTracks(prev => prev.map(t => {
+            if (t.id !== trackId) return t;
+            const newClips = [...t.clips];
+            if (newClips[clipIndex]) {
+              newClips[clipIndex] = { ...newClips[clipIndex], name: newName };
+            }
+            return { ...t, clips: newClips };
+          }));
+        } else {
+          // Pattern logic
+          setActivePatternId(patternId);
+          alert(`Renaming to ${newName} (Requires updatePattern context method)`);
+        }
       }
+    } else if (action === 'automate_volume') {
+      if (type === 'audio' && clip) {
+        // Use audioClipId (Source ID) so automation targets the "Channel" (Player)
+        createAutomation(clip.audioClipId, 'volume');
+      } else {
+        alert("Volume automation is currently only for Audio Clips.");
+      }
+    } else if (action === 'automate_panning') {
+      alert("Create Panning Automation Clip (Placeholder)");
     } else if (action === 'edit') {
-      setActivePatternId(patternId);
-      // Maybe open Piano Roll?
+      if (type === 'audio') {
+        alert("Edit Sample window would open here.");
+      } else {
+        setActivePatternId(patternId);
+      }
+    } else {
+      console.log('Menu action:', action);
     }
 
     setMenu(null);
@@ -759,16 +820,21 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       if (activeClipType === 'audio' && activeAudioClipId) {
         onAddAudioClip(trackId, offset, activeAudioClipId);
         return;
+      } else if (activeClipType === 'automation' && activeAutomationId) {
+        onAddAutomationClip(trackId, offset, activeAutomationId);
+        return;
       }
     }
 
+    // Default: Add Pattern Clip
     setPlaylistTracks(prev => prev.map(t => {
       if (t.id !== trackId) return t;
 
-      const patId = specificPatternId || activePatternId;
+      const patId = specificPatternId || activePatternId || (patterns.length > 0 ? patterns[0].id : null);
+      if (!patId) return t; // No pattern to add
+
       const pattern = patterns.find(p => p.id === patId);
       const length = pattern ? pattern.length : 16;
-
       const lengthBeats = length / 4;
 
       const newClip = {
@@ -796,6 +862,48 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         offset: offset,
         length: audioClip.durationBeats,
         name: audioClip.name
+      };
+      return { ...t, clips: [...t.clips, newClip] };
+    }));
+  };
+
+  const onAddAutomationClip = (trackId, offset, automationId) => {
+    const automation = automations.find(a => a.id === automationId);
+    console.log('Adding Automation:', automationId, automation);
+    if (!automation) return;
+
+    // Find target audio clip to get its duration
+    let targetAudio = audioClips.find(ac => ac.id === automation.targetClipId);
+
+    // Fallback: If not found, maybe targetClipId is an Instance ID (Legacy)
+    if (!targetAudio) {
+      console.warn("Target Audio Source not found directly. Checking for Instance ID...");
+      // Flatten tracks to find clip
+      for (const track of playlistTracks) {
+        const foundClip = track.clips.find(c => c.id === automation.targetClipId);
+        if (foundClip && foundClip.type === 'audio') {
+          targetAudio = audioClips.find(ac => ac.id === foundClip.audioClipId);
+          if (targetAudio) {
+            console.log("Found Source via Instance ID:", targetAudio);
+            break;
+          }
+        }
+      }
+    }
+
+    const defaultLength = targetAudio ? targetAudio.durationBeats : 16;
+    console.log('Target Audio:', targetAudio, 'Duration:', targetAudio?.durationBeats, 'Default:', defaultLength);
+
+    setPlaylistTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+
+      const newClip = {
+        id: Date.now(),
+        type: 'automation',
+        automationId: automationId,
+        offset: offset,
+        length: defaultLength,
+        name: automation.name
       };
       return { ...t, clips: [...t.clips, newClip] };
     }));
@@ -1052,6 +1160,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onToggleSolo={toggleTrackSolo}
           onAddClip={addClip}
           onAddAudioClip={onAddAudioClip}
+          onAddAutomationClip={onAddAutomationClip}
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
           onResizeStart={onResizeStart}
@@ -1061,6 +1170,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           beatsPerBar={beatsPerBar}
           patterns={patterns}
           audioClips={audioClips}
+          automations={automations}
           selected={selected}
           onOpenMenu={setMenu}
           onRenameTrack={renameTrack}
@@ -1070,29 +1180,160 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         />
       ))}
 
-      {/* Context Menu */}
       {menu && (
         <div
           className="clip-menu"
-          style={{ left: menu.x, top: menu.y }}
+          style={{
+            left: menu.x,
+            top: menu.y,
+            minWidth: '280px',
+            maxHeight: '800px',
+            overflowY: 'auto',
+            background: '#1f2937',
+            border: '1px solid #374151',
+            borderRadius: '2px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
+            padding: '2px 0',
+            color: '#d1d5db',
+            fontFamily: 'Segoe UI, sans-serif',
+            fontSize: '12px',
+            zIndex: 1000,
+            position: 'fixed'
+          }}
           ref={menuRef}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="clip-menu-header">Pattern Clip</div>
-          <div className="clip-menu-item" onClick={() => handleMenuAction('edit')}>
-            <Edit size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Edit pattern
-          </div>
-          <div className="clip-menu-separator"></div>
-          <div className="clip-menu-item" onClick={() => handleMenuAction('rename')}>
-            <Palette size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Rename and color...
-          </div>
-          <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')}>
-            <Copy size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Make unique
-          </div>
-          <div className="clip-menu-separator"></div>
-          <div className="clip-menu-item" onClick={() => handleMenuAction('delete')}>
-            <Trash size={12} color="#b3b3b3" className="blender-icon" style={{ marginRight: '6px' }} /> Delete
-          </div>
+          {menu.type === 'audio' ? (
+            <>
+              {/* Audio Clip Header Section */}
+              <div className="clip-menu-header" style={{ color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Audio clip</div>
+
+              <div className="clip-menu-item" onClick={() => handleMenuAction('preview')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Preview
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('toggle_mute')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                <div style={{ width: '16px', display: 'flex', justifyContent: 'center', marginRight: '4px' }}>
+                  {/* Checkmark logic would go here */}
+                </div>
+                Muted
+              </div>
+
+              <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
+
+              <div className="clip-menu-item" onClick={() => handleMenuAction('rename')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Rename and color...
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('random_color')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Random color
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('change_color')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Change color...
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('change_icon')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Change icon...
+              </div>
+
+              <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
+
+              <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Select source channel <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
+              </div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Channel settings
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Make unique
+              </div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Select all similar clips
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('delete')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Delete
+              </div>
+
+              <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Properties...</div>
+
+              {/* Sample Section */}
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Sample</div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Make unique as sample</div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Edit sample</div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Extract stems from sample</div>
+
+              {/* Automation Section */}
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Automation</div>
+              <div className="clip-menu-item"
+                onClick={(e) => { e.stopPropagation(); setActiveSubmenu(activeSubmenu === 'automation' ? null : 'automation'); }}
+                style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Automate <ChevronDown size={10} style={{ transform: activeSubmenu === 'automation' ? 'rotate(0deg)' : 'rotate(-90deg)', color: '#d1d5db', transition: 'transform 0.2s' }} />
+              </div>
+              {activeSubmenu === 'automation' && (
+                <div style={{ background: 'rgba(0,0,0,0.2)', paddingBottom: '4px' }}>
+                  <div className="clip-menu-item" onClick={() => handleMenuAction('automate_volume')}
+                    style={{ padding: '4px 12px 4px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '11px', color: '#9ca3af' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = '#fff' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af' }}>
+                    Volume
+                  </div>
+                  <div className="clip-menu-item" onClick={() => handleMenuAction('automate_panning')}
+                    style={{ padding: '4px 12px 4px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '11px', color: '#9ca3af' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = '#fff' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af' }}>
+                    Panning
+                  </div>
+                </div>
+              )}
+              <div className="clip-menu-item" style={{ color: '#6b7280', padding: '4px 12px', cursor: 'default', display: 'flex', alignItems: 'center' }}>Crossfade with</div>
+
+              {/* Fades Section */}
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Fades</div>
+              <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Reset fades</div>
+              <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Fade in curve <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
+              </div>
+              <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Fade out curve <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
+              </div>
+
+              {/* Region Section */}
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Region</div>
+              <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Select region <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
+              </div>
+              <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Chop <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Pattern Menu - keeping dark or matching? Let's match for consistency but use existing logic if simpler. */}
+              {/* Pattern menu was relying on global CSS .clip-menu probably. Let's start with matching Audio clip style roughly */}
+              <div className="clip-menu-header" style={{ color: '#60a5fa', padding: '4px 12px', fontWeight: 600 }}>Pattern Clip</div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('edit')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                <Edit size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Edit pattern
+              </div>
+              <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('rename')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                <Palette size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Rename and color...
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                <Copy size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Make unique
+              </div>
+              <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('delete')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                <Trash size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Delete
+              </div>
+            </>
+          )}
         </div>
       )}
 

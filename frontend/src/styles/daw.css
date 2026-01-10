@@ -601,7 +601,8 @@
   min-width: 100%;
   width: max-content;
   user-select: none;
-  overflow: visible; /* Allow playhead label to be visible */
+  overflow: visible;
+  /* Allow playhead label to be visible */
   flex-shrink: 0;
 }
 

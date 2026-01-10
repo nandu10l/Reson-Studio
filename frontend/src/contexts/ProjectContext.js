@@ -60,9 +60,11 @@ export const ProjectProvider = ({ children }) => {
     // 4. Audio Clips (imported audio files)
     const [audioClips, setAudioClips] = useState([]);
 
-    // New: Active Clip Selection State for Painting
-    const [activeClipType, setActiveClipType] = useState('pattern'); // 'pattern' | 'audio'
+    // 7. Automation Data
+    const [automations, setAutomations] = useState([]); // Array of automation objects
+    const [activeClipType, setActiveClipType] = useState('pattern'); // 'pattern' | 'audio' | 'automation'
     const [activeAudioClipId, setActiveAudioClipId] = useState(null);
+    const [activeAutomationId, setActiveAutomationId] = useState(null);
 
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
@@ -329,7 +331,7 @@ export const ProjectProvider = ({ children }) => {
             // Always reschedule to ensure audio (which is un-synced) restarts correctly
             // even after a Pause. 
             if (playbackMode === 'SONG') {
-                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, currentTimeSeconds);
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, currentTimeSeconds);
             } else if (playbackMode === 'PAT') {
                 const activePattern = patterns.find(p => p.id === activePatternId);
                 if (activePattern) {
@@ -361,7 +363,7 @@ export const ProjectProvider = ({ children }) => {
 
             Tone.Transport.seconds = seconds;
             if (playbackMode === 'SONG') {
-                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, seconds);
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, seconds);
             } else if (playbackMode === 'PAT') {
                 // In Pattern mode, we just ensure the pattern is scheduled and loop is active
                 // We don't need manual audio clip handling, but we should ensure synth scheduling
@@ -621,6 +623,47 @@ export const ProjectProvider = ({ children }) => {
         }
     }, [bpm, playlistTracks]);
 
+
+    // --- Automation Actions ---
+    const createAutomation = useCallback((targetClipId, type = 'volume') => {
+        let newId = Date.now();
+        setAutomations(prev => {
+            // Check if exists
+            const existing = prev.find(a => a.targetClipId === targetClipId && a.type === type);
+            if (existing) {
+                newId = existing.id;
+                return prev;
+            }
+
+            const newAuto = {
+                id: newId,
+                name: `${type === 'volume' ? 'Vol' : 'Pan'} Auto`,
+                type,
+                targetClipId,
+                points: [
+                    { id: 1, x: 0, y: 0.8 },
+                    { id: 2, x: 1, y: 0.8 }
+                ]
+            };
+            return [...prev, newAuto];
+        });
+
+        // select for painting
+        setPickerTab('AUTO');
+        setActiveClipType('automation');
+        setActiveAutomationId(newId);
+    }, []);
+
+    const updateAutomationPoints = useCallback((automationId, points) => {
+        setAutomations(prev => prev.map(a =>
+            a.id === automationId ? { ...a, points } : a
+        ));
+    }, []);
+
+    const deleteAutomation = useCallback((automationId) => {
+        setAutomations(prev => prev.filter(a => a.id !== automationId));
+    }, []);
+
     // --- Selectors (Derived State) ---
     const activePattern = useMemo(() =>
         patterns.find(p => p.id === activePatternId) || patterns[0]
@@ -634,7 +677,7 @@ export const ProjectProvider = ({ children }) => {
             }
         } else {
             // SONG mode
-            audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips);
+            audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations);
         }
     }, [activePattern, playbackMode, patterns, playlistTracks, audioClips]);
 
@@ -788,13 +831,18 @@ export const ProjectProvider = ({ children }) => {
         activePatternId, setActivePatternId,
         activeClipType, setActiveClipType,
         activeAudioClipId, setActiveAudioClipId,
+        activeAutomationId, setActiveAutomationId,
         activePattern,
         channels, setChannels,
         playlistTracks, setPlaylistTracks,
+        automations, setAutomations,
 
         // Actions
         createPattern,
         createTemplateProject,
+        createAutomation,
+        updateAutomationPoints,
+        deleteAutomation,
         updatePattern,
         toggleStepInActivePattern,
         addNoteToActivePattern,

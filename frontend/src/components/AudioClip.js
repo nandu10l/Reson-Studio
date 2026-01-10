@@ -191,6 +191,36 @@ export default function AudioClip({
           boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.2)'
         }}
       >
+        <button
+          className="clip-menu-btn"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onSelect(clip);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onOpenMenu) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              onOpenMenu({ clip, x: rect.left, y: rect.bottom, type: 'audio' });
+            }
+          }}
+          style={{
+            background: 'rgba(255, 255, 255, 0.1)',
+            border: 'none',
+            color: '#fff',
+            cursor: 'pointer',
+            padding: '2px 4px',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: '2px',
+            transition: 'background 0.15s ease',
+            marginRight: '6px'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+        >
+          <ChevronDown size={10} color="#fff" className="blender-icon" />
+        </button>
         <span
           style={{
             flex: 1,
@@ -206,35 +236,6 @@ export default function AudioClip({
         >
           {clipName}
         </span>
-        <button
-          className="clip-menu-btn"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            onSelect(clip);
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onOpenMenu) {
-              const rect = e.currentTarget.getBoundingClientRect();
-              onOpenMenu({ clip, x: rect.right, y: rect.bottom });
-            }
-          }}
-          style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: 'none',
-            color: '#fff',
-            cursor: 'pointer',
-            padding: '2px 4px',
-            display: 'flex',
-            alignItems: 'center',
-            borderRadius: '2px',
-            transition: 'background 0.15s ease'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
-          onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-        >
-          <ChevronDown size={10} color="#fff" className="blender-icon" />
-        </button>
       </div>
 
       {/* Waveform Canvas */}

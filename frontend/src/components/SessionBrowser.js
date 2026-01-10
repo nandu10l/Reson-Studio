@@ -7,7 +7,9 @@ export default function SessionBrowser() {
   const {
     patterns, setActivePatternId, activePatternId,
     audioClips, pickerTab, setPickerTab,
-    activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId
+    activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId,
+    activeAutomationId, setActiveAutomationId,
+    automations // Added automations
   } = useProject();
 
   const handleDragStart = (e, pattern) => {
@@ -15,6 +17,18 @@ export default function SessionBrowser() {
       type: 'pattern',
       patternId: pattern.id,
       length: pattern.length
+    }));
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleAutoDragStart = (e, automation) => {
+    const targetAudio = audioClips.find(ac => ac.id === automation.targetClipId);
+    const length = targetAudio ? targetAudio.durationBeats : 16;
+
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'automation',
+      automationId: automation.id,
+      length: length
     }));
     e.dataTransfer.effectAllowed = 'copy';
   };
@@ -188,10 +202,43 @@ export default function SessionBrowser() {
         )}
 
         {pickerTab === 'AUTO' && (
-          <div style={{ padding: '32px 20px', textAlign: 'center', color: '#6b7280', fontSize: '12px', lineHeight: '1.6' }}>
-            AUTO mode<br />
-            <span style={{ fontSize: '11px', color: '#4b5563' }}>Shows both patterns and audio clips</span>
-          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {automations.length === 0 ? (
+              <li style={{ padding: '32px 20px', textAlign: 'center', color: '#6b7280', fontSize: '12px', lineHeight: '1.6' }}>
+                No automation created.<br />
+                <span style={{ fontSize: '11px', color: '#4b5563' }}>Right-click Audio Clip &gt; Automate to create.</span>
+              </li>
+            ) : (
+              automations.map(auto => (
+                <li
+                  key={auto.id}
+                  draggable="true"
+                  onDragStart={(e) => handleAutoDragStart(e, auto)}
+                  onClick={() => {
+                    setActiveClipType('automation');
+                    setActiveAutomationId(auto.id);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderBottom: '1px solid #282c31',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '12px',
+                    color: (activeClipType === 'automation' && activeAutomationId === auto.id) ? '#fff' : '#9ca3af',
+                    background: (activeClipType === 'automation' && activeAutomationId === auto.id) ? '#4b5563' : 'transparent',
+                    cursor: 'grab',
+                    transition: 'all 0.15s ease'
+                  }}>
+                  {/* Scalable Vector Graphic for Automation Icon */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={activeClipType === 'automation' && activeAutomationId === auto.id ? "#fff" : "#10b981"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  </svg>
+                  <span>{auto.name}</span>
+                </li>
+              ))
+            )}
+          </ul>
         )}
       </div>
 

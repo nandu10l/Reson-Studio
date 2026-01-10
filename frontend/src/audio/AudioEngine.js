@@ -239,7 +239,7 @@ class AudioEngine {
         console.log('Scheduled pattern:', pattern.id);
     }
 
-    schedulePlaylist(tracks, patterns, audioClips = [], startTime = 0) {
+    schedulePlaylist(tracks, patterns, audioClips = [], automations = [], startTime = 0) {
         Tone.Transport.cancel(0);
         console.log(`Scheduling Playlist (Song Mode) from ${startTime}s...`);
 
@@ -249,6 +249,9 @@ class AudioEngine {
         this.audioPlayers.forEach(player => {
             try {
                 player.stop();
+                // Reset volume for reused players
+                if (player.volume) player.volume.cancelScheduledValues(0);
+                player.volume.value = -6;
             } catch (e) { }
         });
 
@@ -328,6 +331,32 @@ class AudioEngine {
                         }
                     } else if (player) {
                         console.warn(`Player for ${clip.name} not loaded / ready.`);
+                    }
+                    return;
+                }
+
+                if (clip.type === 'automation') {
+                    const automation = automations.find(a => a.id === clip.automationId);
+                    if (automation && automation.points) {
+                        // Target is Audio Source ID
+                        const player = this.audioPlayers.get(automation.targetClipId);
+                        if (player) {
+                            const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
+                            const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
+
+                            const points = [...automation.points].sort((a, b) => a.x - b.x);
+                            points.forEach((p, idx) => {
+                                const pointTime = clipStartTime + (p.x * clipDuration);
+                                const gain = Math.max(0.001, p.y);
+                                const db = Tone.gainToDb(gain);
+
+                                if (idx === 0) {
+                                    player.volume.setValueAtTime(db, pointTime);
+                                } else {
+                                    player.volume.linearRampToValueAtTime(db, pointTime);
+                                }
+                            });
+                        }
                     }
                     return;
                 }
