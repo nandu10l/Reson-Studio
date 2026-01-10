@@ -1,8 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
 import '../styles/daw.css'; // Ensure we have styles
 
-const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, y: 100 }, width = 400, height = 300, children }) => {
+const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, y: 100 }, width = 400, height = 300, children, onHelp }) => {
+    // ... existing hooks ...
+    // ...
+    // ...
+
+    // (We will only show the modified header part in the replace call if possible, or the function signature and import)
+    // Actually replace_file_content works on lines. Let's do imports first then prop change.
+    // Wait, I can do it in one go if I target the top part.
+
+    // Let's split this into two edits for safety or just target the header rendering. 
+    // I need to update the prop definition too.
+
+    // Let's do imports first.
+
     const [position, setPosition] = useState(initialPosition);
     const [size, setSize] = useState({ width, height }); // Track size for restore
     const [isDragging, setIsDragging] = useState(false);
@@ -50,7 +63,7 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
                 const dx = e.clientX - resizeStartInfo.current.x;
                 const dy = e.clientY - resizeStartInfo.current.y;
                 const { edge, startWidth, startHeight, startX, startY } = resizeStartInfo.current;
-                
+
                 let newWidth = startWidth;
                 let newHeight = startHeight;
                 let newX = startX;
@@ -154,6 +167,11 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
             >
                 <div className="window-title">{title}</div>
                 <div className="window-controls">
+                    {onHelp && (
+                        <button onClick={onHelp} className="window-control-btn" title="Tour / Help">
+                            <HelpCircle size={12} />
+                        </button>
+                    )}
                     <button onClick={toggleMaximize} className="window-control-btn" title={isMaximized ? "Restore" : "Maximize"}>
                         {isMaximized ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
                     </button>
@@ -165,7 +183,7 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
             <div className="window-content" style={{ height: 'calc(100% - 24px)', overflow: 'hidden' }}> {/* Adjust for header height */}
                 {children}
             </div>
-            
+
             {/* Resize Handles */}
             {!isMaximized && (
                 <>

@@ -20,10 +20,13 @@ import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
 // Mixer is already imported
 import WelcomeModal from '../components/WelcomeModal';
+import TourOverlay from '../components/TourOverlay';
+import { tourSteps } from '../config/tourSteps';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek, createTemplateProject } = useProject();
   const [showWelcome, setShowWelcome] = useState(true);
+  const [activeTour, setActiveTour] = useState(null); // 'main', 'pianoRoll', 'channelRack', 'mixer'
 
   // Window states
   const [activeWindows, setActiveWindows] = useState({
@@ -39,6 +42,10 @@ function Dashboard() {
       ...prev,
       [name]: !prev[name]
     }));
+  };
+
+  const startTour = (tourId) => {
+    setActiveTour(tourId);
   };
 
   const [playing, setPlaying] = useState(false);
@@ -274,19 +281,38 @@ function Dashboard() {
 
       {/* Floating Windows */}
       {activeWindows.pianoRoll && (
-        <DraggableWindow title="Piano Roll" onClose={() => toggleWindow('pianoRoll')} initialPosition={{ x: 100, y: 100 }} width={800} height={400}>
+        <DraggableWindow
+          title="Piano Roll"
+          onClose={() => toggleWindow('pianoRoll')}
+          initialPosition={{ x: 100, y: 100 }}
+          width={800}
+          height={400}
+          onHelp={() => startTour('pianoRoll')}
+        >
           <PianoRoll />
         </DraggableWindow>
       )}
 
       {activeWindows.channelRack && (
-        <DraggableWindow title="Channel Rack" onClose={() => toggleWindow('channelRack')} initialPosition={{ x: 150, y: 150 }}>
+        <DraggableWindow
+          title="Channel Rack"
+          onClose={() => toggleWindow('channelRack')}
+          initialPosition={{ x: 150, y: 150 }}
+          onHelp={() => startTour('channelRack')}
+        >
           <ChannelRack />
         </DraggableWindow>
       )}
 
       {activeWindows.mixer && (
-        <DraggableWindow title="Mixer" onClose={() => toggleWindow('mixer')} initialPosition={{ x: 100, y: 150 }} width={1120} height={400}>
+        <DraggableWindow
+          title="Mixer"
+          onClose={() => toggleWindow('mixer')}
+          initialPosition={{ x: 100, y: 150 }}
+          width={1120}
+          height={400}
+          onHelp={() => startTour('mixer')}
+        >
           <Mixer />
         </DraggableWindow>
       )}
@@ -306,10 +332,22 @@ function Dashboard() {
             // Here you would handle loading logic
             setShowWelcome(false);
           }}
+          onStartTour={() => {
+            setShowWelcome(false);
+            startTour('main');
+          }}
         />
       )}
+
+      {/* Onboarding Tour */}
+      <TourOverlay
+        isOpen={!!activeTour}
+        onClose={() => setActiveTour(null)}
+        steps={activeTour ? tourSteps[activeTour] : []}
+      />
     </div>
   );
 }
+
 
 export default Dashboard;

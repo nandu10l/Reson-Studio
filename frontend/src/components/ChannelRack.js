@@ -65,38 +65,9 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
 const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }) => {
     const { toggleStepInActivePattern, updateChannelVolume, updateChannelPan, previewChannelSound } = useProject();
     const { useGuideHandlers } = useGuide();
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [editName, setEditName] = useState(name);
-    const nameInputRef = useRef(null);
-
-    useEffect(() => {
-        if (isEditingName && nameInputRef.current) {
-            nameInputRef.current.focus();
-            nameInputRef.current.select();
-        }
-    }, [isEditingName]);
-
     const handleToggleStep = (index) => {
         toggleStepInActivePattern(id, index);
         previewChannelSound(id);
-    };
-
-    const handleNameClick = () => {
-        setIsEditingName(true);
-    };
-
-    const handleNameBlur = () => {
-        setIsEditingName(false);
-        setEditName(name);
-    };
-
-    const handleNameKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            setIsEditingName(false);
-        } else if (e.key === 'Escape') {
-            setEditName(name);
-            setIsEditingName(false);
-        }
     };
 
     const getPanText = (val) => {
@@ -158,28 +129,14 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
                 </VerticalDragKnob>
             </div>
 
-            {/* Channel Name - Inline Editable */}
+            {/* Channel Name - Read Only */}
             <div className="channel-name-container">
-                {isEditingName ? (
-                    <input
-                        ref={nameInputRef}
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onBlur={handleNameBlur}
-                        onKeyDown={handleNameKeyDown}
-                        className="channel-name-input"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                ) : (
-                    <div
-                        className="channel-name"
-                        onClick={handleNameClick}
-                        title="Click to rename"
-                    >
-                        {name}
-                    </div>
-                )}
+                <div
+                    className="channel-name"
+                    title={name}
+                >
+                    {name}
+                </div>
             </div>
 
             {/* Step Sequencer Grid */}

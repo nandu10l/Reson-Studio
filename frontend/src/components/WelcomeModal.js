@@ -1,8 +1,8 @@
 import React from 'react';
 import '../styles/welcome.css';
-import { X, FilePlus, Music, Mic, Zap } from 'lucide-react';
+import { X, FilePlus, Music, Mic, Zap, Compass } from 'lucide-react';
 
-const WelcomeModal = ({ onClose, onNewProject }) => {
+const WelcomeModal = ({ onClose, onNewProject, onStartTour }) => {
 
   const templates = [
     { id: 'empty', name: 'Empty Project', icon: <FilePlus size={18} />, desc: 'Start from scratch' },
@@ -54,6 +54,17 @@ const WelcomeModal = ({ onClose, onNewProject }) => {
               ))}
             </div>
 
+            {/* Learn Section */}
+            <div className="column-header" style={{ marginTop: '20px' }}>Learn</div>
+            <div className="list-container">
+              <div className="list-item" onClick={onStartTour}>
+                <div className="item-icon"><Compass size={18} /></div>
+                <div className="item-text">
+                  <h4>Take a Quick Tour</h4>
+                  <p>Learn the basics of Reson Studio</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
