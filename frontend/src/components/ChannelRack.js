@@ -78,6 +78,7 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
 
     const handleToggleStep = (index) => {
         toggleStepInActivePattern(id, index);
+        previewChannelSound(id);
     };
 
     const handleNameClick = () => {

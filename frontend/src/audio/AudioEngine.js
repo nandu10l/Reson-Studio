@@ -445,10 +445,15 @@ class AudioEngine {
         // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
         if (n.includes('kick')) {
             source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
-        } else if (n.includes('snare') || n.includes('clap')) {
+        } else if (n.includes('snare')) {
             source = new Tone.NoiseSynth({
-                noise: { type: 'white' },
-                envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+                noise: { type: 'pink' }, // Pink noise for more body
+                envelope: { attack: 0.005, decay: 0.25, sustain: 0 }
+            }).connect(channel);
+        } else if (n.includes('clap')) {
+            source = new Tone.NoiseSynth({
+                noise: { type: 'white' }, // White noise for crispness
+                envelope: { attack: 0.001, decay: 0.15, sustain: 0 }
             }).connect(channel);
         } else if (n.includes('hat') || n.includes('cymbal')) {
             source = new Tone.PolySynth(Tone.MetalSynth, {

@@ -664,9 +664,13 @@ export const ProjectProvider = ({ children }) => {
             const drumSteps = createEmptySteps(PATTERN_LENGTH);
             const drumNotes = [];
 
+            // Use a base time + counter to ensure unique IDs even in tight loops
+            let noteIdBase = Date.now();
+            let noteCounter = 0;
+
             const addDrumNote = (channelId, step) => {
                 drumNotes.push({
-                    id: Date.now() + Math.random(),
+                    id: noteIdBase + (noteCounter++) + Math.random(), // Guaranteed unique
                     noteName: 'C5',
                     channelId: channelId,
                     startStep: step,
@@ -674,27 +678,63 @@ export const ProjectProvider = ({ children }) => {
                 });
             };
 
+            // Define Rhythm Presets (Single Bar - 16 steps)
+            const DRUM_PRESETS = [
+                {
+                    name: 'Basic 4-on-Floor',
+                    kick: [0, 4, 8, 12],
+                    clap: [4, 12],
+                    hat: [0, 2, 4, 6, 8, 10, 12, 14]
+                },
+                {
+                    name: 'House',
+                    kick: [0, 4, 8, 12],
+                    clap: [4, 12],
+                    hat: [2, 6, 10, 14] // Off-beat open hats
+                },
+                {
+                    name: 'Trap Pulse',
+                    kick: [0, 8],
+                    clap: [8], // Half-time feel implies snare on 3 (step 8)
+                    hat: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] // 16th notes
+                },
+                {
+                    name: 'Hip Hop Bounce',
+                    kick: [0, 3, 7, 10],
+                    clap: [4, 12],
+                    hat: [0, 2, 4, 6, 8, 10, 12, 14]
+                },
+                {
+                    name: 'Classic Break',
+                    kick: [0, 7, 8],
+                    clap: [4, 12],
+                    hat: [0, 2, 4, 6, 8, 10, 12, 13, 14] // Swing-ish
+                }
+            ];
+
+            // Randomly select a preset
+            const randomPreset = DRUM_PRESETS[Math.floor(Math.random() * DRUM_PRESETS.length)];
+            console.log("Selected Drum Preset:", randomPreset.name);
+
             // Repeat the 1-bar pattern 4 times
             for (let bar = 0; bar < 4; bar++) {
                 const offset = bar * 16;
-                // Kick (1) - 4-to-the-floor
-                [0, 4, 8, 12].forEach(s => {
+                // Apply Preset
+                randomPreset.kick.forEach(s => {
                     const step = offset + s;
-                    drumSteps[1][step] = true;
+                    drumSteps[1][step] = true; // Ch 1: Kick
                     addDrumNote(1, step);
                 });
 
-                // Clap (2) - Backbeat
-                [4, 12].forEach(s => {
+                randomPreset.clap.forEach(s => {
                     const step = offset + s;
-                    drumSteps[2][step] = true;
+                    drumSteps[2][step] = true; // Ch 2: Clap
                     addDrumNote(2, step);
                 });
 
-                // HiHat (3) - 8th notes
-                [0, 2, 4, 6, 8, 10, 12, 14].forEach(s => {
+                randomPreset.hat.forEach(s => {
                     const step = offset + s;
-                    drumSteps[3][step] = true;
+                    drumSteps[3][step] = true; // Ch 3: Hat
                     addDrumNote(3, step);
                 });
             }
