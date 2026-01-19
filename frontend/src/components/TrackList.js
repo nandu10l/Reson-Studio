@@ -9,7 +9,7 @@ import AudioClip from './AudioClip';
 import AutomationClip from './AutomationClip';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, onAddChannel, onAddEffect }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -60,10 +60,52 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
   const isSelected = selected && selected.trackId === track.id;
   const isActive = isSelected;
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const pluginData = e.dataTransfer.getData('plugin');
+    if (pluginData) {
+      try {
+        const plugin = JSON.parse(pluginData);
+        // If instrument, we could potentially "bind" this track to a new channel
+        // For now, let's just create the channel to be helpful
+        const instrumentTypes = ['synthesizer', 'sampler', 'drums'];
+        const effectTypes = ['spatial', 'temporal', 'filter', 'dynamics', 'saturation', 'modulation', 'utility', 'analysis'];
+
+        if (instrumentTypes.includes(plugin.type)) {
+          if (onAddChannel) {
+            // Determine if we want to auto-assign pattern clips to this track?
+            // Just create the channel for now.
+            onAddChannel(plugin);
+            // Feedback?
+            console.log("Added channel from track drop");
+          }
+        } else if (effectTypes.includes(plugin.type)) {
+          if (onAddEffect) {
+            // Heuristic: Map Track ID (1-based) to Channel ID (0-based)
+            // e.g. Track 1 -> Channel 0
+            const targetChannelId = track.id - 1;
+            onAddEffect(targetChannelId, plugin);
+          } else {
+            alert('Please drag effects to a Mixer Channel (bottom panel).');
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   return (
     <div
       className="track-row"
       data-track-id={track.id}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       style={{
         position: 'relative',
         display: 'flex',
@@ -705,7 +747,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, addChannel, addEffect } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
@@ -1177,6 +1219,8 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onDeleteTrack={deleteTrack}
           activeTool={activeTool}
           onSlice={handleSlice}
+          onAddChannel={addChannel}
+          onAddEffect={addEffect}
         />
       ))}
 

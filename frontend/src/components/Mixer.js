@@ -4,7 +4,7 @@ import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import { VolumeX, Volume2, Headphones } from './icons/BlenderIcons';
 
-const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false }) => {
+const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false, effects = [], onAddEffect }) => {
   const [muted, setMuted] = useState(false);
   const [soloed, setSoloed] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -67,8 +67,39 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
   const faderPercent = vol;
   const faderPosition = 100 - faderPercent; // Invert for bottom-up fader
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    if (isMaster) return; // For now
+
+    const pluginData = e.dataTransfer.getData('plugin');
+    if (pluginData) {
+      try {
+        const plugin = JSON.parse(pluginData);
+        // Effects categories
+        const effectTypes = ['spatial', 'temporal', 'filter', 'dynamics', 'saturation', 'modulation', 'utility', 'analysis'];
+
+        if (effectTypes.includes(plugin.type)) {
+          if (onAddEffect) onAddEffect(id, plugin);
+        } else {
+          console.log("Ignored non-effect drop on mixer");
+        }
+      } catch (err) {
+        console.error("Failed to parse dropped plugin", err);
+      }
+    }
+  };
+
   return (
-    <div className={`mixer-channel ${isMaster ? 'master' : ''}`}>
+    <div
+      className={`mixer-channel ${isMaster ? 'master' : ''}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* Track Name - Inline Editable */}
       <div className="channel-header">
         {isEditingName ? (
@@ -89,6 +120,41 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
             title={isMaster ? 'Master' : 'Click to rename'}
           >
             {name}
+          </div>
+        )}
+      </div>
+
+      {/* Level Meter */}
+      <div className="effects-rack" style={{
+        minHeight: '60px',
+        background: 'rgba(0,0,0,0.2)',
+        margin: '4px',
+        padding: '2px',
+        borderRadius: '4px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '2px',
+        overflowY: 'auto',
+        maxHeight: '80px'
+      }}>
+        {effects && effects.length > 0 ? (
+          effects.map(effect => (
+            <div key={effect.id} style={{
+              fontSize: '10px',
+              background: '#333',
+              padding: '2px 4px',
+              borderRadius: '2px',
+              color: '#ddd',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }} title={effect.name}>
+              {effect.name}
+            </div>
+          ))
+        ) : (
+          <div style={{ fontSize: '9px', color: '#555', textAlign: 'center', marginTop: '10px' }}>
+            Drop FX Here
           </div>
         )}
       </div>
@@ -173,7 +239,7 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
 });
 
 function Mixer() {
-  const { channels, updateChannelVolume, updateChannelPan } = useProject();
+  const { channels, updateChannelVolume, updateChannelPan, addEffect } = useProject();
 
   return (
     <div className="mixer">
@@ -199,6 +265,8 @@ function Mixer() {
           pan={ch.pan}
           onVolChange={(v) => updateChannelVolume(ch.id, v)}
           onPanChange={(p) => updateChannelPan(ch.id, p)}
+          effects={ch.effects}
+          onAddEffect={(id, plugin) => addEffect(id, plugin)}
         />
       ))}
 

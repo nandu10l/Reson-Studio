@@ -162,8 +162,43 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
 });
 
 const ChannelRack = () => {
-    const { channels, activePattern, isPlaying, togglePlayback, bpm } = useProject();
+    const { channels, activePattern, isPlaying, togglePlayback, bpm, addChannel } = useProject();
     const rackRef = useRef(null);
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const pluginData = e.dataTransfer.getData('plugin');
+        if (pluginData) {
+            try {
+                const plugin = JSON.parse(pluginData);
+                // Check if plugin is an instrument (simple check for now)
+                // Assuming instrument types don't include 'utility' or 'analysis' or 'effect' type keywords if strict
+                // But plugin.type in PluginToolbar: 'synthesizer', 'sampler', 'drums' etc.
+                // We'll trust the user or check if it's NOT an effect category? 
+                // Let's just allow adding anything as a generator for now, or filter.
+
+                // PluginToolbar categories: instruments, effects, utilities
+                // Better check: is this an instrument?
+                // types: synthesizer, sampler, drums
+                const instrumentTypes = ['synthesizer', 'sampler', 'drums'];
+
+                if (instrumentTypes.includes(plugin.type)) {
+                    addChannel(plugin);
+                } else {
+                    // alert("Only instruments can be added to the Channel Rack.");
+                    // Optionally silently fail or show toast
+                    console.log("Ignored non-instrument drop on rack");
+                }
+            } catch (err) {
+                console.error("Failed to parse dropped plugin", err);
+            }
+        }
+    };
 
     // Track current playback step with direct DOM manipulation
     useEffect(() => {
@@ -253,7 +288,12 @@ const ChannelRack = () => {
     }, [activePattern.length, resizeActivePattern]);
 
     return (
-        <div className="channel-rack-window" ref={rackRef}>
+        <div
+            className="channel-rack-window"
+            ref={rackRef}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+        >
             {/* Header */}
             <div className="rack-header">
                 <div className="header-controls">

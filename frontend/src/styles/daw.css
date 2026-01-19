@@ -403,13 +403,109 @@
 
 .daw-root {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  /* Changed to row for horizontal layout */
   height: 100%;
   flex: 1;
   background-color: var(--bg-app);
   background: linear-gradient(180deg, #2f363c 0%, #252a2e 100%);
   color: var(--text);
   overflow: hidden;
+  position: relative;
+}
+
+/* Plugin Toolbar Toggle Button - Leftmost */
+.plugin-toolbar-toggle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 80px;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #888;
+}
+
+.plugin-toolbar-toggle:hover {
+  background: #333;
+  color: #5a9fd4;
+  width: 28px;
+}
+
+.plugin-toolbar-toggle.active {
+  background: #5a9fd4;
+  color: white;
+  border-color: #5a9fd4;
+}
+
+.plugin-toolbar-toggle svg {
+  transform: rotate(90deg);
+}
+
+/* Plugin Toolbar Drawer */
+.plugin-toolbar-drawer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #1a1a1a;
+  border-right: 1px solid #333;
+  z-index: 99;
+  display: flex;
+  flex-direction: column;
+  animation: slideInFromLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.plugin-toolbar-drawer-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px;
+  border-bottom: 1px solid #333;
+  background: #1e1e1e;
+}
+
+.drag-out-btn {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #888;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.drag-out-btn:hover {
+  background: #5a9fd4;
+  color: white;
+  border-color: #5a9fd4;
+  transform: scale(1.05);
 }
 
 /* ... (rest of the CSS) ... */
@@ -515,9 +611,11 @@
 
 .daw-main {
   display: flex;
+  flex-direction: row;
   gap: 12px;
   padding: 12px;
-  flex: 1
+  flex: 1;
+  min-width: 0;
 }
 
 .session-browser {
@@ -554,6 +652,47 @@
 .session-browser li:hover {
   background: var(--surface-hover)
 }
+
+/* Plugin Toolbar Panel */
+.plugin-toolbar-panel {
+  height: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* Resizer handles */
+.resizer {
+  width: 4px;
+  background: transparent;
+  cursor: ew-resize;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.resizer:hover {
+  background: rgba(90, 159, 212, 0.3);
+}
+
+.resizer svg {
+  color: #666;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.resizer:hover svg {
+  opacity: 1;
+}
+
+.left-resizer,
+.plugin-resizer {
+  margin: 0 2px;
+}
+
 
 .center-canvas {
   flex: 1;
