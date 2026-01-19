@@ -309,7 +309,11 @@ export const ProjectProvider = ({ children }) => {
     // Mark scheduling needed when data changes
     useEffect(() => {
         needsScheduling.current = true;
-    }, [playlistTracks, patterns, audioClips, bpm, activePatternId, playbackMode]);
+
+        // Live Update: If playing, we can try to update automation immediately? 
+        // For now, we rely on Stop/Play or Seek to refresh the schedule to avoid playback interruptions.
+        // (Rescheduling effectively stops and restarts all audio)
+    }, [playlistTracks, patterns, audioClips, bpm, activePatternId, playbackMode, automations]);
 
     // Transport Actions
     const togglePlayback = useCallback(async () => {
@@ -343,7 +347,7 @@ export const ProjectProvider = ({ children }) => {
             audioEngine.start();
             setIsPlaying(true);
         }
-    }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm]);
+    }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm, automations]);
 
     const seek = useCallback((beats) => {
         const safeBeats = Math.max(0, beats);
@@ -384,7 +388,7 @@ export const ProjectProvider = ({ children }) => {
             // THEN set the correct position
             Tone.Transport.seconds = seconds;
         }
-    }, [bpm, isPlaying, playlistTracks, patterns, audioClips, playbackMode, activePatternId]);
+    }, [bpm, isPlaying, playlistTracks, patterns, audioClips, playbackMode, activePatternId, automations]);
 
     const stopPlayback = useCallback(() => {
         audioEngine.stop();

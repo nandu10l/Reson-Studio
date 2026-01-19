@@ -256,6 +256,8 @@ class AudioEngine {
         });
 
         const isAnySolo = tracks.some(t => t.solo);
+        const automationClipsToSchedule = [];
+        const instanceToSourceMap = new Map();
 
         tracks.forEach(track => {
             if (track.muted) return; // Skip muted tracks
@@ -269,6 +271,9 @@ class AudioEngine {
                         console.warn(`Audio clip ${clip.audioClipId} not found`);
                         return;
                     }
+
+                    // Register mapping (Instance ID -> Source ID)
+                    instanceToSourceMap.set(clip.id, clip.audioClipId);
 
                     // Convert offset from beats to time
                     // clipStartTime: when in the playlist it starts
@@ -305,7 +310,6 @@ class AudioEngine {
                     if (player && player.loaded) {
                         try {
                             // Logic for Resume/Seek behavior with unsynced players:
-
                             // 1. Overlap Check: Are we starting IN THE MIDDLE of this clip?
                             if (startTime >= clipStartTime && startTime < clipEndTime) {
                                 // Calculate where in the file we should be
@@ -336,28 +340,8 @@ class AudioEngine {
                 }
 
                 if (clip.type === 'automation') {
-                    const automation = automations.find(a => a.id === clip.automationId);
-                    if (automation && automation.points) {
-                        // Target is Audio Source ID
-                        const player = this.audioPlayers.get(automation.targetClipId);
-                        if (player) {
-                            const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
-                            const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
-
-                            const points = [...automation.points].sort((a, b) => a.x - b.x);
-                            points.forEach((p, idx) => {
-                                const pointTime = clipStartTime + (p.x * clipDuration);
-                                const gain = Math.max(0.001, p.y);
-                                const db = Tone.gainToDb(gain);
-
-                                if (idx === 0) {
-                                    player.volume.setValueAtTime(db, pointTime);
-                                } else {
-                                    player.volume.linearRampToValueAtTime(db, pointTime);
-                                }
-                            });
-                        }
-                    }
+                    // Defer automation scheduling until all audio players are initialized
+                    automationClipsToSchedule.push(clip);
                     return;
                 }
 
@@ -446,6 +430,50 @@ class AudioEngine {
                     }
                 });
             });
+        });
+
+        // Pass 2: Schedule Automation (now that all Players are initialized)
+        automationClipsToSchedule.forEach(clip => {
+            const automation = automations.find(a => a.id === clip.automationId);
+            if (automation && automation.points) {
+                // Resolve Target Player ID
+                // 1. Try direct Source ID match (New System)
+                let targetSourceId = automation.targetClipId;
+
+                // 2. If not found in Players, check if it's an Instance ID and map to Source ID (Legacy)
+                if (!this.audioPlayers.has(targetSourceId) && instanceToSourceMap.has(targetSourceId)) {
+                    targetSourceId = instanceToSourceMap.get(targetSourceId);
+                }
+
+                const player = this.audioPlayers.get(targetSourceId);
+                if (player) {
+                    const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
+                    const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
+
+                    const points = [...automation.points].sort((a, b) => a.x - b.x);
+
+                    // Filter points within clip range if needed? No, points are relative 0-1.
+
+                    points.forEach((p, idx) => {
+                        const pointTime = clipStartTime + (p.x * clipDuration);
+                        const gain = Math.max(0.001, p.y);
+                        const db = Tone.gainToDb(gain);
+
+                        // Only schedule if point is in future relative to Transport start? 
+                        // Tone.js handles scheduling in past (it executes immediately).
+                        // But rampTo in past throws?
+                        // We are scheduling on the PARAMETER, using transport time.
+
+                        if (idx === 0) {
+                            player.volume.setValueAtTime(db, pointTime);
+                        } else {
+                            player.volume.linearRampToValueAtTime(db, pointTime);
+                        }
+                    });
+                } else {
+                    console.warn(`Target Player for Automation ${automation.name} not found. TargetID: ${automation.targetClipId}`);
+                }
+            }
         });
     }
 

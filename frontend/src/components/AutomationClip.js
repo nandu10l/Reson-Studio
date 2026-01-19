@@ -10,6 +10,7 @@ export default function AutomationClip({
     onStartDrag,
     onResizeStart,
     onOpenMenu,
+    onUpdatePoints, // New prop: (automationId, newPoints) => void
     isSelected = false,
     activeTool
 }) {
@@ -18,12 +19,95 @@ export default function AutomationClip({
     const points = automation ? automation.points : [];
 
     const [isHovered, setIsHovered] = React.useState(false);
+    const svgRef = useRef(null);
+
+    // --- Interactive Point Editing ---
+    const handlePointPointerDown = (e, pointId) => {
+        e.stopPropagation(); // Prevent clip drag
+        e.preventDefault();
+
+        // Capture initial state
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const targetPoint = points.find(p => p.id === pointId);
+        if (!targetPoint) return;
+
+        const initialPointX = targetPoint.x;
+        const initialPointY = targetPoint.y;
+
+        const handlePointerMove = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+
+            // Convert px delta to normalized delta (0-1)
+            // Width is clipWidth
+            // Height is 34px (from viewBox/style)
+            const height = 34;
+
+            let newX = initialPointX + (dx / clipWidth);
+            let newY = initialPointY - (dy / height); // Y is inverted in SVG/Audio logic usually? 
+            // In rendering: y={34 - (p.y * 34)}. So p.y=1 is top (34-34=0). p.y=0 is bottom (34-0=34).
+            // Mouse moves down (+dy) -> we want y to decrease.
+            // So: newY = initialY - (dy / height). Correct.
+
+            // Clamp
+            newX = Math.max(0, Math.min(1, newX));
+            newY = Math.max(0, Math.min(1, newY));
+
+            // Update points
+            const updatedPoints = points.map(p =>
+                p.id === pointId ? { ...p, x: newX, y: newY } : p
+            );
+
+            if (onUpdatePoints && automation) {
+                onUpdatePoints(automation.id, updatedPoints);
+            }
+        };
+
+        const handlePointerUp = () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+    };
+
+    const handleSvgDoubleClick = (e) => {
+        e.stopPropagation();
+        if (!automation || !onUpdatePoints) return;
+
+        const rect = svgRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        const height = 34; // Sync with CSS/SVG
+
+        // Normalize
+        const normX = Math.max(0, Math.min(1, clickX / clipWidth));
+        // Y inversion: clickY=0 -> y=1. clickY=height -> y=0.
+        // y = (height - clickY) / height
+        const normY = Math.max(0, Math.min(1, (height - clickY) / height));
+
+        const newPoint = {
+            id: Date.now(),
+            x: normX,
+            y: normY
+        };
+
+        const newPoints = [...points, newPoint];
+        onUpdatePoints(automation.id, newPoints);
+    };
+
+    // Sort points for rendering line
+    const sortedPoints = [...points].sort((a, b) => a.x - b.x);
 
     return (
         <div
             className="track-clip automation-clip"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onDoubleClick={handleSvgDoubleClick}
             style={{
                 left: `${clip.offset * pixelsPerBeat}px`,
                 width: `${clipWidth}px`,
@@ -62,7 +146,7 @@ export default function AutomationClip({
             }}
             onPointerDown={(e) => {
                 e.stopPropagation();
-                if (e.target.closest('.resize-handle') || e.target.closest('.clip-menu-btn')) return;
+                if (e.target.closest('.resize-handle') || e.target.closest('.clip-menu-btn') || e.target.tagName === 'circle') return;
                 onStartDrag(e, clip);
             }}
         >
@@ -82,32 +166,19 @@ export default function AutomationClip({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     letterSpacing: '0.01em',
-                    opacity: isSelected ? 1 : 0.9
+                    opacity: isSelected ? 1 : 0.9,
+                    pointerEvents: 'none' // Click through header unless button
                 }}
             >
                 <button
                     className="clip-menu-btn"
-                    onPointerDown={(e) => {
-                        e.stopPropagation();
-                        onSelect(clip);
-                    }}
+                    style={{ pointerEvents: 'auto', background: 'rgba(255, 255, 255, 0.1)', border: 'none', color: '#fff', cursor: 'pointer', padding: '2px 4px', display: 'flex', alignItems: 'center', borderRadius: '2px', marginRight: '6px' }}
                     onClick={(e) => {
                         e.stopPropagation();
                         if (onOpenMenu) {
                             const rect = e.currentTarget.getBoundingClientRect();
                             onOpenMenu({ clip, x: rect.left, y: rect.bottom, type: 'automation' });
                         }
-                    }}
-                    style={{
-                        background: 'rgba(255, 255, 255, 0.1)',
-                        border: 'none',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        padding: '2px 4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        borderRadius: '2px',
-                        marginRight: '6px'
                     }}
                 >
                     <ChevronDown size={10} color="#fff" />
@@ -118,34 +189,47 @@ export default function AutomationClip({
             {/* Content / SVG */}
             <div className="clip-content" style={{ flex: 1, position: 'relative', background: 'rgba(0,0,0,0.2)' }}>
                 <svg
+                    ref={svgRef}
                     style={{
                         position: 'absolute',
                         top: 0,
                         left: 0,
                         width: '100%',
                         height: '100%',
-                        pointerEvents: 'none'
+                        overflow: 'visible' // Allow points to be on edge
                     }}
                     viewBox={`0 0 ${clipWidth} 34`}
                     preserveAspectRatio="none"
                 >
                     <polyline
-                        points={points
-                            .sort((a, b) => a.x - b.x)
+                        points={sortedPoints
                             .map(p => `${p.x * clipWidth},${34 - (p.y * 34)}`)
                             .join(' ')}
                         fill="none"
                         stroke="#10b981"
                         strokeWidth="2"
                         vectorEffect="non-scaling-stroke"
+                        pointerEvents="none"
                     />
                     {points.map(p => (
                         <circle
                             key={p.id}
                             cx={p.x * clipWidth}
                             cy={34 - (p.y * 34)}
-                            r="3"
+                            r="4"
                             fill="#10b981"
+                            stroke="#fff"
+                            strokeWidth="1"
+                            style={{ cursor: 'pointer' }}
+                            onPointerDown={(e) => handlePointPointerDown(e, p.id)}
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                // Remove point on double click on the point itself
+                                const newPoints = points.filter(pt => pt.id !== p.id);
+                                if (onUpdatePoints && automation) {
+                                    onUpdatePoints(automation.id, newPoints);
+                                }
+                            }}
                         />
                     ))}
                 </svg>

@@ -9,7 +9,7 @@ import AudioClip from './AudioClip';
 import AutomationClip from './AutomationClip';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, onAddChannel, onAddEffect }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -560,6 +560,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
                 onOpenMenu={(menuData) => onOpenMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
+                onUpdatePoints={updateAutomationPoints}
                 isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
                 activeTool={activeTool}
               />
@@ -747,7 +748,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, addChannel, addEffect } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
@@ -1203,6 +1204,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onAddClip={addClip}
           onAddAudioClip={onAddAudioClip}
           onAddAutomationClip={onAddAutomationClip}
+          updateAutomationPoints={updateAutomationPoints}
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
           onResizeStart={onResizeStart}

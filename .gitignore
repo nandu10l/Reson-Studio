@@ -1,3 +1,185 @@
+############################
+# Dependencies
+############################
 node_modules/
+**/node_modules/
+
+############################
+# Python
+############################
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
 dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+venv/
+ENV/
+env/
+.venv
+
+############################
+# Build outputs
+############################
+dist/
+build/
+out/
+release/
+**/dist/
+**/build/
+**/out/
+
+############################
+# Environment variables
+############################
 .env
+.env.*
+!.env.example
+.env.local
+.env.development
+.env.test
+.env.production
+
+############################
+# Logs
+############################
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log.*
+
+############################
+# OS generated files
+############################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*~
+
+############################
+# Editor / IDE settings
+############################
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+############################
+# Electron (VERY IMPORTANT)
+############################
+electron/dist/
+**/electron/dist/
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+############################
+# Cache / temp
+############################
+.cache/
+.parcel-cache/
+.tmp/
+.temp/
+*.tmp
+*.temp
+.awcache/
+.eslintcache
+.stylelintcache
+
+############################
+# Test / coverage
+############################
+coverage/
+.nyc_output/
+test-results/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+############################
+# Package manager locks (optional)
+############################
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+bun.lock
+
+############################
+# Project-specific
+############################
+# Backend generated/processed audio files
+backend/generated_audio/
+backend/processed_audio/
+backend/musicgen_debug.log
+
+# AI models (large files)
+ai_models/*.pth
+ai_models/*.pt
+ai_models/*.h5
+ai_models/*.pkl
+ai_models/*.ckpt
+ai_models/*.safetensors
+ai_models/checkpoints/
+ai_models/models/
+
+# User data
+user_data/
+uploads/
+downloads/
+
+############################
+# Database files
+############################
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+############################
+# Misc
+############################
+.git-credentials
+npm-cache/
+yarn-cache/
+debug/
+*.pid
+*.seed
+*.pid.lock
+pids/
