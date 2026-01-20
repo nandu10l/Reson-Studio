@@ -183,3 +183,17 @@ debug/
 *.seed
 *.pid.lock
 pids/
+
+############################
+# Audio exports
+############################
+exports/
+*.wav
+*.mp3
+!frontend/public/*.wav
+!frontend/public/*.mp3
+
+############################
+# Gemini / AI Agent
+############################
+.gemini/

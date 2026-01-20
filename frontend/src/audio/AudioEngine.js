@@ -9,6 +9,7 @@ class AudioEngine {
         this.previewSynth = null; // Dedicated synth for Piano Roll
         this.masterAnalyser = null; // Analyser for visualization
         this.masterGain = null; // Master gain node
+        this.currentBpm = 120; // Track current BPM
     }
 
     async init() {
@@ -16,8 +17,9 @@ class AudioEngine {
         await Tone.start();
         console.log('Audio Engine Started');
 
-        // Setup Transport
-        Tone.Transport.bpm.value = 120;
+        // Setup Transport - use stored BPM value (not hardcoded)
+        Tone.Transport.bpm.value = this.currentBpm;
+        console.log('BPM set to:', this.currentBpm);
 
         // Setup Master Gain and Analyser for visualization
         // Create a master gain node that all audio routes through
@@ -164,7 +166,13 @@ class AudioEngine {
     }
 
     setBpm(bpm) {
+        this.currentBpm = bpm;
         Tone.Transport.bpm.value = bpm;
+        console.log('BPM updated to:', bpm);
+    }
+
+    getBpm() {
+        return this.currentBpm;
     }
 
     // --- Scheduler ---
@@ -227,10 +235,13 @@ class AudioEngine {
 
                 Tone.Transport.schedule((t) => {
                     // Use dedicated poly synth or channel instrument
+                    // Apply velocity (0-127) as gain multiplier (0-1)
+                    const velocity = note.velocity !== undefined ? note.velocity / 127 : 0.78;
+
                     if (note.channelId !== undefined && note.channelId !== null) {
-                        this.previewChannelNote(note.channelId, note.noteName, duration, t);
+                        this.previewChannelNote(note.channelId, note.noteName, duration, t, velocity);
                     } else if (this.previewSynth && note.noteName) {
-                        this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t);
+                        this.previewSynth.triggerAttackRelease(note.noteName.replace('#', '#'), duration, t, velocity);
                     }
                 }, time);
             }
@@ -634,9 +645,12 @@ class AudioEngine {
         }
     }
 
-    previewChannelNote(channelId, noteName, duration = "8n", time) {
+    previewChannelNote(channelId, noteName, duration = "8n", time, velocity = 0.78) {
         const source = this.sources.get(channelId);
         if (source) {
+            // Velocity affects volume (0-1 range)
+            const vel = Math.max(0, Math.min(1, velocity));
+
             // Harmonized trigger for PolySynth instruments
             if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
                 const lastTime = source._lastTriggerTime || 0;
@@ -649,15 +663,221 @@ class AudioEngine {
                 source._lastTriggerTime = safeTime;
 
                 try {
-                    source.triggerAttackRelease(duration, safeTime);
+                    source.triggerAttackRelease(duration, safeTime, vel);
                 } catch (e) {
                     console.warn("NoiseSynth channel trigger prevented:", e);
                 }
             } else {
-                source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now());
+                source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now(), vel);
             }
         }
+    }
+
+    /**
+     * Render the project to an offline audio context for export
+     * This method is called within Tone.Offline context
+     */
+    async renderOffline(transport, playlistTracks, patterns, channels, audioClips = [], automations = [], duration) {
+        // Create offline versions of channels and sources
+        const offlineChannels = new Map();
+        const offlineSources = new Map();
+        const offlineAudioPlayers = new Map();
+
+        // Create channels for offline context
+        for (const channel of channels) {
+            const offlineChannel = new Tone.Channel({
+                volume: -6,
+                pan: 0,
+            }).toDestination();
+            offlineChannels.set(channel.id, offlineChannel);
+
+            // Create source based on channel name
+            let source;
+            const n = (channel.name || '').toLowerCase();
+
+            if (n.includes('kick')) {
+                source = new Tone.PolySynth(Tone.MembraneSynth).connect(offlineChannel);
+            } else if (n.includes('snare')) {
+                source = new Tone.NoiseSynth({
+                    noise: { type: 'pink' },
+                    envelope: { attack: 0.005, decay: 0.25, sustain: 0 }
+                }).connect(offlineChannel);
+            } else if (n.includes('clap')) {
+                source = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.15, sustain: 0 }
+                }).connect(offlineChannel);
+            } else if (n.includes('hat') || n.includes('cymbal')) {
+                source = new Tone.PolySynth(Tone.MetalSynth, {
+                    frequency: 200, harmonicity: 5.1, modulationIndex: 32,
+                    envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
+                    volume: -10
+                }).connect(offlineChannel);
+            } else if (n.includes('piano')) {
+                // For offline, use a simple synth instead of sampler (samples may not load in time)
+                source = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "triangle" },
+                    envelope: { attack: 0.005, decay: 0.3, sustain: 0.4, release: 1 }
+                }).connect(offlineChannel);
+            } else if (n.includes('bass')) {
+                source = new Tone.PolySynth(Tone.MonoSynth, {
+                    oscillator: { type: "square" },
+                    envelope: { attack: 0.1 }
+                }).connect(offlineChannel);
+            } else {
+                source = new Tone.PolySynth(Tone.Synth).connect(offlineChannel);
+            }
+
+            offlineSources.set(channel.id, source);
+        }
+
+        // Preload audio clips
+        const audioPlayerPromises = [];
+        for (const audioClip of audioClips) {
+            if (audioClip.url || audioClip.audioBuffer) {
+                const loadPromise = new Promise((resolve) => {
+                    let player;
+                    if (audioClip.audioBuffer) {
+                        player = new Tone.Player(audioClip.audioBuffer).toDestination();
+                        player.volume.value = -6;
+                        offlineAudioPlayers.set(audioClip.id, player);
+                        resolve();
+                    } else {
+                        player = new Tone.Player({
+                            url: audioClip.url,
+                            onload: () => {
+                                player.volume.value = -6;
+                                offlineAudioPlayers.set(audioClip.id, player);
+                                resolve();
+                            },
+                            onerror: () => resolve() // Continue even if load fails
+                        }).toDestination();
+                    }
+                });
+                audioPlayerPromises.push(loadPromise);
+            }
+        }
+
+        // Wait for all audio to load
+        await Promise.all(audioPlayerPromises);
+
+        // Helper function for triggering sounds
+        const triggerSound = (id, time) => {
+            const source = offlineSources.get(id);
+            if (source) {
+                if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
+                    try {
+                        source.triggerAttackRelease("8n", time);
+                    } catch (e) { }
+                } else {
+                    source.triggerAttackRelease("C2", "8n", time);
+                }
+            }
+        };
+
+        const triggerNote = (channelId, noteName, dur, time) => {
+            const source = offlineSources.get(channelId);
+            if (source) {
+                if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
+                    try {
+                        source.triggerAttackRelease(dur, time);
+                    } catch (e) { }
+                } else {
+                    source.triggerAttackRelease(noteName || "C2", dur, time);
+                }
+            }
+        };
+
+        // Schedule all tracks
+        playlistTracks.forEach(track => {
+            if (track.muted) return;
+
+            track.clips.forEach(clip => {
+                // Handle audio clips
+                if (clip.type === 'audio') {
+                    const player = offlineAudioPlayers.get(clip.audioClipId);
+                    if (player && player.loaded) {
+                        const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
+                        const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
+                        const startOffset = clip.startOffset ? Tone.Time(`${clip.startOffset}q`).toSeconds() : 0;
+
+                        transport.schedule((time) => {
+                            player.start(time, startOffset, clipDuration);
+                        }, clipStartTime);
+                    }
+                    return;
+                }
+
+                // Handle pattern clips
+                const pattern = patterns.find(p => p.id === clip.patternId);
+                if (!pattern) return;
+
+                const clipPlaylistStartStep = (clip.offset || 0) * 4;
+                const clipInnerStartStep = (clip.startOffset || 0) * 4;
+                const clipLengthSteps = (clip.length || 0) * 4;
+
+                // Schedule Steps (Drums)
+                Object.entries(pattern.data.steps).forEach(([channelId, steps]) => {
+                    const id = parseInt(channelId);
+                    steps.forEach((isActive, index) => {
+                        if (isActive && index >= clipInnerStartStep && index < (clipInnerStartStep + clipLengthSteps)) {
+                            const relativeStepIndex = index - clipInnerStartStep;
+                            const playlistStepIndex = clipPlaylistStartStep + relativeStepIndex;
+
+                            const bar = Math.floor(playlistStepIndex / 16);
+                            const beat = Math.floor((playlistStepIndex % 16) / 4);
+                            const sixteen = playlistStepIndex % 4;
+                            const time = `${bar}:${beat}:${sixteen}`;
+
+                            transport.schedule((t) => {
+                                triggerSound(id, t);
+                            }, time);
+                        }
+                    });
+                });
+
+                // Schedule Notes (Piano Roll)
+                pattern.data.notes.forEach(note => {
+                    if (!note.noteName) return;
+
+                    if (note.startStep >= clipInnerStartStep && note.startStep < (clipInnerStartStep + clipLengthSteps)) {
+                        const relativeStepIndex = note.startStep - clipInnerStartStep;
+                        const playlistStepIndex = clipPlaylistStartStep + relativeStepIndex;
+
+                        const bar = Math.floor(playlistStepIndex / 16);
+                        const beat = Math.floor((playlistStepIndex % 16) / 4);
+                        const sixteen = playlistStepIndex % 4;
+                        const time = `${bar}:${beat}:${sixteen}`;
+
+                        const stepsUntilClipEnd = (clipInnerStartStep + clipLengthSteps) - note.startStep;
+                        const durationStep = Math.min(note.length, stepsUntilClipEnd);
+
+                        const dBar = Math.floor(durationStep / 16);
+                        const dBeat = Math.floor((durationStep % 16) / 4);
+                        const dSixteen = durationStep % 4;
+                        const dur = `${dBar}:${dBeat}:${dSixteen}`;
+
+                        transport.schedule((t) => {
+                            const targetChannelId = note.channelId !== undefined ? note.channelId : undefined;
+                            if (targetChannelId !== undefined) {
+                                triggerNote(targetChannelId, note.noteName, dur, t);
+                            } else {
+                                // Use preview synth equivalent
+                                const defaultSource = offlineSources.values().next().value;
+                                if (defaultSource && defaultSource.triggerAttackRelease) {
+                                    defaultSource.triggerAttackRelease(note.noteName, dur, t);
+                                }
+                            }
+                        }, time);
+                    }
+                });
+            });
+        });
+
+        // Start transport
+        transport.start(0);
     }
 }
 
 export const audioEngine = new AudioEngine();
+

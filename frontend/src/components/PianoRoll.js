@@ -31,6 +31,8 @@ const PianoRoll = () => {
     const [snapStrength, setSnapStrength] = useState(4); // 1, 2, 4, 8, 16
     const [previewNoteOnDraw, setPreviewNoteOnDraw] = useState(true);
     const [velocityEditMode, setVelocityEditMode] = useState(false);
+    const [velocityLaneCollapsed, setVelocityLaneCollapsed] = useState(false);
+    const [velocityDragState, setVelocityDragState] = useState(null);
     const [isEditingName, setIsEditingName] = useState(false);
     const [editName, setEditName] = useState(activePattern?.name || '');
     const nameInputRef = useRef(null);
@@ -362,7 +364,8 @@ const PianoRoll = () => {
                 noteName,
                 channelId: selectedChannelId,
                 startStep: finalStartStep,
-                length: noteLength
+                length: noteLength,
+                velocity: 100  // Default velocity (0-127 range)
             };
             addNoteToActivePattern(newNote);
 
@@ -641,6 +644,29 @@ const PianoRoll = () => {
             window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [dragState, activePattern]); // Dependencies needed for closures
+
+    // Velocity drag handlers
+    useEffect(() => {
+        if (!velocityDragState) return;
+
+        const handleVelocityMove = (e) => {
+            const dy = velocityDragState.startY - e.clientY; // Inverted: drag up = higher velocity
+            const deltaVelocity = Math.round(dy * 0.5); // Sensitivity
+            const newVelocity = Math.max(1, Math.min(127, velocityDragState.initialVelocity + deltaVelocity));
+            updateNote(velocityDragState.noteId, { velocity: newVelocity });
+        };
+
+        const handleVelocityUp = () => {
+            setVelocityDragState(null);
+        };
+
+        window.addEventListener('mousemove', handleVelocityMove);
+        window.addEventListener('mouseup', handleVelocityUp);
+        return () => {
+            window.removeEventListener('mousemove', handleVelocityMove);
+            window.removeEventListener('mouseup', handleVelocityUp);
+        };
+    }, [velocityDragState, updateNote]);
 
     const handleDelete = useCallback((e) => {
         if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -1104,6 +1130,150 @@ const PianoRoll = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Velocity Lane */}
+            {!velocityLaneCollapsed && (
+                <div className="velocity-lane" style={{
+                    height: '120px',
+                    background: '#1a1a1a',
+                    borderTop: '1px solid #333',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}>
+                    {/* Lane Header */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        background: '#252525',
+                        borderBottom: '1px solid #333',
+                        fontSize: '11px',
+                        color: '#888'
+                    }}>
+                        <button
+                            onClick={() => setVelocityLaneCollapsed(true)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#666',
+                                cursor: 'pointer',
+                                padding: '2px 6px',
+                                marginRight: '8px'
+                            }}
+                        >
+                            ▼
+                        </button>
+                        <span style={{ color: '#4ade80' }}>Control ▸</span>
+                        <span style={{ marginLeft: '8px', color: '#aaa' }}>Velocity</span>
+                    </div>
+                    {/* Velocity Bars Area - FL Studio Style */}
+                    <div style={{
+                        flex: 1,
+                        position: 'relative',
+                        overflowX: 'hidden',
+                        overflowY: 'hidden',
+                        marginLeft: `${KEYS_WIDTH}px`
+                    }}>
+                        {/* Grid background */}
+                        <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: 'repeating-linear-gradient(90deg, transparent 0, transparent 63px, #333 63px, #333 64px)',
+                            opacity: 0.3
+                        }} />
+                        {/* FL Studio-style Step Velocity */}
+                        <svg style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
+                            height: '100%',
+                            pointerEvents: 'none'
+                        }}>
+                            {(() => {
+                                const filteredNotes = activePattern.data.notes
+                                    .filter(note => {
+                                        const noteChannelId = note.channelId !== undefined ? note.channelId : 0;
+                                        return noteChannelId === selectedChannelId;
+                                    })
+                                    .sort((a, b) => a.startStep - b.startStep);
+
+                                const laneHeight = 80;
+                                const baseY = 85;
+
+                                return filteredNotes.map((note, index) => {
+                                    const velocity = note.velocity !== undefined ? note.velocity : 100;
+                                    const barHeight = (velocity / 127) * laneHeight;
+                                    const x = note.startStep * pixelsPerStep + (note.length * pixelsPerStep / 2);
+                                    const topY = baseY - barHeight;
+                                    const isSelected = selection.includes(note.id);
+                                    const color = isSelected ? '#60a5fa' : '#4ade80';
+
+                                    // Get next note for horizontal connector
+                                    const nextNote = filteredNotes[index + 1];
+                                    const nextX = nextNote
+                                        ? nextNote.startStep * pixelsPerStep + (nextNote.length * pixelsPerStep / 2)
+                                        : null;
+
+                                    return (
+                                        <g key={note.id}>
+                                            {/* Vertical line from baseline */}
+                                            <line
+                                                x1={x} y1={baseY} x2={x} y2={topY}
+                                                stroke={color} strokeWidth="2"
+                                            />
+                                            {/* Horizontal line to next note (step pattern) */}
+                                            {nextX !== null && (
+                                                <line
+                                                    x1={x} y1={topY} x2={nextX} y2={topY}
+                                                    stroke={color} strokeWidth="2"
+                                                />
+                                            )}
+                                            {/* Drag handle circle */}
+                                            <circle
+                                                cx={x} cy={topY} r="4"
+                                                fill={color} stroke="#222" strokeWidth="1"
+                                                style={{ pointerEvents: 'auto', cursor: 'ns-resize' }}
+                                                onMouseDown={(e) => {
+                                                    e.stopPropagation();
+                                                    setVelocityDragState({
+                                                        noteId: note.id,
+                                                        startY: e.clientY,
+                                                        initialVelocity: velocity
+                                                    });
+                                                }}
+                                            />
+                                        </g>
+                                    );
+                                });
+                            })()}
+                        </svg>
+                    </div>
+                </div>
+            )}
+
+            {/* Collapsed Velocity Lane Toggle */}
+            {velocityLaneCollapsed && (
+                <div
+                    onClick={() => setVelocityLaneCollapsed(false)}
+                    style={{
+                        height: '24px',
+                        background: '#252525',
+                        borderTop: '1px solid #333',
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '0 8px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        color: '#666'
+                    }}
+                >
+                    ▶ Control
+                </div>
+            )}
         </div>
     );
 };

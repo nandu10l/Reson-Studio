@@ -177,7 +177,8 @@ const ChannelRack = () => {
         }
 
         let currentStepLocal = 0;
-        const stepInterval = (60 / (bpm || 120)) * 250; // 16th note interval
+        // 16th note interval: (milliseconds per beat) / 4 = (60000 / bpm) / 4
+        const stepInterval = (60000 / (bpm || 120)) / 4;
         const interval = setInterval(() => {
             if (rackRef.current) {
                 // Remove previous playing class

@@ -1,0 +1,12 @@
+# Reson Studio Backend Dependencies
+
+# Web Framework
+fastapi>=0.100.0
+uvicorn>=0.22.0
+
+# Audio Processing
+pydub>=0.25.1
+
+# Note: pydub requires ffmpeg installed on the system
+# Install on Windows: choco install ffmpeg
+# Or download from: https://ffmpeg.org/download.html

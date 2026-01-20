@@ -49,5 +49,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
     saveFile: (content) => ipcRenderer.invoke('save-file', content),
     saveFileSilent: (path, content) => ipcRenderer.invoke('save-file-silent', path, content),
-    readFile: (path) => ipcRenderer.invoke('read-file', path)
+    readFile: (path) => ipcRenderer.invoke('read-file', path),
+    // Audio export APIs
+    saveAudioFile: (format) => ipcRenderer.invoke('save-audio-file', format),
+    saveAudioBuffer: (path, buffer) => ipcRenderer.invoke('save-audio-buffer', path, buffer)
 });

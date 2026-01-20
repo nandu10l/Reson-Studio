@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import GuideBox from './GuideBox';
 import NewProjectModal from './NewProjectModal';
 import { useProject } from '../contexts/ProjectContext';
+import { audioEngine } from '../audio/AudioEngine';
+import { exportWav, exportMp3, saveAudioBlob, getLastExportFormat, setLastExportFormat } from '../services/ExportService';
 import '../styles/blender-icons.css';
 import './Navbar.css';
 
@@ -15,6 +17,8 @@ function Navbar({
     patterns,
     channels,
     playlistTracks,
+    audioClips,
+    automations,
     bpm,
     currentProjectPath,
     setCurrentProjectPath,
@@ -23,6 +27,7 @@ function Navbar({
   } = useProject();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
+  const [activeSubmenu, setActiveSubmenu] = useState(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -142,6 +147,93 @@ function Navbar({
     if (action === 'exit' && window.electronAPI) {
       window.electronAPI.close();
     }
+
+    // Export actions
+    if (action === 'export_wave') {
+      handleExport('wav');
+    }
+    if (action === 'export_mp3') {
+      handleExport('mp3');
+    }
+    if (action === 'export_last') {
+      const lastFormat = getLastExportFormat();
+      if (lastFormat) {
+        handleExport(lastFormat);
+      } else {
+        alert('No previous export format. Please export as WAV or MP3 first.');
+      }
+    }
+    if (action === 'export_video') {
+      alert('Video export is coming soon!');
+    }
+    if (action === 'export_midi') {
+      alert('MIDI export is coming soon!');
+    }
+  };
+
+  const handleExport = async (format) => {
+    try {
+      // Show exporting message
+      const exportingMsg = document.createElement('div');
+      exportingMsg.id = 'exporting-overlay';
+      exportingMsg.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 99999;">
+          <div style="background: #2a2a2a; padding: 30px; border-radius: 8px; text-align: center;">
+            <div style="color: #60a5fa; font-size: 18px; margin-bottom: 10px;">Exporting ${format.toUpperCase()}...</div>
+            <div style="color: #999;">Please wait while rendering audio</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(exportingMsg);
+
+      let blob;
+      let actualFormat = format;
+      let wasFallback = false;
+
+      if (format === 'wav') {
+        blob = await exportWav(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || []);
+      } else if (format === 'mp3') {
+        const result = await exportMp3(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || []);
+        blob = result.blob;
+        actualFormat = result.format;
+        wasFallback = result.fallback;
+      }
+
+      // Remove overlay
+      document.getElementById('exporting-overlay')?.remove();
+
+      if (blob) {
+        setLastExportFormat(actualFormat);
+        const result = await saveAudioBlob(blob, actualFormat);
+        if (result.success) {
+          if (wasFallback) {
+            alert(`MP3 encoding not available in this environment. Exported as WAV instead.`);
+          } else {
+            alert(`Export successful!`);
+          }
+        } else if (!result.canceled) {
+          alert('Export failed: ' + (result.error || 'Unknown error'));
+        }
+      }
+    } catch (error) {
+      document.getElementById('exporting-overlay')?.remove();
+      console.error('Export error:', error);
+      alert('Export failed: ' + error.message);
+    }
+  };
+
+  const SUBMENUS = {
+    export: [
+      { type: "header", label: "Audio" },
+      { label: "Wave file...", action: "export_wave", shortcut: "Ctrl+R" },
+      { label: "MP3 file...", action: "export_mp3", shortcut: "Shift+Ctrl+R" },
+      { label: "MIDI file...", action: "export_midi", shortcut: "Shift+Ctrl+M" },
+      { type: "divider" },
+      { label: "Last exported format(s)...", action: "export_last" },
+      { type: "divider" },
+      { type: "header", label: "Video" },
+      { label: "Video file...", action: "export_video" },
+    ],
   };
 
   const MENU_ITEMS = {
@@ -157,7 +249,7 @@ function Navbar({
       { label: "Save as template...", action: "save_template" },
       { type: "divider" },
       { label: "Import", action: "import", right: ">" },
-      { label: "Export", action: "export", right: ">" },
+      { label: "Export", action: "export", right: ">", hasSubmenu: true },
       { type: "divider" },
       { label: "Revert to last backup", action: "revert_backup" },
       { type: "divider" },
@@ -222,18 +314,45 @@ function Navbar({
                     return <div key={index} className="dropdown-divider" />;
                   }
                   if (item.type === "header") {
-                    return <div key={index} className="dropdown-item" style={{ color: '#888', cursor: 'default', pointerEvents: 'none' }}>{item.label}</div>;
+                    return <div key={index} className="dropdown-item dropdown-header">{item.label}</div>;
                   }
                   return (
                     <div
                       key={index}
-                      className="dropdown-item"
-                      onClick={() => handleOptionClick(item.action)}
+                      className={`dropdown-item ${item.hasSubmenu ? 'has-submenu' : ''}`}
+                      onClick={() => !item.hasSubmenu && handleOptionClick(item.action)}
+                      onMouseEnter={() => item.hasSubmenu && setActiveSubmenu(item.action)}
+                      onMouseLeave={() => item.hasSubmenu && setActiveSubmenu(null)}
                       title={item.label}
                     >
                       <span>{item.label}</span>
                       {item.shortcut && <span className="dropdown-shortcut">{item.shortcut}</span>}
                       {item.right && <span className="dropdown-right">{item.right}</span>}
+                      {/* Submenu */}
+                      {item.hasSubmenu && activeSubmenu === item.action && SUBMENUS[item.action] && (
+                        <div className="submenu" onMouseEnter={() => setActiveSubmenu(item.action)}>
+                          {SUBMENUS[item.action].map((subItem, subIndex) => {
+                            if (subItem.type === "divider") {
+                              return <div key={subIndex} className="dropdown-divider" />;
+                            }
+                            if (subItem.type === "header") {
+                              return <div key={subIndex} className="dropdown-item dropdown-header">{subItem.label}</div>;
+                            }
+                            return (
+                              <div
+                                key={subIndex}
+                                className="dropdown-item"
+                                onClick={() => handleOptionClick(subItem.action)}
+                                title={subItem.label}
+                              >
+                                <span>{subItem.label}</span>
+                                {subItem.shortcut && <span className="dropdown-shortcut">{subItem.shortcut}</span>}
+                                {subItem.right && <span className="dropdown-right">{subItem.right}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

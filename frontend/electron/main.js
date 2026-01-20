@@ -161,6 +161,35 @@ ipcMain.handle('read-file', async (event, filePath) => {
     }
 });
 
+// Audio export file dialog
+ipcMain.handle('save-audio-file', async (event, format) => {
+    const filters = format === 'mp3'
+        ? [{ name: 'MP3 Audio', extensions: ['mp3'] }]
+        : [{ name: 'WAV Audio', extensions: ['wav'] }];
+
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+        title: `Export as ${format.toUpperCase()}`,
+        defaultPath: `export.${format}`,
+        filters: filters
+    });
+
+    if (canceled || !filePath) {
+        return { canceled: true };
+    }
+    return { success: true, filePath };
+});
+
+// Save binary audio buffer to file
+ipcMain.handle('save-audio-buffer', async (event, filePath, bufferArray) => {
+    try {
+        const buffer = Buffer.from(bufferArray);
+        fs.writeFileSync(filePath, buffer);
+        return { success: true, filePath };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(() => {

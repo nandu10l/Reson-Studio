@@ -237,9 +237,13 @@ export const ProjectProvider = ({ children }) => {
                 audioEngine.updateChannelVolume(ch.id, ch.vol);
                 audioEngine.updateChannelPan(ch.id, ch.pan);
             });
+
+            // Sync BPM to audio engine on initialization
+            audioEngine.setBpm(bpm);
+            console.log('Initial BPM synced:', bpm);
         };
         initAudio();
-    }, []);
+    }, [bpm]);
 
     // --- Actions ---
 
@@ -318,6 +322,10 @@ export const ProjectProvider = ({ children }) => {
     // Transport Actions
     const togglePlayback = useCallback(async () => {
         await audioEngine.init();
+
+        // CRITICAL: Sync BPM after init to ensure correct tempo
+        audioEngine.setBpm(bpm);
+
         if (isPlaying) {
             // Pause playback
             audioEngine.pause();
