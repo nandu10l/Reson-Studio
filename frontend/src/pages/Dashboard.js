@@ -8,6 +8,7 @@ import Playhead from '../components/Playhead';
 import Mixer from '../components/Mixer';
 // import Inspector from '../components/Inspector';
 import PluginPanel from '../components/PluginPanel';
+import PluginToolbar from '../components/PluginToolbar';
 import SessionBrowser from '../components/SessionBrowser';
 import TitleBar from '../components/TitleBar';
 import { GripVertical } from 'lucide-react';
@@ -56,6 +57,11 @@ function Dashboard() {
 
   // State for panel widths for sideways resizing
   const [browserWidth, setBrowserWidth] = useState(240);
+  const [pluginToolbarWidth, setPluginToolbarWidth] = useState(220);
+
+  // Plugin toolbar state
+  const [isPluginToolbarCollapsed, setIsPluginToolbarCollapsed] = useState(true); // Hidden by default
+  const [isPluginToolbarFloating, setIsPluginToolbarFloating] = useState(false);
 
   // Timeline scroll state
   const [timelineScrollLeft, setTimelineScrollLeft] = useState(0);
@@ -142,10 +148,13 @@ function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
 
+    const initialWidth = targetPanel === 'browser' ? browserWidth :
+      targetPanel === 'pluginToolbar' ? pluginToolbarWidth : 0;
+
     resizeState.current = {
       resizing: true,
       startX: e.clientX,
-      startWidth: browserWidth,
+      startWidth: initialWidth,
       target: targetPanel,
     };
 
@@ -167,6 +176,9 @@ function Dashboard() {
     if (rs.target === 'browser') {
       newWidth = Math.max(minWidth, rs.startWidth + deltaX);
       setBrowserWidth(newWidth);
+    } else if (rs.target === 'pluginToolbar') {
+      newWidth = Math.max(minWidth, rs.startWidth + deltaX);
+      setPluginToolbarWidth(newWidth);
     }
   };
 
@@ -206,6 +218,36 @@ function Dashboard() {
         return (
           // Apply CSS variables to control grid columns in daw.css
           <div className="daw-root">
+            {/* Plugin Toolbar Toggle Button - Leftmost */}
+            {!isPluginToolbarFloating && (
+              <button
+                className={`plugin-toolbar-toggle ${!isPluginToolbarCollapsed ? 'active' : ''}`}
+                onClick={() => setIsPluginToolbarCollapsed(!isPluginToolbarCollapsed)}
+                title={isPluginToolbarCollapsed ? 'Show Plugins' : 'Hide Plugins'}
+              >
+                <GripVertical size={16} />
+              </button>
+            )}
+
+            {/* Plugin Toolbar Drawer - Collapsed by default */}
+            {!isPluginToolbarFloating && !isPluginToolbarCollapsed && (
+              <div className="plugin-toolbar-drawer" style={{ width: `${pluginToolbarWidth}px` }}>
+                <div className="plugin-toolbar-drawer-header">
+                  <button
+                    className="drag-out-btn"
+                    onClick={() => {
+                      setIsPluginToolbarFloating(true);
+                      setIsPluginToolbarCollapsed(true);
+                    }}
+                    title="Pop out as floating window"
+                  >
+                    ↗
+                  </button>
+                </div>
+                <PluginToolbar />
+              </div>
+            )}
+
             <div
               className="daw-main"
               style={{
@@ -218,7 +260,7 @@ function Dashboard() {
                 <ProjectSidebar projects={projects} />
               </div>
 
-              {/* 2. Left Resizer */}
+              {/* 2. Session Browser Resizer */}
               <div
                 className="resizer left-resizer"
                 onPointerDown={(e) => startResize(e, 'browser')}
@@ -314,6 +356,19 @@ function Dashboard() {
           onHelp={() => startTour('mixer')}
         >
           <Mixer />
+        </DraggableWindow>
+      )}
+
+      {/* Floating Plugin Toolbar */}
+      {isPluginToolbarFloating && (
+        <DraggableWindow
+          title="Plugins"
+          onClose={() => setIsPluginToolbarFloating(false)}
+          initialPosition={{ x: 50, y: 100 }}
+          width={280}
+          height={600}
+        >
+          <PluginToolbar />
         </DraggableWindow>
       )}
 

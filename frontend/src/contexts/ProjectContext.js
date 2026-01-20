@@ -14,12 +14,12 @@ export const useProject = () => {
 };
 
 const INITIAL_CHANNELS = [
-    { id: 0, name: 'Grand Piano', vol: 78, pan: 50 },
-    { id: 1, name: '808 Kick', vol: 78, pan: 50 },
-    { id: 2, name: '808 Clap', vol: 78, pan: 50 },
-    { id: 3, name: '808 HiHat', vol: 78, pan: 50 },
-    { id: 4, name: '808 Snare', vol: 78, pan: 50 },
-    { id: 5, name: 'FLEX Bass', vol: 78, pan: 50 },
+    { id: 0, name: 'Grand Piano', vol: 78, pan: 50, effects: [] },
+    { id: 1, name: '808 Kick', vol: 78, pan: 50, effects: [] },
+    { id: 2, name: '808 Clap', vol: 78, pan: 50, effects: [] },
+    { id: 3, name: '808 HiHat', vol: 78, pan: 50, effects: [] },
+    { id: 4, name: '808 Snare', vol: 78, pan: 50, effects: [] },
+    { id: 5, name: 'FLEX Bass', vol: 78, pan: 50, effects: [] },
 ];
 
 const createEmptySteps = (length = 16) => {
@@ -543,6 +543,56 @@ export const ProjectProvider = ({ children }) => {
         ));
     }, []);
 
+    const addChannel = useCallback((plugin) => {
+        setChannels(prev => {
+            const nextId = Math.max(...prev.map(c => c.id), -1) + 1;
+            const newChannel = {
+                id: nextId,
+                name: plugin.name,
+                vol: 80,
+                pan: 50,
+                effects: [], // Initialize with empty effects
+                pluginId: plugin.id // Store reference to plugin type
+            };
+
+            // Also need to initialize steps for this new channel in all patterns
+            setPatterns(prevPatterns => prevPatterns.map(pat => {
+                const newSteps = { ...pat.data.steps };
+                newSteps[nextId] = Array(pat.length).fill(false);
+                return {
+                    ...pat,
+                    data: {
+                        ...pat.data,
+                        steps: newSteps
+                    }
+                };
+            }));
+
+            // Register with audio engine
+            audioEngine.createChannel(nextId, newChannel.name);
+
+            return [...prev, newChannel];
+        });
+    }, []);
+
+    const addEffect = useCallback((channelId, plugin) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId) {
+                const newEffect = {
+                    id: Date.now(),
+                    name: plugin.name,
+                    pluginId: plugin.id,
+                    type: plugin.type,
+                    active: true
+                };
+                return { ...ch, effects: [...(ch.effects || []), newEffect] };
+            }
+            return ch;
+        }));
+        // Audio Engine TODO: audioEngine.addEffect(channelId, plugin);
+        console.log(`Added effect ${plugin.name} to channel ${channelId}`);
+    }, []);
+
     // Preview Note Action
     const previewChannelSound = useCallback(async (channelId) => {
         await audioEngine.init(); // Ensure context is started
@@ -871,6 +921,8 @@ export const ProjectProvider = ({ children }) => {
         // New Actions
         updateNote,
         deleteNotes,
+        addChannel,
+        addEffect,
         isPlaying,
         bpm,
         togglePlayback,
