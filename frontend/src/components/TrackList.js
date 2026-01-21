@@ -748,7 +748,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
