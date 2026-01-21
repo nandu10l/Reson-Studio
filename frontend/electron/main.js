@@ -15,6 +15,7 @@ function createWindow() {
         frame: false, // Completely remove default titlebar
         titleBarStyle: 'hidden', // Additional setting for macOS
         autoHideMenuBar: true, // Hide the menu bar
+        show: false, // Don't show until ready
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -24,6 +25,12 @@ function createWindow() {
 
     // Remove the application menu completely
     Menu.setApplicationMenu(null);
+
+    // Maximize and show window when ready
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.maximize();
+        mainWindow.show();
+    });
 
     // Load the index.html from a url in development
     // or the local file in production.

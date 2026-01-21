@@ -99,12 +99,32 @@ export default function AudioClip({
 
   const clipWidth = clip.length * pixelsPerBeat;
   const clipName = clip.name || clip.fileName || 'Audio Clip';
+  const clipColor = clip.color || '#3b82f6'; // Default blue, or custom color from clip
 
   const [isHovered, setIsHovered] = React.useState(false);
 
   const handleDelete = (e) => {
     e.stopPropagation();
     onRemove(clip);
+  };
+
+  // Convert hex to rgba for gradient (with fallback for non-hex colors)
+  const hexToRgba = (hex, alpha) => {
+    // If not a valid hex color, return rgba with the color as-is for CSS named colors
+    if (!hex || !hex.startsWith('#') || hex.length < 7) {
+      return `rgba(59, 130, 246, ${alpha})`; // Fallback to blue
+    }
+    try {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        return `rgba(59, 130, 246, ${alpha})`; // Fallback to blue
+      }
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    } catch {
+      return `rgba(59, 130, 246, ${alpha})`; // Fallback to blue
+    }
   };
 
   return (
@@ -117,9 +137,9 @@ export default function AudioClip({
         left: `${clip.offset * pixelsPerBeat}px`,
         width: `${clipWidth}px`,
         background: isSelected
-          ? 'linear-gradient(180deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.9) 100%)'
-          : 'linear-gradient(180deg, rgba(30, 64, 175, 0.5) 0%, rgba(30, 64, 175, 0.35) 100%)',
-        borderColor: isSelected ? '#3b82f6' : '#60a5fa',
+          ? `linear-gradient(180deg, ${hexToRgba(clipColor, 0.95)} 0%, ${hexToRgba(clipColor, 0.85)} 100%)`
+          : `linear-gradient(180deg, ${hexToRgba(clipColor, 0.5)} 0%, ${hexToRgba(clipColor, 0.35)} 100%)`,
+        borderColor: isSelected ? clipColor : hexToRgba(clipColor, 0.8),
         borderWidth: isSelected ? '2px' : '1px',
         borderStyle: 'solid',
         borderRadius: '8px',
@@ -132,7 +152,7 @@ export default function AudioClip({
         height: '52px',
         zIndex: isSelected ? 10 : 1,
         boxShadow: isSelected
-          ? 'inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 0 16px rgba(59, 130, 246, 0.7), 0 4px 8px rgba(0, 0, 0, 0.4)'
+          ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 0 16px ${hexToRgba(clipColor, 0.7)}, 0 4px 8px rgba(0, 0, 0, 0.4)`
           : isHovered
             ? 'inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 2px 4px rgba(0, 0, 0, 0.3)'
             : 'inset 0 1px 2px rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.2)',
@@ -174,8 +194,8 @@ export default function AudioClip({
         className="clip-header"
         style={{
           background: isSelected
-            ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, #2563eb 100%)'
-            : 'linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, #1e40af 100%)',
+            ? `linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, ${clipColor} 100%)`
+            : `linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, ${hexToRgba(clipColor, 0.8)} 100%)`,
           padding: '2px 8px',
           fontSize: '10px',
           color: '#fff',
