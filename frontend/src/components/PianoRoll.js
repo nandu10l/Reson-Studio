@@ -215,32 +215,42 @@ const PianoRoll = () => {
 
         if (!scrollContainerRef.current) return;
 
-        const scrollRect = scrollContainerRef.current.getBoundingClientRect();
-        // Calculate coordinates relative to the scroll container viewport
-        const viewportX = e.clientX - scrollRect.left;
-        const viewportY = e.clientY - scrollRect.top;
+        const scrollContainer = scrollContainerRef.current;
+        const scrollRect = scrollContainer.getBoundingClientRect();
+
+        // Dynamic measure of keys width to ensure accuracy
+        const currentKeysWidth = pianoKeysRef.current ? pianoKeysRef.current.offsetWidth : KEYS_WIDTH;
+
+        // Calculate coordinates relative to the scroll container viewport, accounting for border
+        const borderLeft = (parseFloat(window.getComputedStyle(scrollContainer).borderLeftWidth) || 0);
+        const borderTop = (parseFloat(window.getComputedStyle(scrollContainer).borderTopWidth) || 0);
+
+        const viewportX = e.clientX - scrollRect.left - borderLeft;
+        const viewportY = e.clientY - scrollRect.top - borderTop;
 
         // Add scroll offsets to get content coordinates
-        const globalX = viewportX + scrollContainerRef.current.scrollLeft;
-        const globalY = viewportY + scrollContainerRef.current.scrollTop;
+        const globalX = viewportX + scrollContainer.scrollLeft;
+        // globalY is relative to the start of the content area vertically
+        const globalY = viewportY + scrollContainer.scrollTop;
 
         // Check if clicked ON keys (sticky)
-        if (viewportX < KEYS_WIDTH) {
+        // With sticky keys, they visually cover the first 'currentKeysWidth' pixels of the viewport always
+        if (viewportX < currentKeysWidth) {
             // Clicked on Keys - potentially preview note sound? 
-            // Logic for that is not fully detailed in original code other than ignore creation
-            // Original logic: "if (x < 300) return;" (Wait, 300? CSS says 100px width ?)
-            // Previous code: "Adjust selection box coordinates... offset (300px)" and "if (x < 300) return;"
-            // But CSS says `.piano-keys-column { width: 100px; ... }`
-            // Why did the JS say 300? 
-            // Line 247 original JS: "if (x < 300) return;" 
-            // Maybe legacy code or I misread? 
-            // Let's stick to using the `keysWidth` variable defined as 100 for accuracy with current CSS.
-
-            // Wait, if sticky, visual clicking is viewport dependent.
+            if (e.button === 0) {
+                // Calculate which key was clicked
+                // Since keys scroll vertically with content, globalY is correct for finding the key index
+                const keyName = getKeyFromY(globalY);
+                if (keyName) {
+                    // Parse note and octave
+                    // Assuming format like "C#5"
+                    previewPianoNote(keyName, selectedChannelId);
+                }
+            }
             return;
         }
 
-        const gridX = globalX - KEYS_WIDTH; // Coordinate relative to grid start
+        const gridX = globalX - currentKeysWidth; // Coordinate relative to grid start
         const gridY = globalY; // Coordinate relative to content top
 
         const targetIsNote = e.target.closest('.piano-note');
@@ -346,7 +356,7 @@ const PianoRoll = () => {
 
         // 3. Background Interactions
         const step = getStepFromX(gridX);
-        const noteName = getKeyFromY(gridY);
+        const noteName = getKeyFromY(globalY); // Use globalY for key lookup
 
         if (!noteName) return;
 
