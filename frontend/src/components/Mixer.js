@@ -1,71 +1,101 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import '../styles/butter/Mixer.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import { VolumeX, Volume2, Headphones } from './icons/BlenderIcons';
 
-const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange, isMaster = false, effects = [], onAddEffect }) => {
-  const [muted, setMuted] = useState(false);
-  const [soloed, setSoloed] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editName, setEditName] = useState(name);
-  const meterFillRef = useRef(null);
-  const nameInputRef = useRef(null);
+// FL Studio-style Mixer Channel
+const MixerChannel = React.memo(({
+  id,
+  name,
+  vol,
+  pan,
+  onVolChange,
+  onPanChange,
+  isMaster = false,
+  channelNumber,
+  effects = [],
+  onAddEffect,
+  isSelected = false,
+  onSelect,
+  muted = false,
+  soloed = false,
+  onMuteToggle,
+  onSoloToggle
+}) => {
+  const [levelL, setLevelL] = useState(0);
+  const [levelR, setLevelR] = useState(0);
+  const [isDraggingFader, setIsDraggingFader] = useState(false);
+  const [isDraggingPan, setIsDraggingPan] = useState(false);
+  const faderRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
-  // Simulate level meter with direct DOM manipulation
+  // Simulate level meter animation
   useEffect(() => {
-    if (!muted && !soloed) {
+    if (!muted) {
       const interval = setInterval(() => {
-        const level = Math.random() * 100;
-        if (meterFillRef.current) {
-          meterFillRef.current.style.height = `${level}%`;
-          meterFillRef.current.style.backgroundColor = level > 80 ? '#f44336' : level > 60 ? '#ffeb3b' : '#4ade80';
-        }
-      }, 100);
+        const baseLevel = (vol / 100) * 0.85;
+        setLevelL(baseLevel * (0.6 + Math.random() * 0.4));
+        setLevelR(baseLevel * (0.6 + Math.random() * 0.4));
+      }, 50);
       return () => clearInterval(interval);
     } else {
-      if (meterFillRef.current) {
-        meterFillRef.current.style.height = `0%`;
-      }
+      setLevelL(0);
+      setLevelR(0);
     }
-  }, [muted, soloed]);
-
-  // Handle name editing
-  useEffect(() => {
-    if (isEditingName && nameInputRef.current) {
-      nameInputRef.current.focus();
-      nameInputRef.current.select();
-    }
-  }, [isEditingName]);
-
-  const handleNameClick = () => {
-    if (!isMaster) {
-      setIsEditingName(true);
-    }
-  };
-
-  const handleNameBlur = () => {
-    setIsEditingName(false);
-    setEditName(name); // Reset if not saved
-  };
-
-  const handleNameKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      setIsEditingName(false);
-      // In real app, would call updateChannelName(id, editName)
-    } else if (e.key === 'Escape') {
-      setEditName(name);
-      setIsEditingName(false);
-    }
-  };
+  }, [muted, vol]);
 
   // Pan knob rotation
-  const panRotation = pan * 1.8; // -90 to +90 degrees for -50 to +50 pan
+  const panRotation = (pan / 50) * 140;
 
-  // Fader value to percentage
-  const faderPercent = vol;
-  const faderPosition = 100 - faderPercent; // Invert for bottom-up fader
+  // Fader handling
+  const handleFaderMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFader(true);
+
+    const handleMouseMove = (moveEvent) => {
+      if (faderRef.current) {
+        const rect = faderRef.current.getBoundingClientRect();
+        const y = moveEvent.clientY - rect.top;
+        const percent = Math.max(0, Math.min(100, 100 - (y / rect.height) * 100));
+        onVolChange(Math.round(percent));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingFader(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [onVolChange]);
+
+  // Pan knob handling
+  const handlePanMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingPan(true);
+    const startY = e.clientY;
+    const startPan = pan;
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      const newPan = Math.max(-50, Math.min(50, startPan + deltaY));
+      onPanChange(Math.round(newPan));
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingPan(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pan, onPanChange]);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -74,19 +104,15 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (isMaster) return; // For now
+    if (isMaster) return;
 
     const pluginData = e.dataTransfer.getData('plugin');
     if (pluginData) {
       try {
         const plugin = JSON.parse(pluginData);
-        // Effects categories
         const effectTypes = ['spatial', 'temporal', 'filter', 'dynamics', 'saturation', 'modulation', 'utility', 'analysis'];
-
         if (effectTypes.includes(plugin.type)) {
           if (onAddEffect) onAddEffect(id, plugin);
-        } else {
-          console.log("Ignored non-effect drop on mixer");
         }
       } catch (err) {
         console.error("Failed to parse dropped plugin", err);
@@ -94,145 +120,282 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
     }
   };
 
+  const handleChannelClick = () => {
+    if (onSelect) onSelect({ id, name, vol, pan, effects, isMaster, channelNumber });
+  };
+
+  // Level meter gradient
+  const getMeterHeight = (level) => `${level * 100}%`;
+
+  // Insert slots (8 visible)
+  const insertSlots = Array(8).fill(null).map((_, i) => effects[i] || null);
+
   return (
     <div
-      className={`mixer-channel ${isMaster ? 'master' : ''}`}
+      className={`fl-channel ${isMaster ? 'master' : ''} ${isSelected ? 'selected' : ''}`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onClick={handleChannelClick}
     >
-      {/* Track Name - Inline Editable */}
-      <div className="channel-header">
-        {isEditingName ? (
-          <input
-            ref={nameInputRef}
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleNameBlur}
-            onKeyDown={handleNameKeyDown}
-            className="channel-name-input"
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : (
+      {/* Channel Number Header */}
+      <div className="fl-channel-num">
+        {isMaster ? 'M' : channelNumber}
+      </div>
+
+      {/* Channel Name Label */}
+      <div className="fl-channel-label">
+        <span className="fl-channel-label-text">
+          {isMaster ? 'Master' : name}
+        </span>
+      </div>
+
+      {/* Insert Slots */}
+      <div className="fl-insert-rack">
+        {insertSlots.map((effect, i) => (
           <div
-            className="channel-name"
-            onClick={handleNameClick}
-            title={isMaster ? 'Master' : 'Click to rename'}
+            key={i}
+            className={`fl-insert-slot ${effect ? 'active' : ''}`}
+            title={effect ? effect.name : `Insert ${i + 1}`}
           >
-            {name}
+            {effect && <div className="fl-insert-led" />}
           </div>
-        )}
+        ))}
       </div>
 
-      {/* Level Meter */}
-      <div className="effects-rack" style={{
-        minHeight: '60px',
-        background: 'rgba(0,0,0,0.2)',
-        margin: '4px',
-        padding: '2px',
-        borderRadius: '4px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '2px',
-        overflowY: 'auto',
-        maxHeight: '80px'
-      }}>
-        {effects && effects.length > 0 ? (
-          effects.map(effect => (
-            <div key={effect.id} style={{
-              fontSize: '10px',
-              background: '#333',
-              padding: '2px 4px',
-              borderRadius: '2px',
-              color: '#ddd',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }} title={effect.name}>
-              {effect.name}
-            </div>
-          ))
-        ) : (
-          <div style={{ fontSize: '9px', color: '#555', textAlign: 'center', marginTop: '10px' }}>
-            Drop FX Here
+      {/* Meter + Fader Section */}
+      <div className="fl-meter-fader">
+        {/* Left Meter */}
+        <div className="fl-meter-bar">
+          <div className="fl-meter-fill" style={{ height: getMeterHeight(levelL) }} />
+          <div className="fl-meter-scale">
+            <span>0</span>
+            <span>6</span>
+            <span>12</span>
+            <span>18</span>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Level Meter */}
-      <div className="level-meter" {...useGuideHandlers(`Level Meter`)}>
-        <div className="meter-track">
+        {/* Fader */}
+        <div
+          className="fl-fader"
+          ref={faderRef}
+          onMouseDown={handleFaderMouseDown}
+          {...useGuideHandlers(`Volume: ${vol}%`)}
+        >
+          <div className="fl-fader-track">
+            <div className="fl-fader-fill" style={{ height: `${vol}%` }} />
+          </div>
           <div
-            ref={meterFillRef}
-            className="meter-fill"
-            style={{
-              height: `0%`,
-              backgroundColor: '#4ade80'
-            }}
+            className={`fl-fader-thumb ${isDraggingFader ? 'dragging' : ''}`}
+            style={{ bottom: `calc(${vol}% - 10px)` }}
           />
+        </div>
+
+        {/* Right Meter */}
+        <div className="fl-meter-bar">
+          <div className="fl-meter-fill" style={{ height: getMeterHeight(levelR) }} />
         </div>
       </div>
 
-      {/* Pan Knob */}
-      <div className="pan-section" {...useGuideHandlers(`Pan: ${pan}%`)}>
-        <div className="pan-knob-container">
-          <div className="pan-knob" style={{ transform: `rotate(${panRotation}deg)` }}>
-            <div className="pan-indicator"></div>
-          </div>
-          <input
-            type="range"
-            min="-50"
-            max="50"
-            value={pan}
-            onChange={(e) => onPanChange(parseInt(e.target.value))}
-            className="pan-input"
-          />
-        </div>
-      </div>
-
-      {/* Mute/Solo/Arm Buttons */}
-      <div className="controls-section">
-        <button
-          className={`control-btn mute ${muted ? 'active' : ''}`}
-          onClick={() => setMuted(!muted)}
-          title={muted ? 'Unmute' : 'Mute'}
-          {...useGuideHandlers(muted ? 'Unmute' : 'Mute')}
+      {/* Pan Knob Row */}
+      <div className="fl-pan-row">
+        <div
+          className={`fl-pan-knob ${isDraggingPan ? 'active' : ''}`}
+          onMouseDown={handlePanMouseDown}
+          title={`Pan: ${pan}`}
+          {...useGuideHandlers(`Pan: ${pan}`)}
         >
-          {muted ? <VolumeX size={12} /> : <Volume2 size={12} />}
+          <div
+            className="fl-pan-pointer"
+            style={{ transform: `rotate(${panRotation}deg)` }}
+          />
+        </div>
+      </div>
+
+      {/* Stereo Separation */}
+      <div className="fl-stereo-row">
+        <button className="fl-arrow-btn">◀◀</button>
+        <button className="fl-arrow-btn">▶▶</button>
+      </div>
+
+      {/* Mute/Solo Row */}
+      <div className="fl-mute-solo-row">
+        <button
+          className={`fl-ms-btn ${muted ? 'muted' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onMuteToggle && onMuteToggle(id); }}
+          title="Mute"
+        >
+          <Volume2 size={10} />
         </button>
         <button
-          className={`control-btn solo ${soloed ? 'active' : ''}`}
-          onClick={() => setSoloed(!soloed)}
-          title={soloed ? 'Unsolo' : 'Solo'}
-          {...useGuideHandlers(soloed ? 'Unsolo' : 'Solo')}
+          className={`fl-ms-btn solo ${soloed ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onSoloToggle && onSoloToggle(id); }}
+          title="Solo"
         >
-          <Headphones size={12} />
+          <Headphones size={10} />
         </button>
       </div>
 
-      {/* Volume Fader */}
-      <div className="fader-section" {...useGuideHandlers(`Volume: ${vol}%`)}>
-        <div className="fader-track">
-          <div className="fader-fill" style={{ height: `${faderPercent}%` }} />
-          <div className="fader-handle" style={{ bottom: `${faderPosition}%` }}>
-            <div className="fader-handle-grip"></div>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={vol}
-            onChange={(e) => onVolChange(parseInt(e.target.value))}
-            className="fader-input"
-            orient="vertical"
-          />
+      {/* Routing Indicator */}
+      <div className="fl-routing-row">
+        <div className="fl-route-arrow">▲</div>
+      </div>
+    </div>
+  );
+});
+
+// FL Studio-style Detail Panel
+const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
+  const [eqLow, setEqLow] = useState(0);
+  const [eqMid, setEqMid] = useState(0);
+  const [eqHigh, setEqHigh] = useState(0);
+
+  if (!selectedChannel) {
+    return (
+      <div className="fl-detail-panel">
+        <div className="fl-detail-header">Mixer - Master</div>
+        <div className="fl-detail-content empty">
+          <p>Select a channel to view details</p>
         </div>
-        <div className="fader-value">{vol}</div>
+      </div>
+    );
+  }
+
+  const channelName = selectedChannel.isMaster ? 'Master' : selectedChannel.name;
+  const insertSlots = Array(10).fill(null).map((_, i) => selectedChannel.effects?.[i] || null);
+
+  const handleSlotDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleSlotDrop = (e, slotIndex) => {
+    e.preventDefault();
+    const pluginData = e.dataTransfer.getData('plugin');
+    if (pluginData) {
+      try {
+        const plugin = JSON.parse(pluginData);
+        if (onAddEffect) onAddEffect(selectedChannel.id, plugin);
+      } catch (err) {
+        console.error("Failed to parse dropped plugin", err);
+      }
+    }
+  };
+
+  const createEqHandler = (setter, current) => (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startValue = current;
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      setter(Math.max(-50, Math.min(50, startValue + deltaY * 0.5)));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <div className="fl-detail-panel">
+      <div className="fl-detail-header">Mixer - {channelName}</div>
+
+      {/* Source Selector */}
+      <div className="fl-source-section">
+        <select className="fl-source-select">
+          <option>(none)</option>
+          <option>Audio In 1</option>
+          <option>Audio In 2</option>
+          <option>Sidechain</option>
+        </select>
       </div>
 
-      {/* Channel Footer */}
-      <div className="channel-footer">
-        {isMaster ? 'M' : id}
+      {/* Insert Slots List */}
+      <div className="fl-slots-list">
+        {insertSlots.map((effect, i) => (
+          <div
+            key={i}
+            className={`fl-slot-item ${effect ? 'has-fx' : ''}`}
+            onDragOver={handleSlotDragOver}
+            onDrop={(e) => handleSlotDrop(e, i)}
+          >
+            <span className="fl-slot-num">Slot {i + 1}</span>
+            {effect && <span className="fl-slot-name">{effect.name}</span>}
+            {effect && <div className="fl-slot-led" />}
+          </div>
+        ))}
+      </div>
+
+      {/* Active Effect Display */}
+      <div className="fl-fx-display">
+        <span className="fl-fx-name">
+          {selectedChannel.effects?.[0]?.name || 'Fruity Limiter'}
+        </span>
+        <button className="fl-fx-power">○</button>
+      </div>
+
+      {/* Equalizer */}
+      <div className="fl-eq-section">
+        <div className="fl-eq-title">Equalizer</div>
+        <div className="fl-eq-graph">
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+            <rect x="0" y="0" width="100" height="40" fill="#1a1a1a" />
+            <line x1="0" y1="20" x2="100" y2="20" stroke="rgba(255,255,255,0.1)" />
+            <path
+              d={`M 0 20 Q 25 ${20 - eqLow * 0.3} 50 ${20 - eqMid * 0.3} T 100 ${20 - eqHigh * 0.3}`}
+              fill="none"
+              stroke="#4ade80"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </div>
+        <div className="fl-eq-knobs">
+          <div className="fl-eq-knob-wrap">
+            <div
+              className="fl-eq-knob"
+              onMouseDown={createEqHandler(setEqLow, eqLow)}
+              style={{ '--rot': `${eqLow * 2.7}deg` }}
+            >
+              <div className="fl-eq-dot" />
+            </div>
+            <span>LOW</span>
+          </div>
+          <div className="fl-eq-knob-wrap">
+            <div
+              className="fl-eq-knob"
+              onMouseDown={createEqHandler(setEqMid, eqMid)}
+              style={{ '--rot': `${eqMid * 2.7}deg` }}
+            >
+              <div className="fl-eq-dot" />
+            </div>
+            <span>MID</span>
+          </div>
+          <div className="fl-eq-knob-wrap">
+            <div
+              className="fl-eq-knob"
+              onMouseDown={createEqHandler(setEqHigh, eqHigh)}
+              style={{ '--rot': `${eqHigh * 2.7}deg` }}
+            >
+              <div className="fl-eq-dot" />
+            </div>
+            <span>HIGH</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Output */}
+      <div className="fl-output-section">
+        <div className="fl-output-ring" />
+        <span>(none)</span>
+      </div>
+      <div className="fl-output-route">
+        <div className="fl-output-dot active" />
+        <span>Out 1 - Out 2</span>
       </div>
     </div>
   );
@@ -240,38 +403,141 @@ const MixerChannel = React.memo(({ id, name, vol, pan, onVolChange, onPanChange,
 
 function Mixer() {
   const { channels, updateChannelVolume, updateChannelPan, addEffect } = useProject();
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [mutedChannels, setMutedChannels] = useState({});
+  const [soloedChannels, setSoloedChannels] = useState({});
+
+  // Generate insert tracks (16 empty insert channels)
+  const insertTracks = Array(16).fill(null).map((_, i) => ({
+    id: `insert-${i + 1}`,
+    name: `Insert ${i + 1}`,
+    vol: 80,
+    pan: 0,
+    effects: []
+  }));
+
+  const handleChannelSelect = (channelData) => {
+    setSelectedChannel(channelData);
+  };
+
+  const handleMuteToggle = (id) => {
+    setMutedChannels(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleSoloToggle = (id) => {
+    setSoloedChannels(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
-    <div className="mixer">
-      {/* Master Channel */}
-      <MixerChannel
-        name="Master"
-        isMaster={true}
-        vol={80}
-        pan={0}
-        onVolChange={() => { }}
-        onPanChange={() => { }}
+    <div className="fl-mixer-container">
+      {/* Main Mixer Area */}
+      <div className="fl-mixer">
+        {/* Toolbar */}
+        <div className="fl-mixer-toolbar">
+          <div className="fl-toolbar-left">
+            <button className="fl-tb-btn">◀</button>
+            <button className="fl-tb-btn">▶</button>
+            <button className="fl-tb-btn">↕</button>
+            <span className="fl-tb-sep" />
+            <button className="fl-tb-btn active">▣</button>
+            <button className="fl-tb-btn">☷</button>
+            <span className="fl-tb-label">+ Wide</span>
+          </div>
+          <div className="fl-toolbar-right">
+            <span className="fl-channel-count">1 - 16</span>
+          </div>
+        </div>
+
+        {/* Channel Numbers Row */}
+        <div className="fl-channel-nums-row">
+          <div className="fl-num-cell master">M</div>
+          {channels.map((ch, i) => (
+            <div key={ch.id} className="fl-num-cell">{i + 1}</div>
+          ))}
+          {insertTracks.slice(0, 10).map((_, i) => (
+            <div key={`insert-${i}`} className="fl-num-cell insert">{channels.length + i + 1}</div>
+          ))}
+        </div>
+
+        {/* Channels Container */}
+        <div className="fl-channels-container">
+          {/* Master Channel */}
+          <MixerChannel
+            id="master"
+            name="Master"
+            isMaster={true}
+            channelNumber="M"
+            vol={80}
+            pan={0}
+            effects={[]}
+            onVolChange={() => { }}
+            onPanChange={() => { }}
+            isSelected={selectedChannel?.id === 'master'}
+            onSelect={handleChannelSelect}
+            muted={mutedChannels['master']}
+            soloed={soloedChannels['master']}
+            onMuteToggle={handleMuteToggle}
+            onSoloToggle={handleSoloToggle}
+          />
+
+          {/* Divider */}
+          <div className="fl-divider" />
+
+          {/* Instrument Channels */}
+          {channels.map((ch, i) => (
+            <MixerChannel
+              key={ch.id}
+              id={ch.id}
+              name={ch.name}
+              channelNumber={i + 1}
+              vol={ch.vol}
+              pan={ch.pan}
+              effects={ch.effects}
+              onVolChange={(v) => updateChannelVolume(ch.id, v)}
+              onPanChange={(p) => updateChannelPan(ch.id, p)}
+              onAddEffect={(id, plugin) => addEffect(id, plugin)}
+              isSelected={selectedChannel?.id === ch.id}
+              onSelect={handleChannelSelect}
+              muted={mutedChannels[ch.id]}
+              soloed={soloedChannels[ch.id]}
+              onMuteToggle={handleMuteToggle}
+              onSoloToggle={handleSoloToggle}
+            />
+          ))}
+
+          {/* Insert Channels */}
+          {insertTracks.slice(0, 10).map((track, i) => (
+            <MixerChannel
+              key={track.id}
+              id={track.id}
+              name={track.name}
+              channelNumber={channels.length + i + 1}
+              vol={track.vol}
+              pan={track.pan}
+              effects={track.effects}
+              onVolChange={() => { }}
+              onPanChange={() => { }}
+              isSelected={selectedChannel?.id === track.id}
+              onSelect={handleChannelSelect}
+              muted={mutedChannels[track.id]}
+              soloed={soloedChannels[track.id]}
+              onMuteToggle={handleMuteToggle}
+              onSoloToggle={handleSoloToggle}
+            />
+          ))}
+
+          {/* Add Button */}
+          <div className="fl-add-channel-btn">
+            <span>+</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Detail Panel */}
+      <MixerDetailPanel
+        selectedChannel={selectedChannel}
+        onAddEffect={addEffect}
       />
-
-      <div className="mixer-divider"></div>
-
-      {/* Instrument Channels */}
-      {channels.map((ch) => (
-        <MixerChannel
-          key={ch.id}
-          id={ch.id}
-          name={ch.name}
-          vol={ch.vol}
-          pan={ch.pan}
-          onVolChange={(v) => updateChannelVolume(ch.id, v)}
-          onPanChange={(p) => updateChannelPan(ch.id, p)}
-          effects={ch.effects}
-          onAddEffect={(id, plugin) => addEffect(id, plugin)}
-        />
-      ))}
-
-      {/* Spacer */}
-      <div className="mixer-spacer"></div>
     </div>
   );
 }

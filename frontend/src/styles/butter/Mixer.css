@@ -1,363 +1,870 @@
-/* Professional DAW Mixer - Blender-style Dark Theme */
+/* FL Studio-style Mixer - Exact Match */
 
-.mixer {
+/* Main Container */
+.fl-mixer-container {
   display: flex;
   height: 100%;
-  background-color: #1e1e1e;
-  color: #b3b3b3;
-  font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 8px;
-  box-sizing: border-box;
+  background-color: #2d2d2d;
+  font-family: 'Segoe UI', 'DM Sans', system-ui, sans-serif;
+}
+
+.fl-mixer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #3a3a3a;
+  overflow: hidden;
+}
+
+/* ==========================================
+   Toolbar
+   ========================================== */
+
+.fl-mixer-toolbar {
+  height: 24px;
+  background: linear-gradient(to bottom, #4a4a4a, #3a3a3a);
+  border-bottom: 1px solid #2a2a2a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+
+.fl-toolbar-left {
+  display: flex;
+  align-items: center;
   gap: 2px;
 }
 
-/* Master Section Divider */
-.mixer-divider {
-  width: 1px;
-  background-color: rgba(255, 255, 255, 0.08);
-  margin: 0 4px;
-  flex-shrink: 0;
-}
-
-.mixer-spacer {
-  width: 20px;
-  flex-shrink: 0;
-}
-
-/* Individual Channel Strip */
-.mixer-channel {
+.fl-toolbar-right {
   display: flex;
-  flex-direction: column;
-  width: 64px;
-  height: 100%;
-  background-color: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  position: relative;
-  flex-shrink: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  align-items: center;
 }
 
-.mixer-channel:hover {
-  background-color: #2f2f2f;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.mixer-channel.master {
-  background-color: #252525;
-  border-color: rgba(255, 255, 255, 0.1);
-  width: 72px;
-  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.1);
-}
-
-.mixer-channel.master:hover {
-  background-color: #2a2a2a;
-  border-color: rgba(96, 165, 250, 0.2);
-}
-
-/* Channel Header - Track Name */
-.channel-header {
-  height: 32px;
+.fl-tb-btn {
+  width: 20px;
+  height: 18px;
+  background: linear-gradient(to bottom, #555, #444);
+  border: 1px solid #333;
+  border-radius: 2px;
+  color: #aaa;
+  font-size: 8px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.02), transparent);
+  padding: 0;
 }
 
-.channel-name {
+.fl-tb-btn:hover {
+  background: linear-gradient(to bottom, #666, #555);
+  color: #ddd;
+}
+
+.fl-tb-btn.active {
+  background: linear-gradient(to bottom, #5a7a5a, #4a6a4a);
+  border-color: #4a6a4a;
+  color: #8f8;
+}
+
+.fl-tb-sep {
+  width: 1px;
+  height: 14px;
+  background: #555;
+  margin: 0 4px;
+}
+
+.fl-tb-label {
   font-size: 11px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.fl-channel-count {
+  font-size: 10px;
+  color: #888;
+}
+
+/* ==========================================
+   Channel Numbers Row
+   ========================================== */
+
+.fl-channel-nums-row {
+  height: 18px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #222;
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  padding-left: 0;
+}
+
+.fl-num-cell {
+  width: 52px;
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  border-right: 1px solid #222;
+  background: #333;
+}
+
+.fl-num-cell.master {
+  width: 56px;
+  min-width: 56px;
+  background: #2a3a2a;
+  color: #8f8;
+  border-right: 2px solid #4a4;
+}
+
+.fl-num-cell.insert {
+  color: #666;
+  background: #2a2a2a;
+}
+
+/* ==========================================
+   Channels Container
+   ========================================== */
+
+.fl-channels-container {
+  flex: 1;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #2d2d2d;
+}
+
+/* Divider between Master and Channels */
+.fl-divider {
+  width: 3px;
+  background: linear-gradient(to bottom, #4a4, #383);
+  flex-shrink: 0;
+}
+
+/* ==========================================
+   Channel Strip
+   ========================================== */
+
+.fl-channel {
+  width: 52px;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to bottom, #404040 0%, #353535 50%, #303030 100%);
+  border-right: 1px solid #252525;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fl-channel:hover {
+  background: linear-gradient(to bottom, #484848 0%, #3d3d3d 50%, #383838 100%);
+}
+
+.fl-channel.selected {
+  background: linear-gradient(to bottom, #4a5a4a 0%, #3a4a3a 50%, #354535 100%);
+  box-shadow: inset 0 0 0 1px #6a6, inset 0 0 8px rgba(102, 170, 102, 0.2);
+}
+
+.fl-channel.master {
+  width: 56px;
+  min-width: 56px;
+  background: linear-gradient(to bottom, #3a4a3a 0%, #2f3f2f 50%, #2a3a2a 100%);
+  border-right: none;
+}
+
+.fl-channel.master.selected {
+  box-shadow: inset 0 0 0 2px #7b7, inset 0 0 12px rgba(119, 187, 119, 0.3);
+}
+
+/* Channel Number */
+.fl-channel-num {
+  height: 0;
+  display: none;
+}
+
+/* Channel Label */
+.fl-channel-label {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.fl-channel-label-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  font-size: 9px;
   font-weight: 500;
-  color: #d0d0d0;
-  text-align: center;
-  white-space: nowrap;
+  color: #aaa;
+  max-height: 48px;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 100%;
-  cursor: pointer;
-  user-select: none;
-  transition: color 0.15s ease;
-  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
-.channel-name:hover {
-  color: #fff;
+.fl-channel.selected .fl-channel-label-text {
+  color: #cfc;
 }
 
-.channel-name-input {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  border-radius: 2px;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: inherit;
-  padding: 2px 4px;
-  text-align: center;
-  outline: none;
+/* Insert Rack */
+.fl-insert-rack {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
 }
 
-/* Level Meter */
-.level-meter {
-  height: 60px;
+.fl-insert-slot {
+  height: 10px;
+  background: #252525;
+  border: 1px solid #1a1a1a;
+  border-radius: 1px;
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 4px 0;
+  justify-content: center;
 }
 
-.meter-track {
+.fl-insert-slot.active {
+  background: linear-gradient(to bottom, #3a4a3a, #2a3a2a);
+  border-color: #4a5;
+}
+
+.fl-insert-led {
   width: 4px;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.3);
+  height: 4px;
+  background: #6f6;
+  border-radius: 50%;
+  box-shadow: 0 0 3px #4f4;
+}
+
+/* ==========================================
+   Meter + Fader Section
+   ========================================== */
+
+.fl-meter-fader {
+  flex: 1;
+  display: flex;
+  padding: 4px 3px;
+  gap: 2px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.2));
+  min-height: 160px;
+}
+
+/* Meter Bar */
+.fl-meter-bar {
+  width: 6px;
+  background: #111;
   border-radius: 2px;
   position: relative;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-.meter-fill {
+.fl-meter-fill {
   position: absolute;
   bottom: 0;
-  width: 100%;
-  border-radius: 2px;
-  transition: height 0.05s linear, background-color 0.1s ease;
-  box-shadow: 0 0 2px rgba(255, 255, 255, 0.2);
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top,
+      #0f0 0%,
+      #0f0 50%,
+      #ff0 70%,
+      #f80 85%,
+      #f00 100%);
+  transition: height 0.05s linear;
+  border-radius: 0 0 2px 2px;
 }
 
-/* Pan Section */
-.pan-section {
-  height: 48px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 4px 0;
-  position: relative;
-}
-
-.pan-knob-container {
-  position: relative;
-  width: 32px;
-  height: 32px;
-}
-
-.pan-knob {
-  width: 32px;
-  height: 32px;
-  background: #1e1e1e;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  position: relative;
-  cursor: ns-resize;
-  transition: border-color 0.15s ease;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.pan-knob:hover {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-
-.pan-indicator {
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 10px;
-  background: #b3b3b3;
-  border-radius: 1px;
-  transition: background-color 0.15s ease;
-}
-
-.pan-knob:hover .pan-indicator {
-  background: #d0d0d0;
-}
-
-.pan-input {
+.fl-meter-scale {
   position: absolute;
   top: 0;
-  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: ns-resize;
-  z-index: 1;
-}
-
-/* Controls Section - Mute/Solo */
-.controls-section {
-  display: flex;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.control-btn {
-  width: 24px;
-  height: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.03);
-  color: #9ca3af;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0;
-  outline: none;
-}
-
-.control-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #d0d0d0;
-}
-
-.control-btn.mute.active {
-  background: #4ade80;
-  border-color: #4ade80;
-  color: #000;
-  box-shadow: 0 0 4px rgba(74, 222, 128, 0.4);
-}
-
-.control-btn.solo.active {
-  background: #fbbf24;
-  border-color: #fbbf24;
-  color: #000;
-  box-shadow: 0 0 4px rgba(251, 191, 36, 0.4);
-}
-
-.control-btn .blender-icon {
-  color: inherit;
-}
-
-/* Fader Section */
-.fader-section {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 8px 0;
-  min-height: 200px;
-  position: relative;
-}
-
-.fader-track {
-  flex: 1;
-  width: 8px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 4px;
-  position: relative;
-  margin: 0 auto;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: flex-end;
-}
-
-.fader-fill {
-  width: 100%;
-  background: linear-gradient(to top, #4ade80 0%, #fbbf24 70%, #f44336 90%);
-  border-radius: 0 0 4px 4px;
-  transition: height 0.1s ease;
-  opacity: 0.6;
-  box-shadow: 0 0 4px rgba(74, 222, 128, 0.3);
-  min-height: 0;
-}
-
-.fader-handle {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 28px;
-  height: 16px;
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  cursor: ns-resize;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.1);
-  z-index: 2;
+  justify-content: space-between;
+  padding: 2px 0;
   pointer-events: none;
 }
 
-.fader-handle:hover {
-  background: #333;
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 8px rgba(96, 165, 250, 0.3);
+.fl-meter-scale span {
+  font-size: 5px;
+  color: #555;
+  text-align: center;
+  line-height: 1;
 }
 
-.fader-handle-grip {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 1px;
+/* Fader */
+.fl-fader {
+  flex: 1;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  cursor: ns-resize;
 }
 
-.fader-input {
+.fl-fader-track {
+  width: 8px;
+  height: 100%;
+  background: linear-gradient(to right, #1a1a1a, #252525, #1a1a1a);
+  border-radius: 4px;
+  position: relative;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.8),
+    0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.fl-fader-fill {
   position: absolute;
-  top: 0;
+  bottom: 0;
+  left: 1px;
+  right: 1px;
+  background: linear-gradient(to top, #4a4, #383);
+  border-radius: 0 0 3px 3px;
+  opacity: 0.4;
+}
+
+.fl-fader-thumb {
+  position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  width: 32px;
-  height: 100%;
-  opacity: 0;
+  width: 24px;
+  height: 20px;
+  background: linear-gradient(to bottom,
+      #666 0%,
+      #555 10%,
+      #4a4a4a 50%,
+      #404040 90%,
+      #333 100%);
+  border: 1px solid #2a2a2a;
+  border-top-color: #777;
+  border-radius: 3px;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.fl-fader-thumb::before {
+  content: '';
+  width: 14px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+
+.fl-fader-thumb::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(0deg,
+      transparent 0px,
+      transparent 1px,
+      rgba(255, 255, 255, 0.1) 1px,
+      rgba(255, 255, 255, 0.1) 2px);
+}
+
+.fl-fader-thumb:hover,
+.fl-fader-thumb.dragging {
+  background: linear-gradient(to bottom,
+      #777 0%,
+      #666 10%,
+      #5a5a5a 50%,
+      #505050 90%,
+      #444 100%);
+  border-top-color: #888;
+}
+
+.fl-channel.selected .fl-fader-thumb {
+  background: linear-gradient(to bottom,
+      #6a7a6a 0%,
+      #5a6a5a 10%,
+      #4a5a4a 50%,
+      #405040 90%,
+      #354535 100%);
+  border-color: #4a5;
+}
+
+/* ==========================================
+   Pan Knob Row
+   ========================================== */
+
+.fl-pan-row {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.fl-pan-knob {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 40% 40%, #555, #333);
+  border: 1px solid #222;
+  border-radius: 50%;
+  position: relative;
   cursor: ns-resize;
-  z-index: 3;
-  writing-mode: bt-lr;
-  -webkit-appearance: slider-vertical;
-  margin: 0;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+.fl-pan-knob:hover,
+.fl-pan-knob.active {
+  background: radial-gradient(circle at 40% 40%, #666, #444);
+}
+
+.fl-pan-pointer {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 2px;
+  height: 7px;
+  background: #4f4;
+  border-radius: 1px;
+  transform-origin: center 8px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 3px rgba(68, 255, 68, 0.5);
+}
+
+/* ==========================================
+   Stereo Row
+   ========================================== */
+
+.fl-stereo-row {
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.fl-arrow-btn {
+  width: 18px;
+  height: 12px;
+  background: #333;
+  border: 1px solid #222;
+  border-radius: 2px;
+  color: #666;
+  font-size: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
 }
 
-.fader-value {
-  margin-top: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #9ca3af;
-  text-align: center;
-  min-height: 14px;
-  letter-spacing: 0.02em;
+.fl-arrow-btn:hover {
+  background: #444;
+  color: #aaa;
 }
 
-/* Channel Footer */
-.channel-footer {
+/* ==========================================
+   Mute/Solo Row
+   ========================================== */
+
+.fl-mute-solo-row {
   height: 20px;
   display: flex;
-  justify-content: center;
   align-items: center;
-  font-size: 9px;
-  font-weight: 600;
-  color: #666;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  justify-content: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.fl-ms-btn {
+  width: 18px;
+  height: 16px;
+  background: linear-gradient(to bottom, #444, #333);
+  border: 1px solid #222;
+  border-radius: 2px;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.fl-ms-btn:hover {
+  background: linear-gradient(to bottom, #555, #444);
+  color: #aaa;
+}
+
+.fl-ms-btn.muted {
+  background: linear-gradient(to bottom, #5a5, #484);
+  border-color: #4a4;
+  color: #000;
+}
+
+.fl-ms-btn.solo.active {
+  background: linear-gradient(to bottom, #da5, #c94);
+  border-color: #b84;
+  color: #000;
+}
+
+/* ==========================================
+   Routing Row
+   ========================================== */
+
+.fl-routing-row {
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.fl-route-arrow {
+  font-size: 8px;
+  color: #5a5;
+}
+
+.fl-channel.selected .fl-route-arrow {
+  color: #8f8;
+}
+
+/* ==========================================
+   Add Channel Button
+   ========================================== */
+
+.fl-add-channel-btn {
+  width: 30px;
+  min-width: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.fl-add-channel-btn span {
+  font-size: 20px;
+  color: #555;
+}
+
+.fl-add-channel-btn:hover span {
+  color: #888;
+}
+
+/* ==========================================
+   Detail Panel
+   ========================================== */
+
+.fl-detail-panel {
+  width: 170px;
+  min-width: 170px;
+  background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
+  border-left: 1px solid #222;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.fl-detail-header {
+  height: 22px;
+  background: linear-gradient(to bottom, #4a4a4a, #3a3a3a);
+  border-bottom: 1px solid #222;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #ccc;
+}
+
+.fl-detail-content.empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.fl-detail-content.empty p {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+}
+
+/* Source Section */
+.fl-source-section {
+  padding: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.fl-source-select {
+  width: 100%;
+  background: #252525;
+  border: 1px solid #1a1a1a;
+  border-radius: 2px;
+  color: #999;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 4px 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.fl-source-select:hover {
+  border-color: #333;
+}
+
+/* Slots List */
+.fl-slots-list {
+  display: flex;
+  flex-direction: column;
+  background: #252525;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.fl-slot-item {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  border-bottom: 1px solid #1a1a1a;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.fl-slot-item:hover {
+  background: #2a2a2a;
+}
+
+.fl-slot-item.has-fx {
+  background: linear-gradient(to right, #252525, #2a352a);
+}
+
+.fl-slot-num {
+  font-size: 9px;
+  color: #666;
+  flex: 1;
+}
+
+.fl-slot-name {
+  font-size: 9px;
+  color: #8b8;
+  margin-right: 4px;
+}
+
+.fl-slot-led {
+  width: 5px;
+  height: 5px;
+  background: #5f5;
+  border-radius: 50%;
+  box-shadow: 0 0 3px #4f4;
+}
+
+/* FX Display */
+.fl-fx-display {
+  height: 22px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #111;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  gap: 4px;
+}
+
+.fl-fx-name {
+  flex: 1;
+  font-size: 10px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fl-fx-power {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border: 1px solid #555;
+  border-radius: 50%;
+  color: #da5;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Equalizer */
+.fl-eq-section {
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.fl-eq-title {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fl-eq-graph {
+  height: 35px;
+  background: #111;
+  border: 1px solid #0a0a0a;
+  border-radius: 2px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.fl-eq-graph svg {
+  width: 100%;
+  height: 100%;
+}
+
+.fl-eq-knobs {
+  display: flex;
+  justify-content: space-around;
+}
+
+.fl-eq-knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.fl-eq-knob-wrap span {
+  font-size: 7px;
+  color: #666;
+  text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-/* Scrollbar Styling */
-.mixer::-webkit-scrollbar {
-  height: 8px;
+.fl-eq-knob {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 40% 40%, #444, #2a2a2a);
+  border: 1px solid #1a1a1a;
+  border-radius: 50%;
+  position: relative;
+  cursor: ns-resize;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
-.mixer::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 4px;
+.fl-eq-knob:hover {
+  background: radial-gradient(circle at 40% 40%, #555, #333);
 }
 
-.mixer::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+.fl-eq-dot {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  width: 2px;
+  height: 6px;
+  background: #6af;
+  border-radius: 1px;
+  transform-origin: center 7px;
+  transform: translateX(-50%) rotate(var(--rot, 0deg));
 }
 
-.mixer::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+/* Output */
+.fl-output-section {
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.fl-output-ring {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #da5;
+  border-radius: 50%;
+}
+
+.fl-output-section span {
+  font-size: 10px;
+  color: #888;
+}
+
+.fl-output-route {
+  padding: 4px 8px;
+  background: rgba(100, 150, 200, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fl-output-dot {
+  width: 6px;
+  height: 6px;
+  border: 2px solid #555;
+  border-radius: 50%;
+}
+
+.fl-output-dot.active {
+  background: #6af;
+  border-color: #6af;
+  box-shadow: 0 0 4px #48f;
+}
+
+.fl-output-route span {
+  font-size: 10px;
+  color: #6af;
+}
+
+/* ==========================================
+   Scrollbar
+   ========================================== */
+
+.fl-channels-container::-webkit-scrollbar {
+  height: 10px;
+}
+
+.fl-channels-container::-webkit-scrollbar-track {
+  background: #222;
+}
+
+.fl-channels-container::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 5px;
+}
+
+.fl-channels-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.fl-detail-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.fl-detail-panel::-webkit-scrollbar-track {
+  background: #222;
+}
+
+.fl-detail-panel::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
 }
