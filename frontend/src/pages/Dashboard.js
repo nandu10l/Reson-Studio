@@ -19,6 +19,7 @@ import '../styles/daw.css';
 import DraggableWindow from '../components/DraggableWindow';
 import PianoRoll from '../components/PianoRoll';
 import ChannelRack from '../components/ChannelRack';
+import SampleEditor from '../components/SampleEditor';
 // Mixer is already imported
 import WelcomeModal from '../components/WelcomeModal';
 import TourOverlay from '../components/TourOverlay';
@@ -34,9 +35,13 @@ function Dashboard() {
     mixer: false,
     pianoRoll: false,
     channelRack: false,
+    sampleEditor: false,
     playlist: true, // Default view
     browser: true
   });
+
+  // Sample editor state
+  const [editingSample, setEditingSample] = useState(null);
 
   const toggleWindow = (name) => {
     setActiveWindows(prev => ({
@@ -47,6 +52,12 @@ function Dashboard() {
 
   const startTour = (tourId) => {
     setActiveTour(tourId);
+  };
+
+  // Open sample editor for a specific audio clip
+  const openSampleEditor = (audioClip) => {
+    setEditingSample(audioClip);
+    setActiveWindows(prev => ({ ...prev, sampleEditor: true }));
   };
 
   const [playing, setPlaying] = useState(false);
@@ -295,6 +306,7 @@ function Dashboard() {
                     onSelectClip={(c) => setSelectedClip(c)}
                     pixelsPerBeat={pixelsPerBeat}
                     playheadPosition={playheadPosition}
+                    onOpenSampleEditor={openSampleEditor}
                   />
                 </div>
               </div>
@@ -356,6 +368,28 @@ function Dashboard() {
           onHelp={() => startTour('mixer')}
         >
           <Mixer />
+        </DraggableWindow>
+      )}
+
+      {/* Sample Editor */}
+      {activeWindows.sampleEditor && editingSample && (
+        <DraggableWindow
+          title={`Sample Editor - ${editingSample.name || 'Untitled'}`}
+          onClose={() => {
+            toggleWindow('sampleEditor');
+            setEditingSample(null);
+          }}
+          initialPosition={{ x: 80, y: 80 }}
+          width={900}
+          height={500}
+        >
+          <SampleEditor
+            audioClip={editingSample}
+            onClose={() => {
+              toggleWindow('sampleEditor');
+              setEditingSample(null);
+            }}
+          />
         </DraggableWindow>
       )}
 

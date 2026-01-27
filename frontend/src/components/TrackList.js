@@ -747,7 +747,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
   );
 });
 
-const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
+const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor }) => {
   const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips } = useProject();
   const [selected, setSelected] = useState(null);
 
@@ -816,6 +816,14 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
         if (audioClip) {
           console.log('Playing preview for:', audioClip.name);
+        }
+      }
+    } else if (action === 'edit_sample') {
+      // Open sample editor for this audio clip
+      if (clip && clip.audioClipId) {
+        const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+        if (audioClip && onOpenSampleEditor) {
+          onOpenSampleEditor(audioClip);
         }
       }
     } else if (action === 'rename') {
@@ -1356,6 +1364,10 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
               <div className="clip-menu-item" onClick={() => handleMenuAction('preview')}
                 style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
                 Preview
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('edit_sample')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
+                Edit sample
               </div>
               <div className="clip-menu-item" onClick={() => handleMenuAction('toggle_mute')}
                 style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>

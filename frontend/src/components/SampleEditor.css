@@ -1,0 +1,361 @@
+/* Sample Editor - Edison-style audio editor */
+
+.sample-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #1a1f2e;
+    color: #d1d5db;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 12px;
+    user-select: none;
+    overflow: hidden;
+}
+
+/* Processing Overlay */
+.processing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.processing-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #374151;
+    border-top-color: #60a5fa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.processing-message {
+    margin-top: 12px;
+    color: #fff;
+    font-size: 14px;
+}
+
+/* Transport Row */
+.sample-editor-transport {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, #2a3142 0%, #232838 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.transport-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    background: #3a4258;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.transport-btn:hover {
+    background: #4a5268;
+    color: #fff;
+}
+
+.transport-btn.active {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #60a5fa;
+}
+
+.transport-btn.small {
+    width: 24px;
+    height: 22px;
+}
+
+.transport-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 8px;
+}
+
+.time-display {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    padding: 0 12px;
+    color: #60a5fa;
+}
+
+.time-current {
+    color: #fff;
+}
+
+.time-separator {
+    margin: 0 4px;
+    color: #6b7280;
+}
+
+.time-total {
+    color: #9ca3af;
+}
+
+/* Main Toolbar */
+.sample-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 12px;
+    background: #252a38;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-btn:active {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 0 8px;
+}
+
+.zoom-display {
+    font-size: 10px;
+    color: #6b7280;
+    margin-left: 4px;
+    min-width: 40px;
+}
+
+/* Info Bar - Edison style */
+.sample-editor-info {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 4px 12px;
+    background: #1e2433;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-item.title {
+    flex: 1;
+}
+
+.info-label {
+    color: #6b7280;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1px;
+}
+
+.info-value {
+    color: #60a5fa;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+}
+
+.info-item.title .info-value {
+    color: #fff;
+}
+
+/* Waveform Display */
+.sample-editor-waveform {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a1f2e;
+    min-height: 200px;
+    overflow: hidden;
+    position: relative;
+}
+
+.sample-editor-waveform canvas {
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+
+/* Overview / Timeline */
+.sample-editor-overview {
+    height: 50px;
+    background: #1a1f2e;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 4px 12px;
+}
+
+.sample-editor-overview canvas {
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+/* Bottom Controls */
+.sample-editor-bottom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, #232838 0%, #1e2433 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bottom-transport {
+    display: flex;
+    gap: 4px;
+}
+
+.scroll-slider {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #374151;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.scroll-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: #60a5fa;
+    border-radius: 50%;
+    cursor: grab;
+}
+
+.scroll-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+}
+
+/* Selection info */
+.selection-info {
+    margin-left: auto;
+    font-size: 10px;
+    color: #6b7280;
+    font-family: 'Consolas', monospace;
+}
+
+/* Toolbar icon buttons grid (for future expansion) */
+.toolbar-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+}
+
+/* Edison-style 2-row Tool Grid */
+.toolbar-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2px;
+    padding: 2px;
+    background: #1e2433;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.toolbar-grid .toolbar-btn {
+    width: 28px;
+    height: 24px;
+    background: #2a3142;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 10px;
+}
+
+.toolbar-grid .toolbar-btn:hover {
+    background: #3b82f6;
+    border-color: #60a5fa;
+}
+
+.toolbar-icon-btn {
+    width: 36px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #3a4258;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.toolbar-icon-btn:hover {
+    background: #4a5268;
+    color: #fff;
+}
+
+.toolbar-icon-btn.active {
+    background: #4a90d9;
+    color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 800px) {
+    .sample-editor-info {
+        gap: 12px;
+        font-size: 10px;
+    }
+
+    .info-item {
+        display: none;
+    }
+
+    .info-item.title,
+    .info-item:last-child {
+        display: flex;
+    }
+}

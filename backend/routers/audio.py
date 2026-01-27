@@ -164,6 +164,172 @@ async def separate_stems(file: UploadFile = File(...)):
                 pass
 
 
+@router.post("/trim")
+async def trim_audio(
+    file: UploadFile = File(...),
+    start_ms: int = 0,
+    end_ms: int = -1
+):
+    """
+    Trim audio to keep only the specified region.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        start_ms: Start time in milliseconds
+        end_ms: End time in milliseconds (-1 for end of file)
+    
+    Returns:
+        Trimmed audio as WAV
+    """
+    try:
+        audio_data = await file.read()
+        
+        # Detect format and load
+        if file.filename.lower().endswith('.mp3'):
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        else:
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        
+        # Apply trim
+        if end_ms == -1:
+            end_ms = len(audio)
+        
+        trimmed = audio[start_ms:end_ms]
+        
+        # Export as WAV
+        wav_buffer = io.BytesIO()
+        trimmed.export(wav_buffer, format="wav")
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=trimmed_{file.filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Trim failed: {str(e)}")
+
+
+@router.post("/cut")
+async def cut_audio(
+    file: UploadFile = File(...),
+    start_ms: int = 0,
+    end_ms: int = 0
+):
+    """
+    Cut (remove) a region from audio.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        start_ms: Start of region to remove
+        end_ms: End of region to remove
+    
+    Returns:
+        Audio with region removed as WAV
+    """
+    try:
+        audio_data = await file.read()
+        
+        if file.filename.lower().endswith('.mp3'):
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        else:
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        
+        # Cut by combining before and after the cut region
+        before = audio[:start_ms]
+        after = audio[end_ms:]
+        result = before + after
+        
+        wav_buffer = io.BytesIO()
+        result.export(wav_buffer, format="wav")
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=cut_{file.filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cut failed: {str(e)}")
+
+
+@router.post("/fade")
+async def fade_audio(
+    file: UploadFile = File(...),
+    fade_type: str = "in",
+    duration_ms: int = 500
+):
+    """
+    Apply fade in or fade out effect.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        fade_type: "in" for fade in, "out" for fade out
+        duration_ms: Duration of fade in milliseconds
+    
+    Returns:
+        Audio with fade applied as WAV
+    """
+    try:
+        audio_data = await file.read()
+        
+        if file.filename.lower().endswith('.mp3'):
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        else:
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        
+        if fade_type == "in":
+            result = audio.fade_in(duration_ms)
+        else:
+            result = audio.fade_out(duration_ms)
+        
+        wav_buffer = io.BytesIO()
+        result.export(wav_buffer, format="wav")
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=fade_{file.filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fade failed: {str(e)}")
+
+
+@router.post("/reverse")
+async def reverse_audio(file: UploadFile = File(...)):
+    """
+    Reverse the audio.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+    
+    Returns:
+        Reversed audio as WAV
+    """
+    try:
+        audio_data = await file.read()
+        
+        if file.filename.lower().endswith('.mp3'):
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+        else:
+            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        
+        result = audio.reverse()
+        
+        wav_buffer = io.BytesIO()
+        result.export(wav_buffer, format="wav")
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=reversed_{file.filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reverse failed: {str(e)}")
+
+
 @router.get("/health")
 async def audio_health():
     """Health check for audio service"""
