@@ -748,7 +748,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0 }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
@@ -762,6 +762,9 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   const [iconModal, setIconModal] = useState({ open: false, trackId: null, clipIndex: null });
   const [renameInput, setRenameInput] = useState('');
   const [colorInput, setColorInput] = useState('#3b82f6');
+
+  // Stem extraction loading state
+  const [isExtractingStems, setIsExtractingStems] = useState(false);
 
   // Close menu on click outside
   useEffect(() => {
@@ -790,7 +793,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = async (action) => {
     if (!menu) return;
     const { trackId, clipIndex, patternId, type, clip } = menu;
 
@@ -855,8 +858,42 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         // TODO: Implement multi-selection state
       }
     } else if (action === 'extract_stems') {
-      console.log('Extract stems from sample - AI feature');
-      // TODO: Integrate with backend AI stem separation
+      // Extract stems using backend AI
+      if (type === 'audio' && clip && clip.audioClipId) {
+        const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+        if (audioClip && audioClip.file) {
+          setIsExtractingStems(true);
+          setMenu(null);
+
+          const formData = new FormData();
+          formData.append('file', audioClip.file);
+
+          try {
+            const response = await fetch('http://localhost:8000/audio/separate-stems', {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.detail || 'Stem separation failed');
+            }
+
+            const data = await response.json();
+            if (data.success && data.stems) {
+              const originalName = audioClip.name.replace(/\.[^/.]+$/, '');
+              await addStemsAsAudioClips(data.stems, originalName);
+              alert(`Successfully extracted ${Object.keys(data.stems).length} stems!`);
+            }
+          } catch (error) {
+            console.error('Stem extraction failed:', error);
+            alert('Stem extraction failed: ' + error.message);
+          } finally {
+            setIsExtractingStems(false);
+          }
+          return; // Already closed menu
+        }
+      }
     } else if (action === 'automate_volume') {
       if (type === 'audio' && clip) {
         createAutomation(clip.audioClipId, 'volume');
@@ -1249,6 +1286,44 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onAddEffect={addEffect}
         />
       ))}
+
+      {/* Stem Extraction Loading Overlay */}
+      {isExtractingStems && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #374151',
+            borderTop: '4px solid #60a5fa',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <div style={{ color: '#fff', marginTop: '16px', fontSize: '16px', fontWeight: 500 }}>
+            Extracting stems...
+          </div>
+          <div style={{ color: '#9ca3af', marginTop: '8px', fontSize: '12px' }}>
+            This may take 30-60 seconds
+          </div>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
 
       {menu && (
         <div

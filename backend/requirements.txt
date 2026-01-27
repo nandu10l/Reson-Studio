@@ -13,3 +13,6 @@ numpy>=1.24.0
 # Note: pydub requires ffmpeg installed on the system
 # Install on Windows: choco install ffmpeg
 # Or download from: https://ffmpeg.org/download.html
+
+# Note: Demucs (stem separation) requires Python 3.10
+# Install separately with: py -3.10 -m pip install demucs torch torchaudio

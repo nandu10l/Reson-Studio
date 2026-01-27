@@ -790,6 +790,74 @@ export const ProjectProvider = ({ children }) => {
         }
     }, [bpm, playlistTracks]);
 
+    // Add stems as audio clips (from stem separation API)
+    const addStemsAsAudioClips = useCallback(async (stemsData, originalName) => {
+        const stemClips = [];
+
+        for (const [stemName, base64Data] of Object.entries(stemsData)) {
+            try {
+                // Convert base64 to blob
+                const binaryString = atob(base64Data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'audio/wav' });
+                const file = new File([blob], `${originalName}_${stemName}.wav`, { type: 'audio/wav' });
+
+                // Decode audio
+                const arrayBuffer = await blob.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+                // Generate waveform
+                const samplesPerSecond = 100;
+                const targetSamples = Math.max(2000, Math.floor(audioBuffer.duration * samplesPerSecond));
+                const waveform = generateWaveform(audioBuffer, targetSamples);
+
+                // Calculate duration in beats
+                const durationBeats = audioDurationToBeats(audioBuffer, bpm);
+
+                // Stem-specific colors for visual distinction
+                const stemColors = {
+                    vocals: '#ec4899',  // Pink
+                    drums: '#f97316',   // Orange
+                    bass: '#8b5cf6',    // Purple
+                    other: '#14b8a6'    // Teal
+                };
+
+                // Create audio clip object
+                const audioClip = {
+                    id: Date.now() + stemClips.length,
+                    fileName: `${originalName}_${stemName}.wav`,
+                    name: `${originalName} - ${stemName.charAt(0).toUpperCase() + stemName.slice(1)}`,
+                    file: file,
+                    audioBuffer: audioBuffer,
+                    waveform: waveform,
+                    duration: audioBuffer.duration,
+                    durationBeats: durationBeats,
+                    sampleRate: audioBuffer.sampleRate,
+                    url: URL.createObjectURL(blob),
+                    stemType: stemName,
+                    color: stemColors[stemName] || '#60a5fa'  // Default blue if unknown stem
+                };
+
+                stemClips.push(audioClip);
+            } catch (error) {
+                console.error(`Error processing ${stemName} stem:`, error);
+            }
+        }
+
+        // Add all stem clips to audio clips
+        if (stemClips.length > 0) {
+            setAudioClips(prev => [...prev, ...stemClips]);
+            setPickerTab('AUDIO');
+            console.log(`Added ${stemClips.length} stem clips successfully`);
+        }
+
+        return stemClips;
+    }, [bpm]);
+
 
     // --- Automation Actions ---
     const createAutomation = useCallback((targetClipId, type = 'volume') => {
@@ -1052,6 +1120,7 @@ export const ProjectProvider = ({ children }) => {
         audioClips,
         setAudioClips,
         importAudioFile,
+        addStemsAsAudioClips,
 
         // Picker Tab
         pickerTab,
