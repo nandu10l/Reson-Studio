@@ -575,22 +575,127 @@ export const ProjectProvider = ({ children }) => {
         });
     }, []);
 
-    const addEffect = useCallback((channelId, plugin) => {
+    const addEffect = useCallback((channelId, plugin, slotIndex = null) => {
         setChannels(prev => prev.map(ch => {
             if (ch.id === channelId) {
+                const currentEffects = ch.effects || [];
+                const slot = slotIndex !== null ? slotIndex : currentEffects.length;
+
+                // Check if slot already has an effect
+                if (currentEffects[slot]) {
+                    console.warn(`Slot ${slot} already has an effect`);
+                    return ch;
+                }
+
                 const newEffect = {
                     id: Date.now(),
                     name: plugin.name,
                     pluginId: plugin.id,
                     type: plugin.type,
-                    active: true
+                    enabled: true,
+                    mix: 50, // 0-100 (dry/wet)
+                    order: slot
                 };
-                return { ...ch, effects: [...(ch.effects || []), newEffect] };
+
+                // Insert at specific slot or append
+                const newEffects = [...currentEffects];
+                newEffects[slot] = newEffect;
+
+                // Also add to audio engine
+                audioEngine.addChannelEffect(channelId, plugin.type, slot);
+
+                return { ...ch, effects: newEffects };
             }
             return ch;
         }));
-        // Audio Engine TODO: audioEngine.addEffect(channelId, plugin);
-        console.log(`Added effect ${plugin.name} to channel ${channelId}`);
+        console.log(`Added effect ${plugin.name} to channel ${channelId} at slot ${slotIndex}`);
+    }, []);
+
+    const removeEffect = useCallback((channelId, slotIndex) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId) {
+                const newEffects = [...(ch.effects || [])];
+                newEffects[slotIndex] = null;
+
+                // Remove from audio engine
+                audioEngine.removeChannelEffect(channelId, slotIndex);
+
+                return { ...ch, effects: newEffects };
+            }
+            return ch;
+        }));
+        console.log(`Removed effect from channel ${channelId} slot ${slotIndex}`);
+    }, []);
+
+    const updateEffectMix = useCallback((channelId, slotIndex, mix) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId && ch.effects?.[slotIndex]) {
+                const newEffects = [...ch.effects];
+                newEffects[slotIndex] = { ...newEffects[slotIndex], mix };
+
+                // Update audio engine
+                audioEngine.updateEffectMix(channelId, slotIndex, mix / 100);
+
+                return { ...ch, effects: newEffects };
+            }
+            return ch;
+        }));
+    }, []);
+
+    const updateEffectEnabled = useCallback((channelId, slotIndex, enabled) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId && ch.effects?.[slotIndex]) {
+                const newEffects = [...ch.effects];
+                newEffects[slotIndex] = { ...newEffects[slotIndex], enabled };
+
+                // Update audio engine
+                audioEngine.updateEffectEnabled(channelId, slotIndex, enabled);
+
+                return { ...ch, effects: newEffects };
+            }
+            return ch;
+        }));
+    }, []);
+
+    const reorderEffect = useCallback((channelId, fromSlot, toSlot) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId) {
+                const newEffects = [...(ch.effects || [])];
+                const temp = newEffects[fromSlot];
+                newEffects[fromSlot] = newEffects[toSlot];
+                newEffects[toSlot] = temp;
+
+                // Update order properties
+                if (newEffects[fromSlot]) newEffects[fromSlot].order = fromSlot;
+                if (newEffects[toSlot]) newEffects[toSlot].order = toSlot;
+
+                // Rebuild audio engine effect chain
+                audioEngine.reorderChannelEffects(channelId, newEffects);
+
+                return { ...ch, effects: newEffects };
+            }
+            return ch;
+        }));
+        console.log(`Reordered effects in channel ${channelId}: ${fromSlot} <-> ${toSlot}`);
+    }, []);
+
+    // Update effect params (e.g., reverb decay, delay time, etc.)
+    const updateEffectParams = useCallback((channelId, slotIndex, params) => {
+        setChannels(prev => prev.map(ch => {
+            if (ch.id === channelId && ch.effects?.[slotIndex]) {
+                const newEffects = [...ch.effects];
+                newEffects[slotIndex] = {
+                    ...newEffects[slotIndex],
+                    params: { ...newEffects[slotIndex].params, ...params }
+                };
+
+                // Update audio engine effect parameters
+                audioEngine.updateEffectParams(channelId, slotIndex, params);
+
+                return { ...ch, effects: newEffects };
+            }
+            return ch;
+        }));
     }, []);
 
     // Preview Note Action
@@ -923,6 +1028,11 @@ export const ProjectProvider = ({ children }) => {
         deleteNotes,
         addChannel,
         addEffect,
+        removeEffect,
+        updateEffectMix,
+        updateEffectEnabled,
+        reorderEffect,
+        updateEffectParams,
         isPlaying,
         bpm,
         togglePlayback,

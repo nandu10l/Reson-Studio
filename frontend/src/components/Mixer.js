@@ -3,6 +3,52 @@ import '../styles/butter/Mixer.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import { VolumeX, Volume2, Headphones } from './icons/BlenderIcons';
+import EffectEditor from './EffectEditor';
+
+// Available effects for the selector
+const AVAILABLE_EFFECTS = [
+  { id: 'reverb-1', name: 'Reverb', type: 'spatial' },
+  { id: 'delay-1', name: 'Delay', type: 'temporal' },
+  { id: 'chorus-1', name: 'Chorus', type: 'modulation' },
+  { id: 'phaser-1', name: 'Phaser', type: 'modulation' },
+  { id: 'dist-1', name: 'Distortion', type: 'saturation' },
+  { id: 'comp-1', name: 'Compressor', type: 'dynamics' },
+  { id: 'eq-1', name: 'Parametric EQ', type: 'filter' }
+];
+
+// Effect Selector Modal
+const EffectSelector = React.memo(({ isOpen, onClose, onSelect, position }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="effect-selector-modal"
+      style={{
+        position: 'fixed',
+        left: position?.x || 200,
+        top: position?.y || 200,
+        zIndex: 10000
+      }}
+    >
+      <div className="effect-selector-header">
+        <span>Select Effect</span>
+        <button onClick={onClose} className="effect-selector-close">×</button>
+      </div>
+      <div className="effect-selector-list">
+        {AVAILABLE_EFFECTS.map(effect => (
+          <div
+            key={effect.id}
+            className="effect-selector-item"
+            onClick={() => { onSelect(effect); onClose(); }}
+          >
+            <span className="effect-selector-name">{effect.name}</span>
+            <span className="effect-selector-type">{effect.type}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
 
 // FL Studio-style Mixer Channel
 const MixerChannel = React.memo(({
@@ -245,10 +291,23 @@ const MixerChannel = React.memo(({
 });
 
 // FL Studio-style Detail Panel
-const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
+const MixerDetailPanel = React.memo(({
+  selectedChannel,
+  onAddEffect,
+  onRemoveEffect,
+  onUpdateEffectMix,
+  onUpdateEffectEnabled,
+  onReorderEffect,
+  onUpdateEffectParams
+}) => {
   const [eqLow, setEqLow] = useState(0);
   const [eqMid, setEqMid] = useState(0);
   const [eqHigh, setEqHigh] = useState(0);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectorPosition, setSelectorPosition] = useState({ x: 200, y: 200 });
+  const [activeSlot, setActiveSlot] = useState(null);
+  const [editingEffect, setEditingEffect] = useState(null);
+  const [editingSlotIndex, setEditingSlotIndex] = useState(null);
 
   if (!selectedChannel) {
     return (
@@ -275,10 +334,74 @@ const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
     if (pluginData) {
       try {
         const plugin = JSON.parse(pluginData);
-        if (onAddEffect) onAddEffect(selectedChannel.id, plugin);
+        if (onAddEffect) onAddEffect(selectedChannel.id, plugin, slotIndex);
       } catch (err) {
         console.error("Failed to parse dropped plugin", err);
       }
+    }
+  };
+
+  const handleSlotClick = (e, slotIndex, effect) => {
+    if (effect) {
+      // If slot has effect, open the effect editor
+      setEditingEffect(effect);
+      setEditingSlotIndex(slotIndex);
+      return;
+    }
+    // Open effect selector for empty slot
+    const rect = e.currentTarget.getBoundingClientRect();
+    setSelectorPosition({ x: rect.right + 10, y: rect.top });
+    setActiveSlot(slotIndex);
+    setSelectorOpen(true);
+  };
+
+  const handleCloseEffectEditor = () => {
+    setEditingEffect(null);
+    setEditingSlotIndex(null);
+  };
+
+  const handleUpdateParams = (params) => {
+    if (onUpdateEffectParams && editingSlotIndex !== null) {
+      onUpdateEffectParams(selectedChannel.id, editingSlotIndex, params);
+      // Update local editing effect to reflect changes
+      setEditingEffect(prev => prev ? { ...prev, params } : null);
+    }
+  };
+
+  const handleEffectSelect = (effect) => {
+    if (onAddEffect && activeSlot !== null) {
+      onAddEffect(selectedChannel.id, effect, activeSlot);
+    }
+    setActiveSlot(null);
+  };
+
+  const handleToggleEnabled = (e, slotIndex, effect) => {
+    e.stopPropagation();
+    if (onUpdateEffectEnabled && effect) {
+      onUpdateEffectEnabled(selectedChannel.id, slotIndex, !effect.enabled);
+    }
+  };
+
+  const handleRemoveEffect = (e, slotIndex) => {
+    e.stopPropagation();
+    if (onRemoveEffect) {
+      onRemoveEffect(selectedChannel.id, slotIndex);
+    }
+  };
+
+  const handleMixChange = (slotIndex, mix) => {
+    if (onUpdateEffectMix) {
+      onUpdateEffectMix(selectedChannel.id, slotIndex, mix);
+    }
+  };
+
+  const handleSlotWheel = (e, slotIndex) => {
+    if (!onReorderEffect) return;
+    e.preventDefault();
+    const direction = e.deltaY > 0 ? 1 : -1;
+    const newSlot = Math.max(0, Math.min(9, slotIndex + direction));
+    if (newSlot !== slotIndex) {
+      onReorderEffect(selectedChannel.id, slotIndex, newSlot);
     }
   };
 
@@ -305,6 +428,30 @@ const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
     <div className="fl-detail-panel">
       <div className="fl-detail-header">Mixer - {channelName}</div>
 
+      {/* Effect Selector Modal */}
+      <EffectSelector
+        isOpen={selectorOpen}
+        onClose={() => setSelectorOpen(false)}
+        onSelect={handleEffectSelect}
+        position={selectorPosition}
+      />
+
+      {/* Effect Editor Modal */}
+      {editingEffect && (
+        <EffectEditor
+          effect={editingEffect}
+          onClose={handleCloseEffectEditor}
+          onUpdateParams={handleUpdateParams}
+          onUpdateMix={(mix) => handleMixChange(editingSlotIndex, mix)}
+          onToggleEnabled={() => {
+            if (onUpdateEffectEnabled) {
+              onUpdateEffectEnabled(selectedChannel.id, editingSlotIndex, !(editingEffect.enabled !== false));
+              setEditingEffect(prev => prev ? { ...prev, enabled: !(prev.enabled !== false) } : null);
+            }
+          }}
+        />
+      )}
+
       {/* Source Selector */}
       <div className="fl-source-section">
         <select className="fl-source-select">
@@ -320,13 +467,34 @@ const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
         {insertSlots.map((effect, i) => (
           <div
             key={i}
-            className={`fl-slot-item ${effect ? 'has-fx' : ''}`}
+            className={`fl-slot-item ${effect ? 'has-fx' : ''} ${effect?.enabled === false ? 'bypassed' : ''}`}
             onDragOver={handleSlotDragOver}
             onDrop={(e) => handleSlotDrop(e, i)}
+            onClick={(e) => handleSlotClick(e, i, effect)}
+            onWheel={(e) => handleSlotWheel(e, i)}
+            title={effect ? `${effect.name} - Scroll to reorder, click power to bypass` : 'Click to add effect'}
           >
             <span className="fl-slot-num">Slot {i + 1}</span>
-            {effect && <span className="fl-slot-name">{effect.name}</span>}
-            {effect && <div className="fl-slot-led" />}
+            {effect && (
+              <>
+                <span className="fl-slot-name">{effect.name}</span>
+                <button
+                  className={`fl-slot-power ${effect.enabled !== false ? 'active' : ''}`}
+                  onClick={(e) => handleToggleEnabled(e, i, effect)}
+                  title="Enable/Bypass"
+                >
+                  ●
+                </button>
+                <button
+                  className="fl-slot-remove"
+                  onClick={(e) => handleRemoveEffect(e, i)}
+                  title="Remove Effect"
+                >
+                  ×
+                </button>
+                <div className="fl-slot-led" />
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -402,7 +570,17 @@ const MixerDetailPanel = React.memo(({ selectedChannel, onAddEffect }) => {
 });
 
 function Mixer() {
-  const { channels, updateChannelVolume, updateChannelPan, addEffect } = useProject();
+  const {
+    channels,
+    updateChannelVolume,
+    updateChannelPan,
+    addEffect,
+    removeEffect,
+    updateEffectMix,
+    updateEffectEnabled,
+    reorderEffect,
+    updateEffectParams
+  } = useProject();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [mutedChannels, setMutedChannels] = useState({});
   const [soloedChannels, setSoloedChannels] = useState({});
@@ -416,17 +594,27 @@ function Mixer() {
     effects: []
   }));
 
-  const handleChannelSelect = (channelData) => {
-    setSelectedChannel(channelData);
-  };
+  // Keep selectedChannel in sync with channels state
+  useEffect(() => {
+    if (selectedChannel && typeof selectedChannel.id === 'number') {
+      const updatedChannel = channels.find(ch => ch.id === selectedChannel.id);
+      if (updatedChannel) {
+        setSelectedChannel(prev => ({ ...prev, ...updatedChannel }));
+      }
+    }
+  }, [channels, selectedChannel?.id]);
 
-  const handleMuteToggle = (id) => {
+  const handleMuteToggle = useCallback((id) => {
     setMutedChannels(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  }, []);
 
-  const handleSoloToggle = (id) => {
+  const handleSoloToggle = useCallback((id) => {
     setSoloedChannels(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+  }, []);
+
+  const handleChannelSelect = useCallback((channelData) => {
+    setSelectedChannel(channelData);
+  }, []);
 
   return (
     <div className="fl-mixer-container">
@@ -435,22 +623,26 @@ function Mixer() {
         {/* Toolbar */}
         <div className="fl-mixer-toolbar">
           <div className="fl-toolbar-left">
-            <button className="fl-tb-btn">◀</button>
-            <button className="fl-tb-btn">▶</button>
-            <button className="fl-tb-btn">↕</button>
-            <span className="fl-tb-sep" />
-            <button className="fl-tb-btn active">▣</button>
-            <button className="fl-tb-btn">☷</button>
-            <span className="fl-tb-label">+ Wide</span>
+            <button className="fl-tb-btn">S</button>
+            <button className="fl-tb-btn">A</button>
+            <div className="fl-tb-sep" />
+            <button className="fl-tb-btn active">1</button>
+            <button className="fl-tb-btn">2</button>
+            <button className="fl-tb-btn">3</button>
+            <button className="fl-tb-btn">4</button>
+            <div className="fl-tb-sep" />
+            <button className="fl-tb-btn">D</button>
+            <button className="fl-tb-btn">L</button>
           </div>
           <div className="fl-toolbar-right">
-            <span className="fl-channel-count">1 - 16</span>
+            <span className="fl-channel-count">{channels.length} channels</span>
           </div>
         </div>
 
         {/* Channel Numbers Row */}
         <div className="fl-channel-nums-row">
           <div className="fl-num-cell master">M</div>
+          <div style={{ width: '3px' }} />
           {channels.map((ch, i) => (
             <div key={ch.id} className="fl-num-cell">{i + 1}</div>
           ))}
@@ -537,6 +729,11 @@ function Mixer() {
       <MixerDetailPanel
         selectedChannel={selectedChannel}
         onAddEffect={addEffect}
+        onRemoveEffect={removeEffect}
+        onUpdateEffectMix={updateEffectMix}
+        onUpdateEffectEnabled={updateEffectEnabled}
+        onReorderEffect={reorderEffect}
+        onUpdateEffectParams={updateEffectParams}
       />
     </div>
   );

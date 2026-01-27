@@ -5,6 +5,7 @@ class AudioEngine {
         this.channels = new Map(); // id -> Tone.Channel
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
         this.audioPlayers = new Map(); // audioClipId -> Tone.Player
+        this.channelEffects = new Map(); // channelId -> [effectNode, ...] (10 slots)
         this.isInitialized = false;
         this.previewSynth = null; // Dedicated synth for Piano Roll
         this.masterAnalyser = null; // Analyser for visualization
@@ -606,6 +607,282 @@ class AudioEngine {
             const clampedPan = Math.max(-1, Math.min(1, panVal));
             channel.pan.rampTo(clampedPan, 0.1);
         }
+    }
+
+    // --- Effect Chain Management ---
+
+    /**
+     * Create a Tone.js effect instance by type
+     */
+    createEffect(type) {
+        switch (type) {
+            case 'reverb':
+            case 'spatial':
+                return new Tone.Reverb({ decay: 1.5, preDelay: 0.01, wet: 0.5 });
+            case 'delay':
+            case 'temporal':
+                return new Tone.FeedbackDelay({ delayTime: 0.3, feedback: 0.4, wet: 0.5 });
+            case 'chorus':
+                return new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.5 });
+            case 'phaser':
+            case 'modulation':
+                return new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 350, wet: 0.5 });
+            case 'distortion':
+            case 'saturation':
+                return new Tone.Distortion({ distortion: 0.4, wet: 0.5 });
+            case 'compressor':
+            case 'dynamics':
+                return new Tone.Compressor({ threshold: -24, ratio: 4, attack: 0.003, release: 0.25 });
+            case 'eq':
+            case 'filter':
+                return new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+            default:
+                console.warn(`Unknown effect type: ${type}`);
+                return null;
+        }
+    }
+
+    /**
+     * Add effect to channel at specific slot
+     */
+    addChannelEffect(channelId, effectType, slotIndex) {
+        const channel = this.channels.get(channelId);
+        if (!channel) {
+            console.warn(`Channel ${channelId} not found`);
+            return;
+        }
+
+        // Initialize effects array for this channel if needed
+        if (!this.channelEffects.has(channelId)) {
+            this.channelEffects.set(channelId, Array(10).fill(null));
+        }
+
+        const effects = this.channelEffects.get(channelId);
+
+        // Create the effect
+        const effectNode = this.createEffect(effectType);
+        if (!effectNode) return;
+
+        // Store in slot
+        effects[slotIndex] = { node: effectNode, type: effectType, enabled: true };
+
+        // Rebuild the effect chain
+        this.rebuildEffectChain(channelId);
+
+        console.log(`Added ${effectType} effect to channel ${channelId} slot ${slotIndex}`);
+    }
+
+    /**
+     * Remove effect from channel slot
+     */
+    removeChannelEffect(channelId, slotIndex) {
+        const effects = this.channelEffects.get(channelId);
+        if (!effects || !effects[slotIndex]) return;
+
+        // Dispose the effect node
+        if (effects[slotIndex].node) {
+            effects[slotIndex].node.dispose();
+        }
+        effects[slotIndex] = null;
+
+        // Rebuild the effect chain
+        this.rebuildEffectChain(channelId);
+
+        console.log(`Removed effect from channel ${channelId} slot ${slotIndex}`);
+    }
+
+    /**
+     * Update effect wet/dry mix (0-1)
+     */
+    updateEffectMix(channelId, slotIndex, mix) {
+        const effects = this.channelEffects.get(channelId);
+        if (!effects || !effects[slotIndex]) return;
+
+        const effect = effects[slotIndex].node;
+        if (effect && effect.wet) {
+            effect.wet.rampTo(mix, 0.1);
+        }
+    }
+
+    /**
+     * Toggle effect bypass
+     */
+    updateEffectEnabled(channelId, slotIndex, enabled) {
+        const effects = this.channelEffects.get(channelId);
+        if (!effects || !effects[slotIndex]) return;
+
+        effects[slotIndex].enabled = enabled;
+
+        const effect = effects[slotIndex].node;
+        if (effect && effect.wet) {
+            // Set wet to 0 when bypassed
+            effect.wet.rampTo(enabled ? 0.5 : 0, 0.05);
+        }
+    }
+
+    /**
+     * Reorder effects in channel (after swap)
+     */
+    reorderChannelEffects(channelId, newEffectsArray) {
+        const effects = this.channelEffects.get(channelId);
+        if (!effects) return;
+
+        // Update the internal effects array to match UI order
+        // (The nodes themselves don't need to be recreated, just the chain rebuilt)
+        this.rebuildEffectChain(channelId);
+    }
+
+    /**
+     * Update effect parameters (e.g., reverb decay, delay time, etc.)
+     */
+    updateEffectParams(channelId, slotIndex, params) {
+        const effects = this.channelEffects.get(channelId);
+        if (!effects || !effects[slotIndex]) return;
+
+        const effect = effects[slotIndex].node;
+        const type = effects[slotIndex].type;
+        if (!effect) return;
+
+        try {
+            switch (type) {
+                case 'reverb':
+                case 'spatial':
+                    if (params.decay !== undefined && effect.decay !== undefined) {
+                        effect.decay = params.decay;
+                    }
+                    if (params.preDelay !== undefined && effect.preDelay !== undefined) {
+                        effect.preDelay = params.preDelay;
+                    }
+                    break;
+
+                case 'delay':
+                case 'temporal':
+                    if (params.delayTime !== undefined && effect.delayTime) {
+                        effect.delayTime.rampTo(params.delayTime, 0.1);
+                    }
+                    if (params.feedback !== undefined && effect.feedback) {
+                        effect.feedback.rampTo(params.feedback, 0.1);
+                    }
+                    break;
+
+                case 'chorus':
+                    if (params.frequency !== undefined && effect.frequency) {
+                        effect.frequency.rampTo(params.frequency, 0.1);
+                    }
+                    if (params.delayTime !== undefined && effect.delayTime !== undefined) {
+                        effect.delayTime = params.delayTime;
+                    }
+                    if (params.depth !== undefined && effect.depth !== undefined) {
+                        effect.depth = params.depth;
+                    }
+                    break;
+
+                case 'phaser':
+                case 'modulation':
+                    if (params.frequency !== undefined && effect.frequency) {
+                        effect.frequency.rampTo(params.frequency, 0.1);
+                    }
+                    if (params.octaves !== undefined && effect.octaves !== undefined) {
+                        effect.octaves = params.octaves;
+                    }
+                    if (params.baseFrequency !== undefined && effect.baseFrequency !== undefined) {
+                        effect.baseFrequency = params.baseFrequency;
+                    }
+                    break;
+
+                case 'distortion':
+                case 'saturation':
+                    if (params.distortion !== undefined && effect.distortion !== undefined) {
+                        effect.distortion = params.distortion;
+                    }
+                    break;
+
+                case 'compressor':
+                case 'dynamics':
+                    if (params.threshold !== undefined && effect.threshold) {
+                        effect.threshold.rampTo(params.threshold, 0.1);
+                    }
+                    if (params.ratio !== undefined && effect.ratio) {
+                        effect.ratio.rampTo(params.ratio, 0.1);
+                    }
+                    if (params.attack !== undefined && effect.attack) {
+                        effect.attack.rampTo(params.attack, 0.1);
+                    }
+                    if (params.release !== undefined && effect.release) {
+                        effect.release.rampTo(params.release, 0.1);
+                    }
+                    break;
+
+                case 'eq':
+                case 'filter':
+                    if (params.low !== undefined && effect.low) {
+                        effect.low.rampTo(params.low, 0.05);
+                    }
+                    if (params.mid !== undefined && effect.mid) {
+                        effect.mid.rampTo(params.mid, 0.05);
+                    }
+                    if (params.high !== undefined && effect.high) {
+                        effect.high.rampTo(params.high, 0.05);
+                    }
+                    break;
+
+                default:
+                    console.warn(`Unknown effect type for param update: ${type}`);
+            }
+
+            // Update wet level if provided
+            if (params.wet !== undefined && effect.wet) {
+                effect.wet.rampTo(params.wet, 0.1);
+            }
+
+            console.log(`Updated effect params for channel ${channelId}, slot ${slotIndex}:`, params);
+        } catch (e) {
+            console.error('Error updating effect params:', e);
+        }
+    }
+
+    /**
+     * Rebuild the audio routing chain for a channel with effects
+     */
+    rebuildEffectChain(channelId) {
+        const channel = this.channels.get(channelId);
+        const source = this.sources.get(channelId);
+        const effects = this.channelEffects.get(channelId);
+
+        if (!channel || !source) return;
+
+        // Disconnect source from channel first
+        try {
+            source.disconnect();
+        } catch (e) {
+            // May not be connected
+        }
+
+        // Get active effects in order
+        const activeEffects = effects
+            ? effects.filter(e => e && e.node && e.enabled)
+            : [];
+
+        if (activeEffects.length === 0) {
+            // No effects - connect source directly to channel
+            source.connect(channel);
+        } else {
+            // Chain: source -> effect1 -> effect2 -> ... -> channel
+            let prev = source;
+
+            activeEffects.forEach(effect => {
+                try {
+                    effect.node.disconnect();
+                } catch (e) { }
+                prev.connect(effect.node);
+                prev = effect.node;
+            });
+
+            // Connect last effect to channel
+            prev.connect(channel);
+        }
+
+        console.log(`Rebuilt effect chain for channel ${channelId} with ${activeEffects.length} effects`);
     }
 
     previewSound(id, time) {
