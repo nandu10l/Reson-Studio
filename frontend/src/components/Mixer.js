@@ -3,6 +3,7 @@ import '../styles/butter/Mixer.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import { VolumeX, Volume2, Headphones } from './icons/BlenderIcons';
+import { audioEngine } from '../audio/AudioEngine';
 import EffectEditor from './EffectEditor';
 
 // Available effects for the selector
@@ -76,20 +77,26 @@ const MixerChannel = React.memo(({
   const faderRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
-  // Simulate level meter animation
+  // Real audio level meter - reads actual levels from AudioEngine
   useEffect(() => {
-    if (!muted) {
-      const interval = setInterval(() => {
-        const baseLevel = (vol / 100) * 0.85;
-        setLevelL(baseLevel * (0.6 + Math.random() * 0.4));
-        setLevelR(baseLevel * (0.6 + Math.random() * 0.4));
-      }, 50);
-      return () => clearInterval(interval);
-    } else {
-      setLevelL(0);
-      setLevelR(0);
-    }
-  }, [muted, vol]);
+    const updateLevels = () => {
+      if (!muted && audioEngine.isPlaying()) {
+        // Get real audio level from the engine
+        const level = audioEngine.getChannelLevel(id);
+        // Add slight stereo variation for visual interest
+        setLevelL(level * (0.95 + Math.random() * 0.1));
+        setLevelR(level * (0.95 + Math.random() * 0.1));
+      } else {
+        // No audio playing or muted - show zero levels
+        setLevelL(0);
+        setLevelR(0);
+      }
+    };
+
+    // Update at 30fps for smooth animation
+    const interval = setInterval(updateLevels, 33);
+    return () => clearInterval(interval);
+  }, [muted, id]);
 
   // Pan knob rotation
   const panRotation = (pan / 50) * 140;

@@ -6,6 +6,8 @@ class AudioEngine {
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
         this.audioPlayers = new Map(); // audioClipId -> Tone.Player
         this.channelEffects = new Map(); // channelId -> [effectNode, ...] (10 slots)
+        this.channelMeters = new Map(); // id -> Tone.Meter for level monitoring
+        this.masterMeter = null; // Master channel meter
         this.isInitialized = false;
         this.previewSynth = null; // Dedicated synth for Piano Roll
         this.masterAnalyser = null; // Analyser for visualization
@@ -70,6 +72,10 @@ class AudioEngine {
         }).connect(this.masterGain);
         this.previewSynth.volume.value = -10;
 
+        // Create master meter for level monitoring
+        this.masterMeter = new Tone.Meter({ smoothing: 0.8 });
+        this.masterGain.connect(this.masterMeter);
+
         this.isInitialized = true;
     }
 
@@ -100,6 +106,53 @@ class AudioEngine {
     // Get master gain node (for channels to connect to)
     getMasterGain() {
         return this.masterGain;
+    }
+
+    /**
+     * Get the current audio level for a specific channel
+     * Returns a value between 0 and 1, where 0 is silence
+     * @param {string|number} channelId - The channel ID
+     * @returns {number} Normalized level (0-1)
+     */
+    getChannelLevel(channelId) {
+        const meter = this.channelMeters.get(channelId);
+        if (!meter) return 0;
+
+        try {
+            const dbValue = meter.getValue();
+            // Convert dB to linear (0-1 range)
+            // -Infinity (silence) -> 0, 0dB -> 1
+            if (dbValue === -Infinity || dbValue < -60) return 0;
+            // Normalize: -60dB to 0dB mapped to 0 to 1
+            const normalized = Math.max(0, Math.min(1, (dbValue + 60) / 60));
+            return normalized;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Get the current master output level
+     * Returns a value between 0 and 1
+     */
+    getMasterLevel() {
+        if (!this.masterMeter) return 0;
+
+        try {
+            const dbValue = this.masterMeter.getValue();
+            if (dbValue === -Infinity || dbValue < -60) return 0;
+            const normalized = Math.max(0, Math.min(1, (dbValue + 60) / 60));
+            return normalized;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Check if the audio transport is currently playing
+     */
+    isPlaying() {
+        return Tone.Transport.state === 'started';
     }
 
     // --- Transport Controls ---
@@ -504,6 +557,11 @@ class AudioEngine {
         } else {
             channel.toDestination(); // Fallback if master gain not initialized
         }
+
+        // Create meter for this channel to monitor audio levels
+        const meter = new Tone.Meter({ smoothing: 0.8 });
+        channel.connect(meter);
+        this.channelMeters.set(id, meter);
 
         this.channels.set(id, channel);
 
