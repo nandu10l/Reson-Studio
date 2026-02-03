@@ -85,6 +85,11 @@ export const ProjectProvider = ({ children }) => {
     const [currentProjectPath, setCurrentProjectPath] = useState(null);
     const needsScheduling = useRef(true);
 
+    // Undo/Redo History for Pattern Notes
+    const [notesHistory, setNotesHistory] = useState([]);
+    const [notesHistoryIndex, setNotesHistoryIndex] = useState(-1);
+    const isUndoRedoAction = useRef(false);
+
     // Audio Recording Refs
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
@@ -296,6 +301,120 @@ export const ProjectProvider = ({ children }) => {
             return p;
         }));
     }, [activePatternId]);
+
+    // Batch add notes (for paste operations)
+    const addNotesToActivePattern = useCallback((notes) => {
+        if (!notes || notes.length === 0) return;
+
+        setPatterns(prev => prev.map(p => {
+            if (p.id === activePatternId) {
+                // Calculate new pattern length if needed
+                const maxNoteEnd = Math.max(...notes.map(n => n.startStep + n.length));
+                let newLength = p.length;
+                if (maxNoteEnd > p.length) {
+                    newLength = Math.ceil(maxNoteEnd / 16) * 16;
+                }
+
+                return {
+                    ...p,
+                    length: newLength,
+                    data: {
+                        ...p.data,
+                        notes: [...p.data.notes, ...notes]
+                    }
+                };
+            }
+            return p;
+        }));
+    }, [activePatternId]);
+
+    // Push current notes state to history (for undo/redo)
+    const pushNotesHistory = useCallback(() => {
+        const activePattern = patterns.find(p => p.id === activePatternId);
+        if (!activePattern || isUndoRedoAction.current) return;
+
+        const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
+
+        setNotesHistory(prev => {
+            // Trim any future history if we're not at the end
+            const newHistory = prev.slice(0, notesHistoryIndex + 1);
+            // Add current state
+            newHistory.push({ patternId: activePatternId, notes: currentNotes });
+            // Limit history size to 50 entries
+            if (newHistory.length > 50) {
+                newHistory.shift();
+            }
+            return newHistory;
+        });
+        setNotesHistoryIndex(prev => Math.min(prev + 1, 49));
+    }, [patterns, activePatternId, notesHistoryIndex]);
+
+    // Undo action
+    const undoNotes = useCallback(() => {
+        if (notesHistoryIndex < 0) return;
+
+        const historyEntry = notesHistory[notesHistoryIndex];
+        if (!historyEntry) return;
+
+        isUndoRedoAction.current = true;
+
+        // First, save current state to enable redo
+        const activePattern = patterns.find(p => p.id === activePatternId);
+        if (activePattern) {
+            const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
+            setNotesHistory(prev => {
+                const newHistory = [...prev];
+                // Store current state at next position for redo
+                newHistory[notesHistoryIndex + 1] = { patternId: activePatternId, notes: currentNotes };
+                return newHistory;
+            });
+        }
+
+        // Restore previous state
+        setPatterns(prev => prev.map(p => {
+            if (p.id === historyEntry.patternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: historyEntry.notes
+                    }
+                };
+            }
+            return p;
+        }));
+
+        setNotesHistoryIndex(prev => prev - 1);
+
+        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
+    }, [notesHistory, notesHistoryIndex, patterns, activePatternId]);
+
+    // Redo action
+    const redoNotes = useCallback(() => {
+        if (notesHistoryIndex >= notesHistory.length - 1) return;
+
+        const nextEntry = notesHistory[notesHistoryIndex + 1];
+        if (!nextEntry) return;
+
+        isUndoRedoAction.current = true;
+
+        setPatterns(prev => prev.map(p => {
+            if (p.id === nextEntry.patternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: nextEntry.notes
+                    }
+                };
+            }
+            return p;
+        }));
+
+        setNotesHistoryIndex(prev => prev + 1);
+
+        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
+    }, [notesHistory, notesHistoryIndex]);
 
     // Track Actions
     const toggleTrackMute = useCallback((trackId) => {
@@ -1113,6 +1232,10 @@ export const ProjectProvider = ({ children }) => {
         // New Actions
         updateNote,
         deleteNotes,
+        addNotesToActivePattern,
+        pushNotesHistory,
+        undoNotes,
+        redoNotes,
         addChannel,
         addEffect,
         removeEffect,
