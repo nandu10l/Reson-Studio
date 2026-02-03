@@ -10,11 +10,11 @@ import EffectEditor from './EffectEditor';
 const AVAILABLE_EFFECTS = [
   { id: 'reverb-1', name: 'Reverb', type: 'spatial' },
   { id: 'delay-1', name: 'Delay', type: 'temporal' },
-  { id: 'chorus-1', name: 'Chorus', type: 'modulation' },
-  { id: 'phaser-1', name: 'Phaser', type: 'modulation' },
-  { id: 'dist-1', name: 'Distortion', type: 'saturation' },
-  { id: 'comp-1', name: 'Compressor', type: 'dynamics' },
-  { id: 'eq-1', name: 'Parametric EQ', type: 'filter' }
+  { id: 'chorus-1', name: 'Chorus', type: 'chorus' },
+  { id: 'phaser-1', name: 'Phaser', type: 'phaser' },
+  { id: 'dist-1', name: 'Distortion', type: 'distortion' },
+  { id: 'comp-1', name: 'Compressor', type: 'compressor' },
+  { id: 'eq-1', name: 'Parametric EQ', type: 'eq' }
 ];
 
 // Effect Selector Modal

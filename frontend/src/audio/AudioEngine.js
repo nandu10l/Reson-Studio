@@ -676,24 +676,24 @@ class AudioEngine {
         switch (type) {
             case 'reverb':
             case 'spatial':
-                return new Tone.Reverb({ decay: 1.5, preDelay: 0.01, wet: 0.5 });
+                return this.createReverbEffect();
             case 'delay':
             case 'temporal':
-                return new Tone.FeedbackDelay({ delayTime: 0.3, feedback: 0.4, wet: 0.5 });
+                return this.createDelayEffect();
             case 'chorus':
-                return new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7, wet: 0.5 });
+                return this.createChorusEffect();
             case 'phaser':
             case 'modulation':
-                return new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 350, wet: 0.5 });
+                return this.createPhaserEffect();
             case 'distortion':
             case 'saturation':
-                return new Tone.Distortion({ distortion: 0.4, wet: 0.5 });
+                return this.createDistortionEffect();
             case 'compressor':
             case 'dynamics':
-                return new Tone.Compressor({ threshold: -24, ratio: 4, attack: 0.003, release: 0.25 });
+                return this.createCompressorEffect();
             case 'eq':
             case 'filter':
-                return new Tone.EQ3({ low: 0, mid: 0, high: 0 });
+                return this.createParametricEQEffect();
             default:
                 console.warn(`Unknown effect type: ${type}`);
                 return null;
@@ -790,6 +790,661 @@ class AudioEngine {
         this.rebuildEffectChain(channelId);
     }
 
+    createDelayEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+
+        // Internal Nodes
+        const dry = new Tone.Gain(1).connect(output);
+        const wetChain = new Tone.Gain(0.5).connect(output);
+
+        input.connect(dry);
+
+        const inputVol = new Tone.Gain(1);
+        const panner = new Tone.Panner(0);
+        input.connect(inputVol);
+        inputVol.connect(panner);
+
+        const split = new Tone.Split();
+        panner.connect(split);
+
+        const delayL = new Tone.Delay(0.3, 1);
+        const delayR = new Tone.Delay(0.3, 1);
+
+        const filterL = new Tone.Filter(10000, "lowpass");
+        const filterR = new Tone.Filter(10000, "lowpass");
+
+        const fbL = new Tone.Gain(0.4);
+        const fbR = new Tone.Gain(0.4);
+
+        const merge = new Tone.Merge();
+
+        // Feedback Matrix Gains
+        const fbLtoL = new Tone.Gain(1);
+        const fbLtoR = new Tone.Gain(0);
+        const fbRtoL = new Tone.Gain(0);
+        const fbRtoR = new Tone.Gain(1);
+
+        // Routing
+        // Feed inputs to delays
+        split.connect(delayL, 0);
+        split.connect(delayR, 1);
+
+        // Feedback Loop
+        delayL.connect(filterL);
+        delayR.connect(filterR);
+
+        filterL.connect(fbL);
+        filterR.connect(fbR);
+
+        fbL.connect(fbLtoL); fbL.connect(fbLtoR);
+        fbR.connect(fbRtoL); fbR.connect(fbRtoR);
+
+        fbLtoL.connect(delayL); fbLtoR.connect(delayR);
+        fbRtoL.connect(delayL); fbRtoR.connect(delayR);
+
+        // Output
+        filterL.connect(merge, 0, 0);
+        filterR.connect(merge, 0, 1);
+        merge.connect(wetChain);
+
+        const state = {
+            delayTime: 0.3,
+            offset: 0
+        };
+
+        const updateDelays = () => {
+            const t = state.delayTime;
+            const o = state.offset;
+            delayL.delayTime.rampTo(t, 0.1);
+            // Offset applied to R channel relative to L
+            delayR.delayTime.rampTo(Math.max(0, t + (o * 0.5)), 0.1);
+        };
+
+        const updateMatrix = (mode) => {
+            if (mode === 'Normal') {
+                fbLtoL.gain.value = 1; fbRtoR.gain.value = 1;
+                fbLtoR.gain.value = 0; fbRtoL.gain.value = 0;
+            } else if (mode === 'P.Pong') {
+                fbLtoL.gain.value = 0; fbRtoR.gain.value = 0;
+                fbLtoR.gain.value = 1; fbRtoL.gain.value = 1;
+            } else if (mode === 'Invert') {
+                // Swap channels
+                fbLtoL.gain.value = 0; fbRtoR.gain.value = 0;
+                fbLtoR.gain.value = 1; fbRtoL.gain.value = 1;
+            }
+        };
+
+        return {
+            input, output,
+            wet: wetChain.gain, // Expose wet gain
+
+            // Custom Setters
+            setInputPan: (v) => panner.pan.rampTo(v / 50, 0.1),
+            setInputVol: (v) => inputVol.gain.rampTo(v, 0.1),
+            setFeedbackMode: (v) => updateMatrix(v),
+            setFeedbackVol: (v) => { fbL.gain.rampTo(v, 0.1); fbR.gain.rampTo(v, 0.1); },
+            setCut: (v) => { filterL.frequency.rampTo(v, 0.1); filterR.frequency.rampTo(v, 0.1); },
+            setDelayTime: (v) => { state.delayTime = v; updateDelays(); },
+            setOffset: (v) => { state.offset = v; updateDelays(); },
+            setDryVol: (v) => dry.gain.rampTo(v, 0.1),
+
+            dispose: () => {
+                input.dispose(); output.dispose(); dry.dispose(); wetChain.dispose();
+                inputVol.dispose(); panner.dispose(); split.dispose();
+                delayL.dispose(); delayR.dispose();
+                filterL.dispose(); filterR.dispose();
+                fbL.dispose(); fbR.dispose();
+                fbLtoL.dispose(); fbLtoR.dispose(); fbRtoL.dispose(); fbRtoR.dispose();
+                merge.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+    createReverbEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+
+        // Signal Paths
+        // Dry Path
+        const dryGain = new Tone.Gain(0.8);
+        input.connect(dryGain);
+        dryGain.connect(output);
+
+        // Wet Path Setup
+        const wetChainInput = new Tone.Gain(1);
+        input.connect(wetChainInput);
+
+        // 1. Input Filters
+        const lowCut = new Tone.Filter(100, "highpass");
+        const highCut = new Tone.Filter(6000, "lowpass");
+
+        // 2. Pre-Delay
+        const preDelay = new Tone.Delay(0.02, 0.5); // max 0.5s
+
+        // 3. Reverb Core
+        // Use Tone.Reverb for better quality tails
+        const reverb = new Tone.Reverb({ decay: 2.5, preDelay: 0.0 });
+        reverb.generate(); // Init impulse
+
+        // 4. Post-Reverb Color/Damping
+        const damping = new Tone.Filter(5000, "lowpass"); // Simulate wall absorption
+
+        // 5. Width/Separation
+        // Tone.StereoWidener or Mid/Side
+        const widener = new Tone.StereoWidener(0.5);
+
+        // 6. Wet Volume
+        const wetGain = new Tone.Gain(0.6);
+
+        // Routing
+        wetChainInput.connect(lowCut);
+        lowCut.connect(highCut);
+        highCut.connect(preDelay);
+        preDelay.connect(reverb);
+        reverb.connect(damping);
+        damping.connect(widener);
+        widener.connect(wetGain);
+        wetGain.connect(output);
+
+        // Early Reflections Simulation (simplified as a parallel short delay/slapback)
+        const erGain = new Tone.Gain(0);
+        const erDelay = new Tone.Delay(0.01);
+        wetChainInput.connect(erDelay);
+        erDelay.connect(erGain);
+        erGain.connect(output);
+
+        return {
+            input, output,
+            // Standard wet prop for identification (though we manage dry/wet manually)
+            wet: { value: 0, rampTo: () => { } },
+
+            // Custom Setters
+            setLowCut: (v) => lowCut.frequency.rampTo(v, 0.1),
+            setHighCut: (v) => highCut.frequency.rampTo(v, 0.1),
+            setPreDelay: (v) => preDelay.delayTime.rampTo(v, 0.1),
+            setDecay: (v) => {
+                if (Math.abs(reverb.decay - v) > 0.1) {
+                    reverb.decay = v;
+                    reverb.generate(); // Regenerate IR
+                }
+            },
+            setDamping: (v) => damping.frequency.rampTo(v, 0.1),
+            setDiffusion: (v) => { /* Tone.Reverb doesn't support diffusion easily */ },
+            setSize: (v) => { /* Tone.Reverb doesn't support size easily */ },
+
+            setDryVol: (v) => dryGain.gain.rampTo(v, 0.1),
+            setErVol: (v) => erGain.gain.rampTo(v, 0.1),
+            setWetVol: (v) => wetGain.gain.rampTo(v, 0.1),
+            setSeparation: (v) => widener.width.rampTo(v * 0.5 + 0.5, 0.1), // Map -1..1 to 0..1 (approx)
+
+            dispose: () => {
+                input.dispose(); output.dispose();
+                dryGain.dispose(); wetChainInput.dispose();
+                lowCut.dispose(); highCut.dispose();
+                preDelay.dispose(); reverb.dispose();
+                damping.dispose(); widener.dispose();
+                wetGain.dispose(); erGain.dispose(); erDelay.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+    createChorusEffect() {
+        // Multi-Voice Chorus (3 Voices)
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+
+        // Wet/Dry path
+        const dryNode = new Tone.Gain(1).connect(output);
+        const wetChain = new Tone.Gain(0.5).connect(output);
+
+        input.connect(dryNode);
+
+        // Crossover / Filtering
+        // If Type is HF, we filter input HP -> Chorus. LP goes to dry?
+        // Ideally: Input -> Filter -> Chorus -> WetMix.
+        const inputFilter = new Tone.Filter(320, "highpass"); // Default HF
+        input.connect(inputFilter);
+
+        // 3 Parallel Voices
+        // Voice 1
+        const v1Delay = new Tone.Delay(0.015, 0.1); // min 0, max 0.1
+        const v1LFO = new Tone.LFO(0.45, 0, 0.005); // freq, min, max (depth applied later)
+        const v1Pan = new Tone.Panner(-0.5);
+        v1LFO.connect(v1Delay.delayTime);
+        v1LFO.start();
+
+        // Voice 2
+        const v2Delay = new Tone.Delay(0.015, 0.1);
+        const v2LFO = new Tone.LFO(1.25, 0, 0.005);
+        const v2Pan = new Tone.Panner(0.5);
+        v2LFO.connect(v2Delay.delayTime);
+        v2LFO.start();
+
+        // Voice 3
+        const v3Delay = new Tone.Delay(0.015, 0.1);
+        const v3LFO = new Tone.LFO(2.45, 0, 0.005);
+        const v3Pan = new Tone.Panner(0);
+        v3LFO.connect(v3Delay.delayTime);
+        v3LFO.start();
+
+        // Routing
+        inputFilter.connect(v1Delay);
+        inputFilter.connect(v2Delay);
+        inputFilter.connect(v3Delay);
+
+        v1Delay.connect(v1Pan); v1Pan.connect(wetChain);
+        v2Delay.connect(v2Pan); v2Pan.connect(wetChain);
+        v3Delay.connect(v3Pan); v3Pan.connect(wetChain);
+
+        // State for managing complex updates
+        const state = {
+            delayMs: 15,
+            depthMs: 2.25,
+            stereo: 59, // deg (0-360, but effectively spread)
+            crossType: 'HF'
+        };
+
+        const updateLFOs = () => {
+            // Depth in seconds
+            const depthSec = state.depthMs / 1000;
+            const delaySec = state.delayMs / 1000;
+
+            // Update Min/Max of LFOs based on Delay center and Depth
+            // LFO oscillates around delaySec +/- depth? 
+            // Logic: DelayTime is base. LFO adds 0 to Depth? Or -Depth/2 to +Depth/2?
+            // Tone.LFO output connects to delayTime param.
+            // We set LFO min = delaySec, max = delaySec + depthSec.
+
+            [v1LFO, v2LFO, v3LFO].forEach(lfo => {
+                lfo.min = delaySec;
+                lfo.max = delaySec + depthSec;
+            });
+        };
+
+        const updateStereo = () => {
+            // Map 0-100 (ish logic) or 0-360 degrees to pan spread
+            // 0 -> Mono (all 0), 360 -> Full Wide (-1, 1)
+            // Let's assume 59 is default spread.
+            const spread = Math.min(1, state.stereo / 180); // Normalize roughly
+            v1Pan.pan.value = -spread;
+            v2Pan.pan.value = spread;
+            v3Pan.pan.value = 0;
+        };
+
+        return {
+            input, output,
+            wet: wetChain.gain,
+
+            // Setters
+            setDelayTime: (v) => { state.delayMs = v; updateLFOs(); },
+            setDepth: (v) => { state.depthMs = v; updateLFOs(); },
+            setStereo: (v) => { state.stereo = v; updateStereo(); },
+
+            setLfo1Freq: (v) => v1LFO.frequency.rampTo(v, 0.1),
+            setLfo1Wave: (v) => v1LFO.type = v === 'sin' ? 'sine' : (v === 'tri' ? 'triangle' : 'square'),
+
+            setLfo2Freq: (v) => v2LFO.frequency.rampTo(v, 0.1),
+            setLfo2Wave: (v) => v2LFO.type = v === 'sin' ? 'sine' : (v === 'tri' ? 'triangle' : 'square'),
+
+            setLfo3Freq: (v) => v3LFO.frequency.rampTo(v, 0.1),
+            setLfo3Wave: (v) => v3LFO.type = v === 'sin' ? 'sine' : (v === 'tri' ? 'triangle' : 'square'),
+
+            setCrossType: (v) => {
+                state.crossType = v;
+                if (v === 'HF') {
+                    inputFilter.type = "highpass";
+                    inputFilter.frequency.value = inputFilter.frequency.value; // Refresh
+                } else if (v === 'LF') {
+                    inputFilter.type = "lowpass";
+                } else {
+                    inputFilter.type = "allpass"; // 'Off' or full band
+                }
+            },
+            setCrossCutoff: (v) => inputFilter.frequency.rampTo(v, 0.1),
+            setWet: (v) => wetChain.gain.rampTo(v, 0.1),
+
+            dispose: () => {
+                input.dispose(); output.dispose(); dryNode.dispose(); wetChain.dispose();
+                inputFilter.dispose();
+                v1Delay.dispose(); v1LFO.dispose(); v1Pan.dispose();
+                v2Delay.dispose(); v2LFO.dispose(); v2Pan.dispose();
+                v3Delay.dispose(); v3LFO.dispose(); v3Pan.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+    createPhaserEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+        const outGain = new Tone.Gain(1); // For output gain param
+
+        // Core Phaser
+        // We initialize with defaults matching the Editor
+        const phaser = new Tone.Phaser({
+            frequency: 0.5,
+            octaves: 3,
+            stages: 8,
+            Q: 0.4,
+            baseFrequency: 350,
+            wet: 0.5
+        });
+
+        // Routing
+        input.connect(phaser);
+        phaser.connect(outGain);
+        outGain.connect(output);
+
+        // State for calculating complex props
+        const state = {
+            minDepth: 0.1,
+            maxDepth: 0.8,
+            rangeMode: 'Large', // 'Small' or 'Large'
+        };
+
+        const updateDepth = () => {
+            // Map 0-1 depth params to BaseFreq and Octaves
+            // Fruity Phaser Logic Approx:
+            // Min Depth affects lowest frequency.
+            // Max Depth affects highest frequency (range).
+
+            // Base Range: 200Hz to 2000Hz?
+            // If Range is 'Small', shift up or limit range?
+            // Let's approximate:
+            // BaseFreq = 200 + (minDepth * 800)
+            // TopFreq = BaseFreq + (maxDepth * 2000)
+            // Octaves = Math.log2(TopFreq / BaseFreq)
+
+            const baseMin = state.rangeMode === 'Small' ? 500 : 200;
+            const rangeScale = state.rangeMode === 'Small' ? 1000 : 5000;
+
+            const baseFreq = baseMin + (state.minDepth * 500);
+            const topFreq = baseFreq + Math.max(10, state.maxDepth * rangeScale);
+
+            const octaves = Math.log2(topFreq / baseFreq);
+
+            phaser.baseFrequency = baseFreq;
+            phaser.octaves = Math.max(0.1, octaves);
+        };
+
+        return {
+            input, output,
+            wet: phaser.wet,
+
+            // Setters
+            setSweepFreq: (v) => phaser.frequency.rampTo(v, 0.1),
+            setMinDepth: (v) => { state.minDepth = v; updateDepth(); },
+            setMaxDepth: (v) => { state.maxDepth = v; updateDepth(); },
+            setFreqRange: (v) => { state.rangeMode = v; updateDepth(); },
+            setStereo: (v) => {
+                // Tone.Phaser doesn't expose easy stereo phase offset. 
+                // We could modulate it slightly or leave blank for stability. 
+            },
+            setStages: (v) => {
+                // Changing stages may be glitchy, stick to even numbers or just update
+                phaser.stages = Math.round(v);
+            },
+            setFeedback: (v) => {
+                // Map Feedback to Q (Resonance)
+                phaser.Q.rampTo(v * 10, 0.1);
+            },
+            setWet: (v) => phaser.wet.rampTo(v, 0.1),
+            setOutGain: (v) => {
+                // dB to linear gain
+                // value is -20 to 20
+                const linear = Math.pow(10, v / 20);
+                outGain.gain.rampTo(linear, 0.1);
+            },
+
+            dispose: () => {
+                input.dispose(); output.dispose(); phaser.dispose(); outGain.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+
+
+    createParametricEQEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+        const analyser = new Tone.Analyser('fft', 2048); // For visuals
+
+        // 7 Bands
+        // 1: Low Shelf
+        // 2-6: Peaking
+        // 7: High Shelf
+        const bands = [];
+        const freqs = [60, 130, 300, 800, 2000, 5000, 12000];
+
+        for (let i = 0; i < 7; i++) {
+            let type = 'peaking';
+            if (i === 0) type = 'lowshelf';
+            if (i === 6) type = 'highshelf';
+
+            const filter = new Tone.Filter({
+                frequency: freqs[i],
+                type: type,
+                rolloff: -12,
+                Q: 1,
+                gain: 0
+            });
+            bands.push(filter);
+        }
+
+        // Chain input -> b0 -> b1 ... -> b6 -> output
+        input.connect(bands[0]);
+        for (let i = 0; i < 6; i++) {
+            bands[i].connect(bands[i + 1]);
+        }
+        bands[6].connect(output);
+        bands[6].connect(analyser); // Visualization tap
+
+        return {
+            input, output, analyser,
+            wet: { value: 1, rampTo: () => { } },
+            bands, // Expose for internal checks if needed
+
+            setBand: (index, params) => {
+                const band = bands[index];
+                if (!band) return;
+
+                if (params.freq !== undefined) band.frequency.rampTo(params.freq, 0.1);
+                if (params.gain !== undefined) band.gain.rampTo(params.gain, 0.1);
+                // Tone.Filter Q is standard Q factor
+                if (params.bw !== undefined) band.Q.rampTo(params.bw, 0.1);
+                if (params.type !== undefined) {
+                    // Map generic types if needed, Tone types:
+                    // lowpass, highpass, bandpass, lowshelf, highshelf, notch, allpass, peaking
+                    band.type = params.type;
+                }
+                if (params.slope !== undefined) {
+                    // -12, -24, -48, -96
+                    // Tone.Filter supports -12, -24, -48, -96 for rolloff
+                    // But usually only for lowpass/highpass/bandpass?
+                    // Peaking might not support rolloff.
+                    // We'll set it anyway, Tone handles it or ignores it.
+                    band.rolloff = params.slope;
+                }
+                if (params.enabled !== undefined) {
+                    // If disabled, just set gain to 0 if peaking/shelf or disconnect?
+                    // Gain 0 is safest for now.
+                }
+            },
+
+            dispose: () => {
+                input.dispose(); output.dispose(); analyser.dispose();
+                bands.forEach(b => b.dispose());
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+    createDistortionEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+
+        // Dry/Wet splitting
+        const dryNode = new Tone.Gain(0);
+        const wetChain = new Tone.Gain(1);
+        const outputMix = new Tone.Gain(1);
+
+        input.connect(dryNode);
+        dryNode.connect(outputMix);
+
+        input.connect(wetChain);
+
+        // Chain: Pre -> Gate -> Shaper -> Post -> WetChain -> OutputMix
+        const preGain = new Tone.Gain(1);
+
+        // Threshold (Noise Gate behavior as per Fruity Fast Dist)
+        const gate = new Tone.Gate(-60, 0.1); // default low
+
+        // Distortion Shaper
+        // We use WaveShaper for custom Types A/B
+        const shaper = new Tone.WaveShaper((x) => x, 4096);
+
+        const postGain = new Tone.Gain(1);
+
+        wetChain.connect(preGain);
+        preGain.connect(gate);
+        gate.connect(shaper);
+        shaper.connect(postGain);
+        postGain.connect(outputMix);
+
+        outputMix.connect(output);
+
+        const state = {
+            type: 'A',
+            mix: 1
+        };
+
+        const updateCurve = () => {
+            // Generate curve based on Type
+            // Type A: Soft/Warm saturation (Tanh-like)
+            // Type B: Harder/Foldback 
+
+            if (state.type === 'A') {
+                // Soft Clip
+                shaper.setMap((x) => Math.tanh(x * 2));
+            } else {
+                // Harder / Asymmetric
+                shaper.setMap((x) => {
+                    // Simple foldback-ish or harder clip
+                    const k = 2; // drive
+                    const y = x * k;
+                    return Math.max(-1, Math.min(1, y)); // Hard clip
+                });
+            }
+        };
+
+        // Init Curve
+        updateCurve();
+
+        return {
+            input, output,
+            wet: { value: 1, rampTo: () => { } }, // Mock
+
+            // Setters
+            setPreGain: (v) => preGain.gain.rampTo(v, 0.1),
+            setThreshold: (v) => {
+                // v is 0-1. Map to dB range for Gate.
+                // 0 = no gate (-Infinity or very low), 1 = high thresh (-10dB?)
+                // Default 0.5
+                const db = -80 + (v * 70); // -80 to -10 dB
+                gate.threshold = db;
+            },
+            setDistType: (v) => { state.type = v; updateCurve(); },
+            setMix: (v) => {
+                state.mix = v;
+                // Dry gain = 1 - v
+                dryNode.gain.value = 1 - v;
+                // Wet line gain logic:
+                wetChain.gain.value = v;
+            },
+            setPostGain: (v) => postGain.gain.rampTo(v, 0.1),
+
+            dispose: () => {
+                input.dispose(); output.dispose();
+                dryNode.dispose(); wetChain.dispose(); outputMix.dispose();
+                preGain.dispose(); gate.dispose(); shaper.dispose(); postGain.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
+    createCompressorEffect() {
+        const input = new Tone.Gain(1);
+        const output = new Tone.Gain(1);
+
+        const comp = new Tone.Compressor({
+            threshold: -15,
+            ratio: 2.4,
+            attack: 0.015,
+            release: 0.2,
+            knee: 30 // Soft-ish default
+        });
+
+        const makeupGain = new Tone.Gain(1);
+
+        input.connect(comp);
+        comp.connect(makeupGain);
+        makeupGain.connect(output);
+
+        const state = {
+            gainDb: 0
+        };
+
+        return {
+            input, output,
+            wet: { value: 1, rampTo: () => { } }, // Always wet for insert compressor usually
+
+            // Setters
+            setThreshold: (v) => comp.threshold.rampTo(v, 0.1),
+            setRatio: (v) => comp.ratio.rampTo(v, 0.1),
+            setGain: (v) => {
+                state.gainDb = v;
+                // dB to linear
+                const linear = Math.pow(10, v / 20);
+                makeupGain.gain.rampTo(linear, 0.1);
+            },
+            setAttack: (v) => {
+                // v is in ms, Tone wants seconds
+                const sec = Math.max(0.001, v / 1000);
+                comp.attack.rampTo(sec, 0.1);
+            },
+            setRelease: (v) => {
+                // v is in ms, Tone wants seconds
+                const sec = Math.max(0.01, v / 1000);
+                comp.release.rampTo(sec, 0.1);
+            },
+            setType: (v) => {
+                // Map Type to Knee
+                let k = 30;
+                if (v === 'Hard') k = 0;
+                else if (v === 'Medium') k = 15;
+                else if (v === 'Soft') k = 30;
+                else if (v === 'Vintage') k = 40; // Very soft knee
+                comp.knee.rampTo(k, 0.2);
+            },
+
+            dispose: () => {
+                input.dispose(); output.dispose(); comp.dispose(); makeupGain.dispose();
+            },
+            connect: (d) => output.connect(d),
+            disconnect: () => output.disconnect()
+        };
+    }
+
     /**
      * Update effect parameters (e.g., reverb decay, delay time, etc.)
      */
@@ -805,82 +1460,190 @@ class AudioEngine {
             switch (type) {
                 case 'reverb':
                 case 'spatial':
-                    if (params.decay !== undefined && effect.decay !== undefined) {
-                        effect.decay = params.decay;
-                    }
-                    if (params.preDelay !== undefined && effect.preDelay !== undefined) {
-                        effect.preDelay = params.preDelay;
+                    if (effect.setDecay) {
+                        // Custom Reverb
+                        if (params.lowCut !== undefined) effect.setLowCut(params.lowCut);
+                        if (params.highCut !== undefined) effect.setHighCut(params.highCut);
+                        if (params.preDelay !== undefined) effect.setPreDelay(params.preDelay);
+                        if (params.decay !== undefined) effect.setDecay(params.decay);
+                        if (params.damping !== undefined) effect.setDamping(params.damping);
+                        if (params.dryVol !== undefined) effect.setDryVol(params.dryVol);
+                        if (params.erVol !== undefined) effect.setErVol(params.erVol);
+                        if (params.wet !== undefined) effect.setWetVol(params.wet);
+                        if (params.separation !== undefined) effect.setSeparation(params.separation);
+                    } else {
+                        // Fallback
+                        if (params.decay !== undefined && effect.decay !== undefined) {
+                            effect.decay = params.decay;
+                        }
+                        if (params.preDelay !== undefined && effect.preDelay !== undefined) {
+                            effect.preDelay = params.preDelay;
+                        }
                     }
                     break;
 
                 case 'delay':
                 case 'temporal':
-                    if (params.delayTime !== undefined && effect.delayTime) {
-                        effect.delayTime.rampTo(params.delayTime, 0.1);
-                    }
-                    if (params.feedback !== undefined && effect.feedback) {
-                        effect.feedback.rampTo(params.feedback, 0.1);
+                    // Check for custom setters (Advanced Delay)
+                    if (effect.setDelayTime) {
+                        if (params.inputPan !== undefined) effect.setInputPan(params.inputPan);
+                        if (params.inputVol !== undefined) effect.setInputVol(params.inputVol);
+                        if (params.feedbackMode !== undefined) effect.setFeedbackMode(params.feedbackMode);
+                        if (params.feedbackVol !== undefined) effect.setFeedbackVol(params.feedbackVol);
+                        if (params.cut !== undefined) effect.setCut(params.cut);
+                        if (params.delayTime !== undefined) effect.setDelayTime(params.delayTime);
+                        if (params.offset !== undefined) effect.setOffset(params.offset);
+                        if (params.dryVol !== undefined) effect.setDryVol(params.dryVol);
+                    } else {
+                        // Fallback for standard nodes if any
+                        if (params.delayTime !== undefined && effect.delayTime) {
+                            effect.delayTime.rampTo(params.delayTime, 0.1);
+                        }
+                        if (params.feedback !== undefined && effect.feedback) {
+                            effect.feedback.rampTo(params.feedback, 0.1);
+                        }
                     }
                     break;
 
                 case 'chorus':
-                    if (params.frequency !== undefined && effect.frequency) {
-                        effect.frequency.rampTo(params.frequency, 0.1);
-                    }
-                    if (params.delayTime !== undefined && effect.delayTime !== undefined) {
-                        effect.delayTime = params.delayTime;
-                    }
-                    if (params.depth !== undefined && effect.depth !== undefined) {
-                        effect.depth = params.depth;
+                    if (effect.setDelayTime) {
+                        // Custom 3-Voice Chorus
+                        if (params.delayTime !== undefined) effect.setDelayTime(params.delayTime);
+                        if (params.depth !== undefined) effect.setDepth(params.depth);
+                        if (params.stereo !== undefined) effect.setStereo(params.stereo);
+
+                        if (params.lfo1Freq !== undefined) effect.setLfo1Freq(params.lfo1Freq);
+                        if (params.lfo1Wave !== undefined) effect.setLfo1Wave(params.lfo1Wave);
+
+                        if (params.lfo2Freq !== undefined) effect.setLfo2Freq(params.lfo2Freq);
+                        if (params.lfo2Wave !== undefined) effect.setLfo2Wave(params.lfo2Wave);
+
+                        if (params.lfo3Freq !== undefined) effect.setLfo3Freq(params.lfo3Freq);
+                        if (params.lfo3Wave !== undefined) effect.setLfo3Wave(params.lfo3Wave);
+
+                        if (params.crossType !== undefined) effect.setCrossType(params.crossType);
+                        if (params.crossCutoff !== undefined) effect.setCrossCutoff(params.crossCutoff);
+                        if (params.wet !== undefined) effect.setWet(params.wet);
+                    } else {
+                        // Fallback
+                        if (params.frequency !== undefined && effect.frequency) {
+                            effect.frequency.rampTo(params.frequency, 0.1);
+                        }
+                        if (params.delayTime !== undefined && effect.delayTime !== undefined) {
+                            effect.delayTime = params.delayTime;
+                        }
+                        if (params.depth !== undefined && effect.depth !== undefined) {
+                            effect.depth = params.depth;
+                        }
                     }
                     break;
 
                 case 'phaser':
                 case 'modulation':
-                    if (params.frequency !== undefined && effect.frequency) {
-                        effect.frequency.rampTo(params.frequency, 0.1);
-                    }
-                    if (params.octaves !== undefined && effect.octaves !== undefined) {
-                        effect.octaves = params.octaves;
-                    }
-                    if (params.baseFrequency !== undefined && effect.baseFrequency !== undefined) {
-                        effect.baseFrequency = params.baseFrequency;
+                    if (effect.setSweepFreq) {
+                        // Custom Phaser
+                        if (params.sweepFreq !== undefined) effect.setSweepFreq(params.sweepFreq);
+                        if (params.minDepth !== undefined) effect.setMinDepth(params.minDepth);
+                        if (params.maxDepth !== undefined) effect.setMaxDepth(params.maxDepth);
+                        if (params.freqRange !== undefined) effect.setFreqRange(params.freqRange);
+                        if (params.stereo !== undefined) effect.setStereo(params.stereo);
+                        if (params.stages !== undefined) effect.setStages(params.stages);
+                        if (params.feedback !== undefined) effect.setFeedback(params.feedback);
+                        if (params.wet !== undefined) effect.setWet(params.wet);
+                        if (params.outGain !== undefined) effect.setOutGain(params.outGain);
+                    } else {
+                        // Fallback
+                        if (params.frequency !== undefined && effect.frequency) {
+                            effect.frequency.rampTo(params.frequency, 0.1);
+                        }
+                        if (params.octaves !== undefined && effect.octaves !== undefined) {
+                            effect.octaves = params.octaves;
+                        }
+                        if (params.baseFrequency !== undefined && effect.baseFrequency !== undefined) {
+                            effect.baseFrequency = params.baseFrequency;
+                        }
                     }
                     break;
 
                 case 'distortion':
                 case 'saturation':
-                    if (params.distortion !== undefined && effect.distortion !== undefined) {
-                        effect.distortion = params.distortion;
+                    if (effect.setPreGain) {
+                        // Custom Distortion
+                        if (params.preGain !== undefined) effect.setPreGain(params.preGain);
+                        if (params.threshold !== undefined) effect.setThreshold(params.threshold);
+                        if (params.distType !== undefined) effect.setDistType(params.distType);
+                        if (params.mix !== undefined) effect.setMix(params.mix);
+                        if (params.postGain !== undefined) effect.setPostGain(params.postGain);
+                    } else {
+                        // Fallback
+                        if (params.distortion !== undefined && effect.distortion !== undefined) {
+                            effect.distortion = params.distortion;
+                        }
                     }
                     break;
 
                 case 'compressor':
                 case 'dynamics':
-                    if (params.threshold !== undefined && effect.threshold) {
-                        effect.threshold.rampTo(params.threshold, 0.1);
-                    }
-                    if (params.ratio !== undefined && effect.ratio) {
-                        effect.ratio.rampTo(params.ratio, 0.1);
-                    }
-                    if (params.attack !== undefined && effect.attack) {
-                        effect.attack.rampTo(params.attack, 0.1);
-                    }
-                    if (params.release !== undefined && effect.release) {
-                        effect.release.rampTo(params.release, 0.1);
+                    if (effect.setThreshold) {
+                        // Custom Compressor
+                        if (params.threshold !== undefined) effect.setThreshold(params.threshold);
+                        if (params.ratio !== undefined) effect.setRatio(params.ratio);
+                        if (params.gain !== undefined) effect.setGain(params.gain);
+                        if (params.attack !== undefined) effect.setAttack(params.attack);
+                        if (params.release !== undefined) effect.setRelease(params.release);
+                        if (params.type !== undefined) effect.setType(params.type);
+                    } else {
+                        // Fallback
+                        if (params.threshold !== undefined && effect.threshold) {
+                            effect.threshold.rampTo(params.threshold, 0.1);
+                        }
+                        if (params.ratio !== undefined && effect.ratio) {
+                            effect.ratio.rampTo(params.ratio, 0.1);
+                        }
+                        if (params.attack !== undefined && effect.attack) {
+                            // Convert ms to s if needed, but fallback assumes standard units
+                            // We should probably check range. Standard Tone Comp takes seconds.
+                            // If params coming from new UI are > 1 (ms), convert.
+                            const val = params.attack > 1 ? params.attack / 1000 : params.attack;
+                            effect.attack.rampTo(val, 0.1);
+                        }
+                        if (params.release !== undefined && effect.release) {
+                            const val = params.release > 1 ? params.release / 1000 : params.release;
+                            effect.release.rampTo(val, 0.1);
+                        }
                     }
                     break;
 
                 case 'eq':
                 case 'filter':
-                    if (params.low !== undefined && effect.low) {
-                        effect.low.rampTo(params.low, 0.05);
-                    }
-                    if (params.mid !== undefined && effect.mid) {
-                        effect.mid.rampTo(params.mid, 0.05);
-                    }
-                    if (params.high !== undefined && effect.high) {
-                        effect.high.rampTo(params.high, 0.05);
+                    // Expect params like: { bandIndex: 0, freq: 100, gain: 5 }
+                    // OR flattened: { b0Freq: 100, ... }
+                    // Let's support the flattened style for easier React state mapping
+
+                    // Or check for specific keys
+                    if (effect.setBand) {
+                        // Check for flattened updates
+                        // We iterate 0-6
+                        for (let i = 0; i < 7; i++) {
+                            const prefix = `b${i}`;
+                            const update = {};
+                            let hasUpdate = false;
+
+                            if (params[`${prefix}Freq`] !== undefined) { update.freq = params[`${prefix}Freq`]; hasUpdate = true; }
+                            if (params[`${prefix}Gain`] !== undefined) { update.gain = params[`${prefix}Gain`]; hasUpdate = true; }
+                            if (params[`${prefix}BW`] !== undefined) { update.bw = params[`${prefix}BW`]; hasUpdate = true; }
+                            if (params[`${prefix}Type`] !== undefined) { update.type = params[`${prefix}Type`]; hasUpdate = true; }
+                            if (params[`${prefix}Slope`] !== undefined) { update.slope = params[`${prefix}Slope`]; hasUpdate = true; }
+
+                            if (hasUpdate) {
+                                effect.setBand(i, update);
+                            }
+                        }
+                    } else {
+                        // Fallback for Tone.EQ3
+                        if (params.low !== undefined && effect.low) effect.low.rampTo(params.low, 0.05);
+                        if (params.mid !== undefined && effect.mid) effect.mid.rampTo(params.mid, 0.05);
+                        if (params.high !== undefined && effect.high) effect.high.rampTo(params.high, 0.05);
                     }
                     break;
 
@@ -928,16 +1691,30 @@ class AudioEngine {
             // Chain: source -> effect1 -> effect2 -> ... -> channel
             let prev = source;
 
-            activeEffects.forEach(effect => {
+            activeEffects.forEach(effectEntry => {
+                const node = effectEntry.node;
                 try {
-                    effect.node.disconnect();
+                    // Handle disconnect for both standard nodes and wrappers
+                    if (node.disconnect) node.disconnect();
                 } catch (e) { }
-                prev.connect(effect.node);
-                prev = effect.node;
+
+                // Check if the node is a custom wrapper with an input property
+                if (node.input) {
+                    prev.connect(node.input);
+                } else {
+                    // Standard Tone.js node
+                    prev.connect(node);
+                }
+                prev = node;
             });
 
             // Connect last effect to channel
-            prev.connect(channel);
+            if (prev.connect) {
+                // If wrapper, it has connect method defined
+                prev.connect(channel);
+            } else {
+                // Should not happen if prev is node or wrapper
+            }
         }
 
         console.log(`Rebuilt effect chain for channel ${channelId} with ${activeEffects.length} effects`);

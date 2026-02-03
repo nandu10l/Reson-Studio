@@ -1,4 +1,4 @@
-/* Effect Editor Modal Styles */
+/* Effect Editor Modal Styles - Reson Theme */
 
 .effect-editor-overlay {
     position: fixed;
@@ -6,39 +6,45 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.75);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10001;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
 }
 
 .effect-editor-modal {
-    background: linear-gradient(180deg, #3a3a3a 0%, #2d2d2d 100%);
-    border: 1px solid #555;
-    border-radius: 8px;
-    min-width: 300px;
-    max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    overflow: hidden;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 4px;
+    min-width: 620px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    animation: effectEditorFadeIn 0.2s ease-out;
 }
 
+/* Header */
 .effect-editor-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
-    background: linear-gradient(180deg, #4a4a4a 0%, #3a3a3a 100%);
-    border-bottom: 1px solid #555;
+    padding: 8px 12px;
+    background: #333;
+    border-bottom: 1px solid #222;
+    height: 36px;
 }
 
 .effect-editor-title {
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 600;
-    color: #fff;
-    text-transform: uppercase;
+    color: #4ade80;
+    /* Reson Green */
     letter-spacing: 0.5px;
+    text-transform: uppercase;
 }
 
 .effect-editor-controls {
@@ -48,74 +54,126 @@
 }
 
 .effect-editor-power {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    border: none;
-    background: #333;
-    color: #666;
-    font-size: 10px;
+    background: #222;
+    border: 1px solid #555;
+    color: transparent;
     cursor: pointer;
-    transition: all 0.2s;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
     display: flex;
-    align-items: center;
     justify-content: center;
+    align-items: center;
+    font-size: 0;
+    transition: all 0.2s;
 }
 
 .effect-editor-power:hover {
-    background: #444;
+    border-color: #888;
 }
 
 .effect-editor-power.active {
     background: #4ade80;
-    color: #1a1a1a;
+    border-color: #22c55e;
     box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
 }
 
 .effect-editor-close {
     width: 24px;
     height: 24px;
-    border-radius: 4px;
-    border: none;
     background: transparent;
+    border: none;
     color: #888;
     font-size: 18px;
     cursor: pointer;
-    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: color 0.1s;
 }
 
 .effect-editor-close:hover {
-    background: rgba(255, 255, 255, 0.1);
     color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
 }
 
+/* Body */
 .effect-editor-body {
-    padding: 20px;
+    padding: 12px;
+    /* Nicer padding */
+    background: #252525;
+    position: relative;
+    user-select: none;
 }
 
-.effect-editor-params {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: 20px;
-    justify-items: center;
+/* No Watermark */
+.effect-editor-body::after {
+    display: none;
 }
 
+/* Sections Container */
+.effect-editor-sections {
+    display: flex;
+    gap: 1px;
+    background: #1a1a1a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Individual Section */
+.effect-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #2d2d2d;
+    min-height: 140px;
+    padding-bottom: 10px;
+}
+
+/* Section Header */
+.effect-section-header {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-style: normal;
+    font-size: 10px;
+    color: #888;
+    padding: 6px 0 0 10px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    background: transparent;
+    text-align: left;
+    height: 24px;
+}
+
+.effect-section-content {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+}
+
+/* Parameter Group */
 .effect-param {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    width: 50px;
+    position: relative;
 }
 
+/* Knob Styling - Clean Reson Style */
 .effect-param-knob {
     position: relative;
-    width: 50px;
-    height: 50px;
-    cursor: pointer;
-    user-select: none;
+    width: 44px;
+    height: 44px;
+    cursor: ns-resize;
 }
 
 .effect-param-knob-bg {
@@ -123,14 +181,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
-    background: linear-gradient(180deg, #555 0%, #333 100%);
-    border: 1px solid #666;
+    background: linear-gradient(135deg, #3d3d3d, #252525);
+    border: 1px solid #111;
     box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.3),
-        0 2px 4px rgba(0, 0, 0, 0.2);
+        1px 2px 5px rgba(0, 0, 0, 0.4),
+        inset 0 1px 1px rgba(255, 255, 255, 0.05);
 }
 
 .effect-param-knob-indicator {
@@ -138,66 +196,190 @@
     top: 50%;
     left: 50%;
     width: 3px;
-    height: 12px;
+    height: 14px;
     background: #4ade80;
-    border-radius: 1px;
+    /* Reson Green */
+    border-radius: 2px;
     transform-origin: center bottom;
     transform: translateX(-50%) translateY(-100%) rotate(var(--rotation, 0deg));
-    box-shadow: 0 0 4px rgba(74, 222, 128, 0.5);
+    box-shadow: 0 0 5px rgba(74, 222, 128, 0.6);
     z-index: 2;
 }
 
 .effect-param-knob-track {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     width: 100%;
     height: 100%;
-    z-index: 1;
+    opacity: 0.4;
+    pointer-events: none;
 }
 
-.effect-param-knob:hover .effect-param-knob-bg {
-    border-color: #888;
+.effect-param-knob-track circle:first-child {
+    stroke: #1a1a1a;
+    stroke-width: 3;
 }
 
-.effect-param-knob:active .effect-param-knob-bg {
-    border-color: #4ade80;
+.effect-param-knob-track circle:last-child {
+    stroke: #4ade80;
+    stroke-width: 3;
 }
 
-.effect-param-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
+/* Slider/Fader Styles */
+.effect-param-slider {
+    width: 30px;
+    height: 100%;
+    justify-content: flex-end;
 }
 
+.effect-slider-track {
+    width: 6px;
+    height: 80px;
+    background: #111;
+    border-radius: 3px;
+    position: relative;
+    cursor: ns-resize;
+    border: 1px solid #333;
+}
+
+.effect-slider-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: #4ade80;
+    border-radius: 3px;
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.effect-slider-handle {
+    position: absolute;
+    left: 50%;
+    width: 12px;
+    height: 6px;
+    background: #ddd;
+    border-radius: 1px;
+    transform: translate(-50%, 50%);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    z-index: 2;
+    pointer-events: none;
+}
+
+.effect-slider-track:hover .effect-slider-handle {
+    background: #fff;
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+/* Param Info */
 .effect-param-name {
-    font-size: 10px;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 9px;
+    color: #aaa;
+    font-family: inherit;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    text-align: center;
 }
 
 .effect-param-value {
-    font-size: 11px;
-    color: #fff;
+    display: none;
+}
+
+.effect-param:hover .effect-param-value {
+    display: block;
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: #4ade80;
+    padding: 3px 6px;
+    z-index: 20;
+    border: 1px solid #4ade80;
+    font-size: 10px;
+    white-space: nowrap;
+    border-radius: 3px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Mode Selector */
+.effect-mode-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    padding: 6px;
+    border: 1px solid #222;
+    background: #252525;
+    border-radius: 4px;
+    margin-right: 4px;
+}
+
+.effect-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 6px;
+    width: 100%;
+    border-radius: 3px;
+    transition: background 0.1s;
+}
+
+.effect-mode-option:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.effect-mode-radio {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #222;
+    border: 1px solid #555;
+    position: relative;
+    transition: all 0.2s;
+}
+
+.effect-mode-option.active .effect-mode-radio {
+    background: #4ade80;
+    border-color: #22c55e;
+    box-shadow: 0 0 5px rgba(74, 222, 128, 0.5);
+}
+
+/* Tiny dot in center */
+.effect-mode-option.active .effect-mode-radio::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 4px;
+    background: #1a1a1a;
+    border-radius: 50%;
+}
+
+.effect-mode-label {
+    font-size: 10px;
+    color: #888;
     font-weight: 500;
-    font-family: 'Consolas', 'Monaco', monospace;
+    text-transform: uppercase;
 }
 
-/* Animation for opening */
-.effect-editor-modal {
-    animation: effectEditorSlideIn 0.2s ease-out;
+.effect-mode-option.active .effect-mode-label {
+    color: #fff;
 }
 
-@keyframes effectEditorSlideIn {
+@keyframes effectEditorFadeIn {
     from {
         opacity: 0;
-        transform: scale(0.95) translateY(-10px);
+        transform: scale(0.98);
     }
 
     to {
         opacity: 1;
-        transform: scale(1) translateY(0);
+        transform: scale(1);
     }
 }
