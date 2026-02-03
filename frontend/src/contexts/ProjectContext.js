@@ -66,6 +66,9 @@ export const ProjectProvider = ({ children }) => {
     const [activeAudioClipId, setActiveAudioClipId] = useState(null);
     const [activeAutomationId, setActiveAutomationId] = useState(null);
 
+    // 8. Selection State
+    const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
 
@@ -305,6 +308,22 @@ export const ProjectProvider = ({ children }) => {
         setPlaylistTracks(prev => prev.map(t =>
             t.id === trackId ? { ...t, solo: !t.solo } : t
         ));
+    }, []);
+
+    const selectChannel = useCallback((channelId, isMultiSelect = false) => {
+        setSelectedChannelIds(prev => {
+            if (isMultiSelect) {
+                // Toggle selection
+                if (prev.includes(channelId)) {
+                    return prev.filter(id => id !== channelId);
+                } else {
+                    return [...prev, channelId];
+                }
+            } else {
+                // Single selection
+                return [channelId];
+            }
+        });
     }, []);
 
     // Optimization: Track if scheduling is needed
@@ -1115,6 +1134,9 @@ export const ProjectProvider = ({ children }) => {
         playheadPosition,
         setPlayheadPosition,
         seek,
+
+        // Selection
+        selectedChannelIds, selectChannel,
 
         // Audio Clips
         audioClips,

@@ -62,7 +62,7 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
     );
 };
 
-const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }) => {
+const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying, isSelected, onSelect }) => {
     const { toggleStepInActivePattern, updateChannelVolume, updateChannelPan, previewChannelSound } = useProject();
     const { useGuideHandlers } = useGuide();
     const handleToggleStep = (index) => {
@@ -139,6 +139,13 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
                 </div>
             </div>
 
+            {/* Selection Indicator */}
+            <div
+                className={`channel-selector ${isSelected ? 'selected' : ''}`}
+                onClick={onSelect}
+                title="Select Channel"
+            />
+
             {/* Step Sequencer Grid */}
             <div className="step-sequencer">
                 {steps.map((active, i) => {
@@ -162,7 +169,7 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
 });
 
 // Audio Channel component - displays waveform instead of step sequencer
-const AudioChannel = React.memo(({ audioClip }) => {
+const AudioChannel = React.memo(({ audioClip, isSelected, onSelect }) => {
     const waveformRef = useRef(null);
 
     return (
@@ -193,6 +200,13 @@ const AudioChannel = React.memo(({ audioClip }) => {
                     {audioClip.name}
                 </div>
             </div>
+
+            {/* Selection Indicator */}
+            <div
+                className={`channel-selector ${isSelected ? 'selected' : ''}`}
+                onClick={onSelect}
+                title="Select Channel"
+            />
 
             {/* Waveform Display instead of Step Sequencer */}
             <div className="audio-waveform-container" ref={waveformRef}>
@@ -235,7 +249,7 @@ const AudioChannel = React.memo(({ audioClip }) => {
 });
 
 const ChannelRack = () => {
-    const { channels, activePattern, isPlaying, togglePlayback, bpm, addChannel, audioClips } = useProject();
+    const { channels, activePattern, isPlaying, togglePlayback, bpm, addChannel, audioClips, selectedChannelIds, selectChannel } = useProject();
     const rackRef = useRef(null);
     const [filterType, setFilterType] = useState('all'); // 'all', 'audio', 'unsorted'
     const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
@@ -476,6 +490,8 @@ const ChannelRack = () => {
                             <AudioChannel
                                 key={`audio-${item.id}`}
                                 audioClip={item}
+                                isSelected={selectedChannelIds.includes(`audio-${item.id}`)}
+                                onSelect={(e) => selectChannel(`audio-${item.id}`, e.ctrlKey || e.metaKey)}
                             />
                         ) : (
                             <Channel
@@ -487,6 +503,8 @@ const ChannelRack = () => {
                                 color={activePattern.color}
                                 steps={activePattern.data.steps[item.id] || Array(activePattern.length).fill(false)}
                                 isPlaying={isPlaying}
+                                isSelected={selectedChannelIds.includes(item.id)}
+                                onSelect={(e) => selectChannel(item.id, e.ctrlKey || e.metaKey)}
                             />
                         )
                     ))
