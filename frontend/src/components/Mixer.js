@@ -75,27 +75,47 @@ const MixerChannel = React.memo(({
   const [isDraggingFader, setIsDraggingFader] = useState(false);
   const [isDraggingPan, setIsDraggingPan] = useState(false);
   const faderRef = useRef(null);
+  const rafRef = useRef(null);
   const { useGuideHandlers } = useGuide();
 
-  // Real audio level meter - reads actual levels from AudioEngine
+  // Optimized audio level meter using requestAnimationFrame for better performance
   useEffect(() => {
-    const updateLevels = () => {
-      if (!muted && audioEngine.isPlaying()) {
-        // Get real audio level from the engine
-        const level = audioEngine.getChannelLevel(id);
-        // Add slight stereo variation for visual interest
-        setLevelL(level * (0.95 + Math.random() * 0.1));
-        setLevelR(level * (0.95 + Math.random() * 0.1));
-      } else {
-        // No audio playing or muted - show zero levels
-        setLevelL(0);
-        setLevelR(0);
+    let lastUpdate = 0;
+    const minInterval = 66; // Update at ~15fps for better performance (still smooth)
+    let prevLevelL = 0;
+    let prevLevelR = 0;
+
+    const updateLevels = (timestamp) => {
+      if (timestamp - lastUpdate >= minInterval) {
+        if (!muted && audioEngine.isPlaying()) {
+          const level = audioEngine.getChannelLevel(id);
+          const newLevelL = level * (0.95 + Math.random() * 0.1);
+          const newLevelR = level * (0.95 + Math.random() * 0.1);
+
+          // Only update if values changed significantly (reduce unnecessary renders)
+          if (Math.abs(newLevelL - prevLevelL) > 0.01 || Math.abs(newLevelR - prevLevelR) > 0.01) {
+            setLevelL(newLevelL);
+            setLevelR(newLevelR);
+            prevLevelL = newLevelL;
+            prevLevelR = newLevelR;
+          }
+        } else if (prevLevelL !== 0 || prevLevelR !== 0) {
+          setLevelL(0);
+          setLevelR(0);
+          prevLevelL = 0;
+          prevLevelR = 0;
+        }
+        lastUpdate = timestamp;
       }
+      rafRef.current = requestAnimationFrame(updateLevels);
     };
 
-    // Update at 30fps for smooth animation
-    const interval = setInterval(updateLevels, 33);
-    return () => clearInterval(interval);
+    rafRef.current = requestAnimationFrame(updateLevels);
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, [muted, id]);
 
   // Pan knob rotation
@@ -107,16 +127,25 @@ const MixerChannel = React.memo(({
     e.stopPropagation();
     setIsDraggingFader(true);
 
+    const rect = faderRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    let rafId = null;
     const handleMouseMove = (moveEvent) => {
-      if (faderRef.current) {
-        const rect = faderRef.current.getBoundingClientRect();
+      // Cancel previous RAF if still pending
+      if (rafId) cancelAnimationFrame(rafId);
+
+      // Schedule update for next frame
+      rafId = requestAnimationFrame(() => {
         const y = moveEvent.clientY - rect.top;
         const percent = Math.max(0, Math.min(100, 100 - (y / rect.height) * 100));
         onVolChange(Math.round(percent));
-      }
+        rafId = null;
+      });
     };
 
     const handleMouseUp = () => {
+      if (rafId) cancelAnimationFrame(rafId);
       setIsDraggingFader(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -134,13 +163,22 @@ const MixerChannel = React.memo(({
     const startY = e.clientY;
     const startPan = pan;
 
+    let rafId = null;
     const handleMouseMove = (moveEvent) => {
-      const deltaY = startY - moveEvent.clientY;
-      const newPan = Math.max(-50, Math.min(50, startPan + deltaY));
-      onPanChange(Math.round(newPan));
+      // Cancel previous RAF if still pending
+      if (rafId) cancelAnimationFrame(rafId);
+
+      // Schedule update for next frame
+      rafId = requestAnimationFrame(() => {
+        const deltaY = startY - moveEvent.clientY;
+        const newPan = Math.max(-50, Math.min(50, startPan + deltaY));
+        onPanChange(Math.round(newPan));
+        rafId = null;
+      });
     };
 
     const handleMouseUp = () => {
+      if (rafId) cancelAnimationFrame(rafId);
       setIsDraggingPan(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -180,8 +218,11 @@ const MixerChannel = React.memo(({
   // Level meter gradient
   const getMeterHeight = (level) => `${level * 100}%`;
 
-  // Insert slots (8 visible)
-  const insertSlots = Array(8).fill(null).map((_, i) => effects[i] || null);
+  // Insert slots (8 visible) - Memoize to prevent recalculation on every render
+  const insertSlots = React.useMemo(
+    () => Array(8).fill(null).map((_, i) => effects[i] || null),
+    [effects]
+  );
 
   return (
     <div
@@ -418,8 +459,11 @@ const MixerDetailPanel = React.memo(({
     const startValue = current;
 
     const handleMouseMove = (moveEvent) => {
-      const deltaY = startY - moveEvent.clientY;
-      setter(Math.max(-50, Math.min(50, startValue + deltaY * 0.5)));
+      // Use RAF for smooth EQ updates
+      requestAnimationFrame(() => {
+        const deltaY = startY - moveEvent.clientY;
+        setter(Math.max(-50, Math.min(50, startValue + deltaY * 0.5)));
+      });
     };
 
     const handleMouseUp = () => {

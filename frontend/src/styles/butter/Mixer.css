@@ -158,6 +158,11 @@
   border-right: 1px solid #252525;
   cursor: pointer;
   flex-shrink: 0;
+  transition: background 0.15s ease-out;
+  will-change: background;
+  transform: translateZ(0);
+  contain: layout style paint;
+  /* Isolate rendering for better performance */
 }
 
 .fl-channel:hover {
@@ -280,8 +285,11 @@
       #ff0 70%,
       #f80 85%,
       #f00 100%);
-  transition: height 0.05s linear;
+  transition: height 0.08s linear;
   border-radius: 0 0 2px 2px;
+  will-change: height;
+  transform: translateZ(0);
+  /* Force GPU acceleration */
 }
 
 .fl-meter-scale {
@@ -337,7 +345,7 @@
 .fl-fader-thumb {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(0);
   width: 24px;
   height: 20px;
   background: linear-gradient(to bottom,
@@ -357,6 +365,7 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
+  will-change: bottom;
 }
 
 .fl-fader-thumb::before {
@@ -426,6 +435,8 @@
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.5),
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  transform: translateZ(0);
+  transition: background 0.1s ease-out;
 }
 
 .fl-pan-knob:hover,
@@ -442,8 +453,9 @@
   background: #4f4;
   border-radius: 1px;
   transform-origin: center 8px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(0);
   box-shadow: 0 0 3px rgba(68, 255, 68, 0.5);
+  will-change: transform;
 }
 
 /* ==========================================
@@ -647,7 +659,9 @@
   padding: 0 6px;
   border-bottom: 1px solid #1a1a1a;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background 0.1s ease-out;
+  will-change: background;
+  transform: translateZ(0);
 }
 
 .fl-slot-item:hover {
