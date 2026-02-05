@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { Plus, Grid, ChevronDown, Trash, Edit, Copy, Palette, Volume2, VolumeX, GripVertical, Headphones } from './icons/BlenderIcons';
 import '../styles/blender-icons.css';
 import { useGuide } from '../contexts/GuideContext';
@@ -768,7 +769,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, setAudioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm } = useProject();
   const [selected, setSelected] = useState(null);
 
   // Menu State
@@ -1102,8 +1103,9 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   // Handle dropping audio pack samples onto tracks
   const handleAddAudioPackSample = async (trackId, offset, sampleData) => {
     try {
-      // Parse duration string to get seconds
-      const durationSeconds = audioPackSynth.parseDuration(sampleData.duration, 120); // TODO: use actual BPM
+      // Parse duration string to get seconds using actual BPM
+      const currentBpm = bpm || 120;
+      const durationSeconds = audioPackSynth.parseDuration(sampleData.duration, currentBpm);
 
       // Generate the audio buffer
       const buffer = await audioPackSynth.generateSampleBuffer(
@@ -1115,30 +1117,53 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       // Convert Tone.ToneAudioBuffer to standard AudioBuffer if needed
       const audioBuffer = buffer.get ? buffer.get() : buffer;
 
-      // Calculate duration in beats (assuming 120 BPM default)
-      const bpm = 120; // TODO: get from context
-      const beatsPerSecond = bpm / 60;
+      // Calculate duration in beats
+      const beatsPerSecond = currentBpm / 60;
       const durationBeats = Math.max(1, Math.ceil(durationSeconds * beatsPerSecond));
 
-      // Generate simple waveform data for visualization
+      // Generate waveform data for visualization
       const channelData = audioBuffer.getChannelData(0);
       const waveformLength = 100;
       const waveformData = [];
       const samplesPerPoint = Math.floor(channelData.length / waveformLength);
 
       for (let i = 0; i < waveformLength; i++) {
-        let sum = 0;
+        let min = 0, max = 0;
         const start = i * samplesPerPoint;
         for (let j = 0; j < samplesPerPoint; j++) {
-          sum += Math.abs(channelData[start + j] || 0);
+          const sample = channelData[start + j] || 0;
+          if (sample < min) min = sample;
+          if (sample > max) max = sample;
         }
-        waveformData.push(sum / samplesPerPoint);
+        waveformData.push({ min, max });
       }
 
       // Create a new audio clip ID
       const newClipId = `audiopack-${Date.now()}`;
 
-      // Add to playlist track
+      // Create the audio clip object for the audioClips array (source of truth)
+      const newAudioClip = {
+        id: newClipId,
+        name: sampleData.name,
+        fileName: `${sampleData.name}.wav`,
+        audioBuffer: audioBuffer,
+        waveform: waveformData,
+        duration: durationSeconds,
+        durationBeats: durationBeats,
+        sampleRate: audioBuffer.sampleRate,
+        color: sampleData.color,
+        type: 'audioPackSample',
+        packId: sampleData.packId
+      };
+
+      // Use flushSync to ensure both state updates happen atomically
+      // This prevents the race condition where playlistTracks updates before audioClips
+      flushSync(() => {
+        // Add to audioClips array FIRST (so AudioEngine can find it)
+        setAudioClips(prev => [...prev, newAudioClip]);
+      });
+
+      // Now add to playlist track (audioClips is guaranteed to be updated)
       setPlaylistTracks(prev => prev.map(t => {
         if (t.id !== trackId) return t;
 
@@ -1149,14 +1174,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           offset: offset,
           length: durationBeats,
           name: sampleData.name,
-          color: sampleData.color,
-          // Store generated audio data directly on the clip
-          generatedAudio: {
-            buffer: audioBuffer,
-            waveformData: waveformData,
-            duration: durationSeconds,
-            sampleRate: audioBuffer.sampleRate
-          }
+          color: sampleData.color
         };
         return { ...t, clips: [...t.clips, newClip] };
       }));

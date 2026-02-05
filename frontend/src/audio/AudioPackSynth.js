@@ -1,15 +1,25 @@
 import * as Tone from 'tone';
 
 /**
- * AudioPackSynth - Synthesizes audio samples for the Audio Packs feature
- * Uses Tone.js to generate sounds on-demand without requiring external audio files
+ * AudioPackSynth - Hybrid audio pack system
+ * 
+ * FRONTEND (Tone.js): Instant previews for responsive UX
+ * BACKEND (Python/scipy): High-quality buffer generation with caching
+ * 
+ * This file handles ONLY the preview functionality.
+ * Buffer generation is delegated to the backend API.
  */
+
+const API_BASE = 'http://localhost:8000';
+
 class AudioPackSynth {
     constructor() {
         this.isInitialized = false;
-        this.previewSynth = null;
-        this.previewFilter = null;
-        this.previewNoise = null;
+        this.previewSynths = [];
+        this.previewFilters = [];
+        this.previewNoises = [];
+        this.previewEffects = [];
+        this.bufferCache = new Map(); // Local cache for fetched buffers
     }
 
     async init() {
@@ -19,14 +29,10 @@ class AudioPackSynth {
     }
 
     /**
-     * Preview a sample by playing a short sound
-     * @param {string} sampleId - The sample ID (e.g., 'riser-white', 'swoosh-fast')
-     * @param {string} packType - The pack type (e.g., 'risers', 'swooshes')
+     * Preview a sample by playing a short sound (FRONTEND - instant)
      */
     async previewSample(sampleId, packType) {
         await this.init();
-
-        // Dispose previous synths to prevent memory leaks
         this.disposePreviewSynths();
 
         const now = Tone.now();
@@ -56,424 +62,1112 @@ class AudioPackSynth {
     }
 
     disposePreviewSynths() {
-        if (this.previewSynth) {
-            try { this.previewSynth.dispose(); } catch (e) { }
-            this.previewSynth = null;
-        }
-        if (this.previewFilter) {
-            try { this.previewFilter.dispose(); } catch (e) { }
-            this.previewFilter = null;
-        }
-        if (this.previewNoise) {
-            try { this.previewNoise.dispose(); } catch (e) { }
-            this.previewNoise = null;
-        }
+        this.previewSynths.forEach(s => { try { s.dispose(); } catch (e) { } });
+        this.previewFilters.forEach(f => { try { f.dispose(); } catch (e) { } });
+        this.previewNoises.forEach(n => { try { n.dispose(); } catch (e) { } });
+        this.previewEffects.forEach(e => { try { e.dispose(); } catch (e) { } });
+        this.previewSynths = [];
+        this.previewFilters = [];
+        this.previewNoises = [];
+        this.previewEffects = [];
     }
 
-    // === RISERS ===
+    // === PREVIEW METHODS (distinct sounds for each sample) ===
+
     playRiserPreview(sampleId, now) {
-        const duration = 0.8;
-
-        // Create a filtered noise riser
-        this.previewFilter = new Tone.Filter({
-            frequency: 200,
-            type: 'lowpass',
-            rolloff: -24
-        }).toDestination();
-
-        this.previewNoise = new Tone.Noise({
-            type: sampleId.includes('white') ? 'white' :
-                sampleId.includes('sub') ? 'brown' : 'pink',
-            volume: -12
-        }).connect(this.previewFilter);
-
-        // Frequency sweep up
-        this.previewFilter.frequency.setValueAtTime(200, now);
-        this.previewFilter.frequency.exponentialRampToValueAtTime(8000, now + duration);
-
-        this.previewNoise.start(now);
-        this.previewNoise.stop(now + duration);
-    }
-
-    // === SWOOSHES ===
-    playSwooshPreview(sampleId, now) {
-        const duration = 0.4;
-        const isFast = sampleId.includes('fast');
-
-        this.previewFilter = new Tone.Filter({
-            frequency: 8000,
-            type: 'bandpass',
-            Q: 2
-        }).toDestination();
-
-        this.previewNoise = new Tone.Noise({
-            type: 'white',
-            volume: -8
-        }).connect(this.previewFilter);
-
-        // Frequency sweep
-        const sweepDuration = isFast ? 0.2 : 0.4;
-        this.previewFilter.frequency.setValueAtTime(8000, now);
-        this.previewFilter.frequency.exponentialRampToValueAtTime(200, now + sweepDuration);
-
-        this.previewNoise.start(now);
-        this.previewNoise.stop(now + duration);
-    }
-
-    // === CLICKS ===
-    playClickPreview(sampleId, now) {
-        this.previewSynth = new Tone.MembraneSynth({
-            pitchDecay: 0.01,
-            octaves: 4,
-            oscillator: { type: 'sine' },
-            envelope: {
-                attack: 0.001,
-                decay: 0.05,
-                sustain: 0,
-                release: 0.02
+        switch (sampleId) {
+            case 'riser-white': {
+                const filter = new Tone.Filter({ frequency: 100, type: 'lowpass', rolloff: -24 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -10 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(100, now);
+                filter.frequency.exponentialRampToValueAtTime(12000, now + 1.0);
+                noise.start(now);
+                noise.stop(now + 1.0);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('wood') ? 'G5' :
-            sampleId.includes('snap') ? 'C5' :
-                sampleId.includes('digital') ? 'A6' : 'E5';
-
-        this.previewSynth.triggerAttackRelease(pitch, '32n', now);
-    }
-
-    // === BASS NOTES ===
-    playBassPreview(sampleId, now) {
-        const is808 = sampleId.includes('808');
-
-        this.previewSynth = new Tone.MonoSynth({
-            oscillator: {
-                type: is808 ? 'sine' : 'triangle'
-            },
-            envelope: {
-                attack: 0.005,
-                decay: is808 ? 0.8 : 0.3,
-                sustain: 0.1,
-                release: is808 ? 1.2 : 0.5
-            },
-            filterEnvelope: {
-                attack: 0.001,
-                decay: 0.2,
-                sustain: 0.1,
-                release: 0.3,
-                baseFrequency: 100,
-                octaves: 2
+            case 'riser-sweep': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.8, decay: 0.1, sustain: 0.8, release: 0.2 }
+                }).toDestination();
+                this.previewSynths.push(synth);
+                synth.frequency.setValueAtTime(80, now);
+                synth.frequency.exponentialRampToValueAtTime(800, now + 0.8);
+                synth.triggerAttackRelease('C2', 0.8, now);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('sub') ? 'C1' :
-            sampleId.includes('punch') ? 'E1' : 'G1';
-
-        this.previewSynth.triggerAttackRelease(pitch, '4n', now);
-    }
-
-    // === BEEPS ===
-    playBeepPreview(sampleId, now) {
-        const isRetro = sampleId.includes('retro');
-
-        this.previewSynth = new Tone.Synth({
-            oscillator: {
-                type: isRetro ? 'square' : 'sine'
-            },
-            envelope: {
-                attack: 0.01,
-                decay: 0.1,
-                sustain: 0.3,
-                release: 0.1
+            case 'riser-cinematic': {
+                const filter = new Tone.Filter({ frequency: 200, type: 'lowpass', rolloff: -12 }).toDestination();
+                const reverb = new Tone.Reverb({ decay: 2, wet: 0.5 }).connect(filter);
+                const noise = new Tone.Noise({ type: 'pink', volume: -8 }).connect(reverb);
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 1.2, decay: 0.1, sustain: 0.5, release: 0.3 }
+                }).connect(reverb);
+                this.previewFilters.push(filter);
+                this.previewEffects.push(reverb);
+                this.previewNoises.push(noise);
+                this.previewSynths.push(synth);
+                filter.frequency.setValueAtTime(200, now);
+                filter.frequency.exponentialRampToValueAtTime(6000, now + 1.2);
+                noise.start(now);
+                noise.stop(now + 1.2);
+                synth.triggerAttackRelease('C3', 1.2, now);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('alert') ? 'A5' :
-            sampleId.includes('scan') ? 'E6' :
-                sampleId.includes('robot') ? ['C5', 'E5'] :
-                    sampleId.includes('notification') ? 'G5' : 'C5';
-
-        if (Array.isArray(pitch)) {
-            this.previewSynth.triggerAttackRelease(pitch[0], '16n', now);
-            this.previewSynth.triggerAttackRelease(pitch[1], '16n', now + 0.1);
-        } else {
-            this.previewSynth.triggerAttackRelease(pitch, '8n', now);
+            case 'riser-reverse': {
+                const filter = new Tone.Filter({ frequency: 2000, type: 'highpass', rolloff: -24 }).toDestination();
+                const gain = new Tone.Gain(0).connect(filter);
+                const noise = new Tone.Noise({ type: 'white', volume: -15 }).connect(gain);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                this.previewEffects.push(gain);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(1, now + 0.7);
+                filter.frequency.setValueAtTime(8000, now);
+                filter.frequency.linearRampToValueAtTime(2000, now + 0.7);
+                noise.start(now);
+                noise.stop(now + 0.8);
+                break;
+            }
+            case 'riser-tension': {
+                const filter = new Tone.Filter({ frequency: 300, type: 'bandpass', Q: 5 }).toDestination();
+                const synth1 = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 1.0, decay: 0.1, sustain: 0.7, release: 0.2 }
+                }).connect(filter);
+                const synth2 = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 1.0, decay: 0.1, sustain: 0.5, release: 0.2 }
+                }).connect(filter);
+                synth2.volume.value = -6;
+                this.previewFilters.push(filter);
+                this.previewSynths.push(synth1, synth2);
+                filter.frequency.setValueAtTime(300, now);
+                filter.frequency.exponentialRampToValueAtTime(3000, now + 1.0);
+                synth1.triggerAttackRelease('C2', 1.0, now);
+                synth2.triggerAttackRelease('Db2', 1.0, now);
+                break;
+            }
+            case 'riser-sub': {
+                const filter = new Tone.Filter({ frequency: 60, type: 'lowpass', rolloff: -48 }).toDestination();
+                const noise = new Tone.Noise({ type: 'brown', volume: -6 }).connect(filter);
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 1.0, decay: 0.1, sustain: 0.8, release: 0.3 }
+                }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                this.previewSynths.push(synth);
+                filter.frequency.setValueAtTime(40, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 1.0);
+                noise.start(now);
+                noise.stop(now + 1.0);
+                synth.triggerAttackRelease('C1', 1.0, now);
+                break;
+            }
+            default: {
+                const filter = new Tone.Filter({ frequency: 200, type: 'lowpass' }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -12 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.exponentialRampToValueAtTime(8000, now + 0.8);
+                noise.start(now);
+                noise.stop(now + 0.8);
+            }
         }
     }
 
-    // === FX & TEXTURES ===
+    playSwooshPreview(sampleId, now) {
+        switch (sampleId) {
+            case 'swoosh-fast': {
+                const filter = new Tone.Filter({ frequency: 10000, type: 'bandpass', Q: 3 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -6 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(10000, now);
+                filter.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+                noise.start(now);
+                noise.stop(now + 0.2);
+                break;
+            }
+            case 'swoosh-slow': {
+                const filter = new Tone.Filter({ frequency: 6000, type: 'bandpass', Q: 1.5 }).toDestination();
+                const reverb = new Tone.Reverb({ decay: 1.5, wet: 0.4 }).connect(filter);
+                const noise = new Tone.Noise({ type: 'pink', volume: -8 }).connect(reverb);
+                this.previewFilters.push(filter);
+                this.previewEffects.push(reverb);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(6000, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.8);
+                noise.start(now);
+                noise.stop(now + 0.9);
+                break;
+            }
+            case 'swoosh-vinyl': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'bandpass', Q: 2 }).toDestination();
+                const distortion = new Tone.Distortion(0.3).connect(filter);
+                const noise = new Tone.Noise({ type: 'brown', volume: -8 }).connect(distortion);
+                this.previewFilters.push(filter);
+                this.previewEffects.push(distortion);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(4000, now);
+                filter.frequency.exponentialRampToValueAtTime(500, now + 0.5);
+                noise.start(now);
+                noise.stop(now + 0.6);
+                break;
+            }
+            case 'swoosh-air': {
+                const filter = new Tone.Filter({ frequency: 5000, type: 'lowpass', rolloff: -12 }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -10 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(8000, now);
+                filter.frequency.exponentialRampToValueAtTime(1000, now + 0.4);
+                noise.start(now);
+                noise.stop(now + 0.5);
+                break;
+            }
+            case 'swoosh-transition': {
+                const filter = new Tone.Filter({ frequency: 1000, type: 'bandpass', Q: 2 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -8 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(200, now);
+                filter.frequency.exponentialRampToValueAtTime(8000, now + 0.3);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.6);
+                noise.start(now);
+                noise.stop(now + 0.7);
+                break;
+            }
+            default: {
+                const filter = new Tone.Filter({ frequency: 8000, type: 'bandpass', Q: 2 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -8 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+                noise.start(now);
+                noise.stop(now + 0.4);
+            }
+        }
+    }
+
+    playClickPreview(sampleId, now) {
+        switch (sampleId) {
+            case 'click-vintage': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.008, octaves: 3,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.03 }
+                }).toDestination();
+                synth.volume.value = -4;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('F4', '64n', now);
+                break;
+            }
+            case 'click-finger-snap': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'highpass' }).toDestination();
+                const synth = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
+                }).connect(filter);
+                synth.volume.value = -8;
+                this.previewSynths.push(synth);
+                this.previewFilters.push(filter);
+                synth.triggerAttackRelease('32n', now);
+                break;
+            }
+            case 'click-wood': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.005, octaves: 6,
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -2;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('G5', '64n', now);
+                break;
+            }
+            case 'click-digital': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 0.001, decay: 0.015, sustain: 0, release: 0.01 }
+                }).toDestination();
+                synth.volume.value = -8;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('A6', '128n', now);
+                break;
+            }
+            case 'click-metronome': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -6;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C6', '64n', now);
+                break;
+            }
+            case 'click-mouth': {
+                const filter = new Tone.Filter({ frequency: 2500, type: 'bandpass', Q: 3 }).toDestination();
+                const synth = new Tone.NoiseSynth({
+                    noise: { type: 'pink' },
+                    envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.04 }
+                }).connect(filter);
+                synth.volume.value = -6;
+                this.previewSynths.push(synth);
+                this.previewFilters.push(filter);
+                synth.triggerAttackRelease('32n', now);
+                break;
+            }
+            default: {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.01, octaves: 4,
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+                }).toDestination();
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('E5', '32n', now);
+            }
+        }
+    }
+
+    playBassPreview(sampleId, now) {
+        switch (sampleId) {
+            case 'bass-808': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.08, octaves: 5,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.6, sustain: 0.1, release: 0.8 }
+                }).toDestination();
+                synth.volume.value = -4;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C1', '2n', now);
+                break;
+            }
+            case 'bass-deep': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 1.0, sustain: 0.2, release: 1.0 },
+                    filterEnvelope: { attack: 0.01, decay: 0.3, sustain: 0.2, release: 0.5, baseFrequency: 60, octaves: 1.5 }
+                }).toDestination();
+                synth.volume.value = -2;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('E1', '2n', now);
+                break;
+            }
+            case 'bass-punch': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.005, decay: 0.15, sustain: 0.1, release: 0.2 },
+                    filterEnvelope: { attack: 0.001, decay: 0.1, sustain: 0.1, release: 0.1, baseFrequency: 200, octaves: 3 }
+                }).toDestination();
+                synth.volume.value = -4;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('G1', '8n', now);
+                break;
+            }
+            case 'bass-reese': {
+                const synth1 = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.3 },
+                    filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.2, baseFrequency: 150, octaves: 2 }
+                }).toDestination();
+                const synth2 = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.3 },
+                    filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.2, baseFrequency: 150, octaves: 2 }
+                }).toDestination();
+                synth1.volume.value = -8;
+                synth2.volume.value = -8;
+                synth2.detune.value = 15;
+                this.previewSynths.push(synth1, synth2);
+                synth1.triggerAttackRelease('D1', '4n', now);
+                synth2.triggerAttackRelease('D1', '4n', now);
+                break;
+            }
+            case 'bass-wobble': {
+                const filter = new Tone.Filter({ frequency: 400, type: 'lowpass', Q: 8 }).toDestination();
+                const lfo = new Tone.LFO({ frequency: 4, min: 100, max: 1200 }).start();
+                lfo.connect(filter.frequency);
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 }
+                }).connect(filter);
+                synth.volume.value = -6;
+                this.previewSynths.push(synth);
+                this.previewFilters.push(filter);
+                this.previewEffects.push(lfo);
+                synth.triggerAttackRelease('E1', '4n', now);
+                break;
+            }
+            case 'bass-slide': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.4, sustain: 0.3, release: 0.3 },
+                    filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.2, baseFrequency: 100, octaves: 2 }
+                }).toDestination();
+                synth.volume.value = -4;
+                this.previewSynths.push(synth);
+                synth.triggerAttack('C1', now);
+                synth.frequency.exponentialRampToValueAtTime(Tone.Frequency('G1').toFrequency(), now + 0.3);
+                synth.triggerRelease(now + 0.5);
+                break;
+            }
+            default: {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.005, decay: 0.3, sustain: 0.1, release: 0.5 }
+                }).toDestination();
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C1', '4n', now);
+            }
+        }
+    }
+
+    playBeepPreview(sampleId, now) {
+        switch (sampleId) {
+            case 'beep-alert': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -8;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('A5', '16n', now);
+                synth.triggerAttackRelease('A5', '16n', now + 0.15);
+                break;
+            }
+            case 'beep-scan': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.1, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -10;
+                this.previewSynths.push(synth);
+                synth.frequency.setValueAtTime(Tone.Frequency('C5').toFrequency(), now);
+                synth.frequency.exponentialRampToValueAtTime(Tone.Frequency('C7').toFrequency(), now + 0.3);
+                synth.triggerAttackRelease('C5', 0.35, now);
+                break;
+            }
+            case 'beep-notification': {
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 }
+                }).toDestination();
+                synth.volume.value = -10;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('E5', '8n', now);
+                synth.triggerAttackRelease('G5', '8n', now + 0.1);
+                break;
+            }
+            case 'beep-retro': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 0.001, decay: 0.08, sustain: 0.2, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -12;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C5', '16n', now);
+                synth.triggerAttackRelease('E5', '16n', now + 0.08);
+                synth.triggerAttackRelease('G5', '16n', now + 0.16);
+                break;
+            }
+            case 'beep-robot': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.005, decay: 0.05, sustain: 0.3, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -12;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C4', '32n', now);
+                synth.triggerAttackRelease('E4', '32n', now + 0.06);
+                synth.triggerAttackRelease('G4', '32n', now + 0.12);
+                synth.triggerAttackRelease('C5', '32n', now + 0.18);
+                break;
+            }
+            case 'beep-countdown': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -8;
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('G4', '32n', now);
+                synth.triggerAttackRelease('G4', '32n', now + 0.15);
+                synth.triggerAttackRelease('G4', '32n', now + 0.30);
+                synth.triggerAttackRelease('C5', '16n', now + 0.45);
+                break;
+            }
+            default: {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+                }).toDestination();
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C5', '8n', now);
+            }
+        }
+    }
+
     playFxPreview(sampleId, now) {
-        if (sampleId.includes('impact')) {
-            // Low impact hit
-            this.previewSynth = new Tone.MembraneSynth({
-                pitchDecay: 0.3,
-                octaves: 6,
-                oscillator: { type: 'sine' },
-                envelope: {
-                    attack: 0.001,
-                    decay: 0.5,
-                    sustain: 0,
-                    release: 0.5
+        switch (sampleId) {
+            case 'fx-impact': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.4, octaves: 8,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.8, sustain: 0, release: 0.6 }
+                }).toDestination();
+                const reverb = new Tone.Reverb({ decay: 1.5, wet: 0.3 }).toDestination();
+                synth.connect(reverb);
+                synth.volume.value = -4;
+                this.previewSynths.push(synth);
+                this.previewEffects.push(reverb);
+                synth.triggerAttackRelease('C1', '2n', now);
+                break;
+            }
+            case 'fx-atmosphere': {
+                const reverb = new Tone.Reverb({ decay: 3, wet: 0.7 }).toDestination();
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.5, decay: 0.3, sustain: 0.6, release: 1.0 }
+                }).connect(reverb);
+                synth.volume.value = -12;
+                this.previewSynths.push(synth);
+                this.previewEffects.push(reverb);
+                synth.triggerAttackRelease(['C3', 'Eb3', 'G3'], 1.2, now);
+                break;
+            }
+            case 'fx-glitch': {
+                const bitCrusher = new Tone.BitCrusher(4).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -8 }).connect(bitCrusher);
+                this.previewNoises.push(noise);
+                this.previewEffects.push(bitCrusher);
+                noise.start(now);
+                noise.stop(now + 0.03);
+                noise.start(now + 0.05);
+                noise.stop(now + 0.08);
+                noise.start(now + 0.12);
+                noise.stop(now + 0.18);
+                noise.start(now + 0.22);
+                noise.stop(now + 0.25);
+                break;
+            }
+            case 'fx-vinyl-crackle': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'lowpass' }).toDestination();
+                const noise = new Tone.Noise({ type: 'brown', volume: -18 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                noise.start(now);
+                noise.stop(now + 1.0);
+                break;
+            }
+            case 'fx-downlifter': {
+                const filter = new Tone.Filter({ frequency: 10000, type: 'lowpass', rolloff: -24 }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -8 }).connect(filter);
+                this.previewFilters.push(filter);
+                this.previewNoises.push(noise);
+                filter.frequency.setValueAtTime(10000, now);
+                filter.frequency.exponentialRampToValueAtTime(50, now + 0.8);
+                noise.start(now);
+                noise.stop(now + 0.9);
+                break;
+            }
+            case 'fx-stutter': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.001, decay: 0.03, sustain: 0.5, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -10;
+                this.previewSynths.push(synth);
+                for (let i = 0; i < 8; i++) {
+                    synth.triggerAttackRelease('C4', '64n', now + i * 0.05);
                 }
-            }).toDestination();
-            this.previewSynth.triggerAttackRelease('C1', '2n', now);
-        } else if (sampleId.includes('glitch')) {
-            // Glitchy noise burst
-            this.previewNoise = new Tone.Noise({ type: 'white', volume: -6 }).toDestination();
-            this.previewNoise.start(now);
-            this.previewNoise.stop(now + 0.05);
-            setTimeout(() => {
-                if (this.previewNoise) {
-                    this.previewNoise.start(now + 0.1);
-                    this.previewNoise.stop(now + 0.12);
-                }
-            }, 100);
-        } else if (sampleId.includes('downlifter')) {
-            // Downward sweep
-            this.previewFilter = new Tone.Filter({
-                frequency: 8000,
-                type: 'lowpass'
-            }).toDestination();
-            this.previewNoise = new Tone.Noise({ type: 'pink', volume: -10 }).connect(this.previewFilter);
+                break;
+            }
+            default: {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.3, decay: 0.2, sustain: 0.5, release: 0.8 }
+                }).toDestination();
+                this.previewSynths.push(synth);
+                synth.triggerAttackRelease('C3', '2n', now);
+            }
+        }
+    }
 
-            this.previewFilter.frequency.setValueAtTime(8000, now);
-            this.previewFilter.frequency.exponentialRampToValueAtTime(100, now + 0.6);
+    // === BUFFER GENERATION (uses BACKEND) ===
 
-            this.previewNoise.start(now);
-            this.previewNoise.stop(now + 0.6);
-        } else {
-            // Default atmospheric pad
-            this.previewSynth = new Tone.Synth({
-                oscillator: { type: 'sine' },
-                envelope: {
-                    attack: 0.3,
-                    decay: 0.2,
-                    sustain: 0.5,
-                    release: 0.8
-                }
-            }).toDestination();
-            this.previewSynth.triggerAttackRelease('C3', '2n', now);
+    /**
+     * Generate an AudioBuffer for a sample (for adding to playlist)
+     * Uses backend API with caching for consistent, high-quality output
+     */
+    async generateSampleBuffer(sampleId, packType, durationSeconds = 2, bpm = 120) {
+        await this.init();
+
+        // Check local cache first
+        const cacheKey = `${sampleId}_${packType}_${durationSeconds}_${bpm}`;
+        if (this.bufferCache.has(cacheKey)) {
+            return this.bufferCache.get(cacheKey);
+        }
+
+        try {
+            // Try backend first
+            const buffer = await this.fetchFromBackend(sampleId, packType, durationSeconds, bpm);
+            this.bufferCache.set(cacheKey, buffer);
+            return buffer;
+        } catch (error) {
+            console.warn('Backend unavailable, falling back to frontend synthesis:', error.message);
+            // Fallback to frontend synthesis if backend is unavailable
+            return this.generateLocalBuffer(sampleId, packType, durationSeconds);
         }
     }
 
     /**
-     * Generate an AudioBuffer for a sample (for adding to playlist)
-     * @param {string} sampleId - The sample ID
-     * @param {string} packType - The pack type
-     * @param {number} durationSeconds - Duration in seconds
-     * @returns {Promise<AudioBuffer>}
+     * Fetch sample from backend API
      */
-    async generateSampleBuffer(sampleId, packType, durationSeconds = 2) {
-        await this.init();
+    async fetchFromBackend(sampleId, packType, durationSeconds, bpm) {
+        const params = new URLSearchParams({
+            sample_id: sampleId,
+            pack_type: packType,
+            duration: `${durationSeconds}s`,
+            bpm: bpm.toString()
+        });
 
-        // Use Tone.Offline to render the sample to a buffer
+        const response = await fetch(`${API_BASE}/audiopack/fetch?${params}`);
+        
+        if (!response.ok) {
+            throw new Error(`Backend returned ${response.status}`);
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        const audioContext = Tone.getContext().rawContext;
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        return new Tone.ToneAudioBuffer().fromArray(audioBuffer);
+    }
+
+    /**
+     * Fallback: Generate buffer locally using Tone.Offline
+     * Only used when backend is unavailable
+     */
+    async generateLocalBuffer(sampleId, packType, durationSeconds) {
+        const self = this;
         const buffer = await Tone.Offline(({ transport }) => {
             const now = 0;
-
             switch (packType) {
                 case 'risers':
-                    this.renderRiser(sampleId, now, durationSeconds);
+                    self.renderRiserOffline(sampleId, now, durationSeconds);
                     break;
                 case 'swooshes':
-                    this.renderSwoosh(sampleId, now, durationSeconds);
+                    self.renderSwooshOffline(sampleId, now, durationSeconds);
                     break;
                 case 'clicks':
-                    this.renderClick(sampleId, now);
+                    self.renderClickOffline(sampleId, now, durationSeconds);
                     break;
                 case 'bassNotes':
-                    this.renderBass(sampleId, now, durationSeconds);
+                    self.renderBassOffline(sampleId, now, durationSeconds);
                     break;
                 case 'beeps':
-                    this.renderBeep(sampleId, now);
+                    self.renderBeepOffline(sampleId, now, durationSeconds);
                     break;
                 case 'fx':
-                    this.renderFx(sampleId, now, durationSeconds);
+                    self.renderFxOffline(sampleId, now, durationSeconds);
                     break;
                 default:
-                    this.renderBeep('beep-alert', now);
+                    self.renderBeepOffline('beep-alert', now, durationSeconds);
             }
         }, durationSeconds);
 
         return buffer;
     }
 
-    // Offline render methods (similar to preview but for buffer generation)
-    renderRiser(sampleId, now, duration) {
-        const filter = new Tone.Filter({
-            frequency: 200,
-            type: 'lowpass',
-            rolloff: -24
-        }).toDestination();
+    // === OFFLINE RENDER METHODS (for buffer generation) ===
 
-        const noise = new Tone.Noise({
-            type: sampleId.includes('white') ? 'white' :
-                sampleId.includes('sub') ? 'brown' : 'pink',
-            volume: -6
-        }).connect(filter);
-
-        filter.frequency.setValueAtTime(200, now);
-        filter.frequency.exponentialRampToValueAtTime(12000, now + duration * 0.9);
-
-        const gain = new Tone.Gain(0).connect(filter);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(1, now + duration * 0.8);
-        gain.gain.linearRampToValueAtTime(0, now + duration);
-
-        noise.connect(gain);
-        noise.start(now);
-        noise.stop(now + duration);
-    }
-
-    renderSwoosh(sampleId, now, duration) {
-        const filter = new Tone.Filter({
-            frequency: 8000,
-            type: 'bandpass',
-            Q: 2
-        }).toDestination();
-
-        const noise = new Tone.Noise({
-            type: 'white',
-            volume: -4
-        }).connect(filter);
-
-        filter.frequency.setValueAtTime(8000, now);
-        filter.frequency.exponentialRampToValueAtTime(200, now + duration);
-
-        noise.start(now);
-        noise.stop(now + duration);
-    }
-
-    renderClick(sampleId, now) {
-        const synth = new Tone.MembraneSynth({
-            pitchDecay: 0.01,
-            octaves: 4,
-            oscillator: { type: 'sine' },
-            envelope: {
-                attack: 0.001,
-                decay: 0.05,
-                sustain: 0,
-                release: 0.02
+    renderRiserOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'riser-white': {
+                const filter = new Tone.Filter({ frequency: 100, type: 'lowpass', rolloff: -24 }).toDestination();
+                const gain = new Tone.Gain(0).connect(filter);
+                const noise = new Tone.Noise({ type: 'white', volume: -6 }).connect(gain);
+                filter.frequency.setValueAtTime(100, now);
+                filter.frequency.exponentialRampToValueAtTime(12000, now + duration * 0.95);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(1, now + duration * 0.8);
+                gain.gain.linearRampToValueAtTime(0, now + duration);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('wood') ? 'G5' :
-            sampleId.includes('snap') ? 'C5' :
-                sampleId.includes('digital') ? 'A6' : 'E5';
-
-        synth.triggerAttackRelease(pitch, '32n', now);
-    }
-
-    renderBass(sampleId, now, duration) {
-        const is808 = sampleId.includes('808');
-
-        const synth = new Tone.MonoSynth({
-            oscillator: {
-                type: is808 ? 'sine' : 'triangle'
-            },
-            envelope: {
-                attack: 0.005,
-                decay: duration * 0.6,
-                sustain: 0.1,
-                release: duration * 0.4
-            },
-            filterEnvelope: {
-                attack: 0.001,
-                decay: 0.2,
-                sustain: 0.1,
-                release: 0.3,
-                baseFrequency: 100,
-                octaves: 2
+            case 'riser-sweep': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: duration * 0.9, decay: 0.1, sustain: 0.8, release: duration * 0.1 }
+                }).toDestination();
+                synth.frequency.setValueAtTime(60, now);
+                synth.frequency.exponentialRampToValueAtTime(800, now + duration * 0.9);
+                synth.triggerAttackRelease('C2', duration * 0.95, now);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('sub') ? 'C1' :
-            sampleId.includes('punch') ? 'E1' : 'G1';
-
-        synth.triggerAttackRelease(pitch, duration * 0.8, now);
-    }
-
-    renderBeep(sampleId, now) {
-        const isRetro = sampleId.includes('retro');
-
-        const synth = new Tone.Synth({
-            oscillator: {
-                type: isRetro ? 'square' : 'sine'
-            },
-            envelope: {
-                attack: 0.01,
-                decay: 0.1,
-                sustain: 0.3,
-                release: 0.1
+            case 'riser-cinematic': {
+                const filter = new Tone.Filter({ frequency: 200, type: 'lowpass' }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -8 }).connect(filter);
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: duration * 0.9, decay: 0.1, sustain: 0.5, release: duration * 0.1 }
+                }).connect(filter);
+                filter.frequency.setValueAtTime(200, now);
+                filter.frequency.exponentialRampToValueAtTime(6000, now + duration * 0.9);
+                noise.start(now);
+                noise.stop(now + duration);
+                synth.triggerAttackRelease('C3', duration * 0.95, now);
+                break;
             }
-        }).toDestination();
-
-        const pitch = sampleId.includes('alert') ? 'A5' :
-            sampleId.includes('scan') ? 'E6' :
-                sampleId.includes('notification') ? 'G5' : 'C5';
-
-        synth.triggerAttackRelease(pitch, '8n', now);
+            case 'riser-tension': {
+                const filter = new Tone.Filter({ frequency: 300, type: 'bandpass', Q: 5 }).toDestination();
+                const synth1 = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: duration * 0.9, decay: 0.1, sustain: 0.7, release: duration * 0.1 }
+                }).connect(filter);
+                const synth2 = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: duration * 0.9, decay: 0.1, sustain: 0.5, release: duration * 0.1 }
+                }).connect(filter);
+                synth2.volume.value = -6;
+                filter.frequency.setValueAtTime(300, now);
+                filter.frequency.exponentialRampToValueAtTime(3000, now + duration * 0.9);
+                synth1.triggerAttackRelease('C2', duration * 0.95, now);
+                synth2.triggerAttackRelease('Db2', duration * 0.95, now);
+                break;
+            }
+            case 'riser-sub': {
+                const filter = new Tone.Filter({ frequency: 40, type: 'lowpass', rolloff: -48 }).toDestination();
+                const noise = new Tone.Noise({ type: 'brown', volume: -6 }).connect(filter);
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: duration * 0.9, decay: 0.1, sustain: 0.8, release: duration * 0.1 }
+                }).connect(filter);
+                filter.frequency.setValueAtTime(40, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + duration * 0.9);
+                noise.start(now);
+                noise.stop(now + duration);
+                synth.triggerAttackRelease('C1', duration * 0.95, now);
+                break;
+            }
+            default: {
+                const filter = new Tone.Filter({ frequency: 200, type: 'lowpass', rolloff: -24 }).toDestination();
+                const gain = new Tone.Gain(0).connect(filter);
+                const noise = new Tone.Noise({ type: 'pink', volume: -6 }).connect(gain);
+                filter.frequency.setValueAtTime(200, now);
+                filter.frequency.exponentialRampToValueAtTime(12000, now + duration * 0.9);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(1, now + duration * 0.8);
+                gain.gain.linearRampToValueAtTime(0, now + duration);
+                noise.start(now);
+                noise.stop(now + duration);
+            }
+        }
     }
 
-    renderFx(sampleId, now, duration) {
-        if (sampleId.includes('impact')) {
-            const synth = new Tone.MembraneSynth({
-                pitchDecay: 0.3,
-                octaves: 6,
-                oscillator: { type: 'sine' },
-                envelope: {
-                    attack: 0.001,
-                    decay: duration * 0.5,
-                    sustain: 0,
-                    release: duration * 0.5
+    renderSwooshOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'swoosh-fast': {
+                const filter = new Tone.Filter({ frequency: 10000, type: 'bandpass', Q: 3 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -4 }).connect(filter);
+                filter.frequency.setValueAtTime(10000, now);
+                filter.frequency.exponentialRampToValueAtTime(100, now + duration * 0.8);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'swoosh-slow': {
+                const filter = new Tone.Filter({ frequency: 6000, type: 'bandpass', Q: 1.5 }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -6 }).connect(filter);
+                filter.frequency.setValueAtTime(6000, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + duration * 0.9);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'swoosh-vinyl': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'bandpass', Q: 2 }).toDestination();
+                const distortion = new Tone.Distortion(0.3).connect(filter);
+                const noise = new Tone.Noise({ type: 'brown', volume: -6 }).connect(distortion);
+                filter.frequency.setValueAtTime(4000, now);
+                filter.frequency.exponentialRampToValueAtTime(500, now + duration * 0.8);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'swoosh-air': {
+                const filter = new Tone.Filter({ frequency: 5000, type: 'lowpass', rolloff: -12 }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -8 }).connect(filter);
+                filter.frequency.setValueAtTime(8000, now);
+                filter.frequency.exponentialRampToValueAtTime(1000, now + duration * 0.8);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'swoosh-transition': {
+                const filter = new Tone.Filter({ frequency: 1000, type: 'bandpass', Q: 2 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -6 }).connect(filter);
+                filter.frequency.setValueAtTime(200, now);
+                filter.frequency.exponentialRampToValueAtTime(8000, now + duration * 0.45);
+                filter.frequency.exponentialRampToValueAtTime(200, now + duration * 0.9);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            default: {
+                const filter = new Tone.Filter({ frequency: 8000, type: 'bandpass', Q: 2 }).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -4 }).connect(filter);
+                filter.frequency.setValueAtTime(8000, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + duration);
+                noise.start(now);
+                noise.stop(now + duration);
+            }
+        }
+    }
+
+    renderClickOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'click-vintage': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.008, octaves: 3,
+                    envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.03 }
+                }).toDestination();
+                synth.volume.value = -4;
+                synth.triggerAttackRelease('F4', '64n', now);
+                break;
+            }
+            case 'click-finger-snap': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'highpass' }).toDestination();
+                const synth = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 }
+                }).connect(filter);
+                synth.volume.value = -8;
+                synth.triggerAttackRelease('32n', now);
+                break;
+            }
+            case 'click-wood': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.005, octaves: 6,
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.001, decay: 0.03, sustain: 0, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -2;
+                synth.triggerAttackRelease('G5', '64n', now);
+                break;
+            }
+            case 'click-digital': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 0.001, decay: 0.015, sustain: 0, release: 0.01 }
+                }).toDestination();
+                synth.volume.value = -8;
+                synth.triggerAttackRelease('A6', '128n', now);
+                break;
+            }
+            case 'click-metronome': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -6;
+                synth.triggerAttackRelease('C6', '64n', now);
+                break;
+            }
+            case 'click-mouth': {
+                const filter = new Tone.Filter({ frequency: 2500, type: 'bandpass', Q: 3 }).toDestination();
+                const synth = new Tone.NoiseSynth({
+                    noise: { type: 'pink' },
+                    envelope: { attack: 0.002, decay: 0.06, sustain: 0, release: 0.04 }
+                }).connect(filter);
+                synth.volume.value = -6;
+                synth.triggerAttackRelease('32n', now);
+                break;
+            }
+            default: {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.01, octaves: 4,
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 }
+                }).toDestination();
+                synth.triggerAttackRelease('E5', '32n', now);
+            }
+        }
+    }
+
+    renderBassOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'bass-808': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.08, octaves: 5,
+                    envelope: { attack: 0.001, decay: duration * 0.5, sustain: 0.1, release: duration * 0.4 }
+                }).toDestination();
+                synth.volume.value = -4;
+                synth.triggerAttackRelease('C1', duration * 0.9, now);
+                break;
+            }
+            case 'bass-deep': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: duration * 0.6, sustain: 0.2, release: duration * 0.3 }
+                }).toDestination();
+                synth.volume.value = -2;
+                synth.triggerAttackRelease('E1', duration * 0.8, now);
+                break;
+            }
+            case 'bass-punch': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.005, decay: 0.15, sustain: 0.1, release: 0.2 },
+                    filterEnvelope: { attack: 0.001, decay: 0.1, sustain: 0.1, release: 0.1, baseFrequency: 200, octaves: 3 }
+                }).toDestination();
+                synth.volume.value = -4;
+                synth.triggerAttackRelease('G1', duration * 0.6, now);
+                break;
+            }
+            case 'bass-reese': {
+                const synth1 = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: duration * 0.4, sustain: 0.5, release: duration * 0.3 }
+                }).toDestination();
+                const synth2 = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: duration * 0.4, sustain: 0.5, release: duration * 0.3 }
+                }).toDestination();
+                synth1.volume.value = -8;
+                synth2.volume.value = -8;
+                synth2.detune.value = 15;
+                synth1.triggerAttackRelease('D1', duration * 0.8, now);
+                synth2.triggerAttackRelease('D1', duration * 0.8, now);
+                break;
+            }
+            case 'bass-wobble': {
+                const filter = new Tone.Filter({ frequency: 400, type: 'lowpass', Q: 8 }).toDestination();
+                const lfo = new Tone.LFO({ frequency: 4, min: 100, max: 1200 }).start();
+                lfo.connect(filter.frequency);
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.2 }
+                }).connect(filter);
+                synth.volume.value = -6;
+                synth.triggerAttackRelease('E1', duration * 0.8, now);
+                break;
+            }
+            case 'bass-slide': {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: duration * 0.5, sustain: 0.3, release: duration * 0.3 }
+                }).toDestination();
+                synth.volume.value = -4;
+                synth.triggerAttack('C1', now);
+                synth.frequency.exponentialRampToValueAtTime(Tone.Frequency('G1').toFrequency(), now + duration * 0.4);
+                synth.triggerRelease(now + duration * 0.8);
+                break;
+            }
+            default: {
+                const synth = new Tone.MonoSynth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.005, decay: duration * 0.5, sustain: 0.1, release: duration * 0.4 }
+                }).toDestination();
+                synth.triggerAttackRelease('C1', duration * 0.8, now);
+            }
+        }
+    }
+
+    renderBeepOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'beep-alert': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -8;
+                synth.triggerAttackRelease('A5', '16n', now);
+                synth.triggerAttackRelease('A5', '16n', now + 0.15);
+                break;
+            }
+            case 'beep-scan': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.1, release: 0.1 }
+                }).toDestination();
+                synth.volume.value = -10;
+                synth.frequency.setValueAtTime(Tone.Frequency('C5').toFrequency(), now);
+                synth.frequency.exponentialRampToValueAtTime(Tone.Frequency('C7').toFrequency(), now + 0.3);
+                synth.triggerAttackRelease('C5', 0.35, now);
+                break;
+            }
+            case 'beep-notification': {
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 }
+                }).toDestination();
+                synth.volume.value = -10;
+                synth.triggerAttackRelease('E5', '8n', now);
+                synth.triggerAttackRelease('G5', '8n', now + 0.1);
+                break;
+            }
+            case 'beep-retro': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'square' },
+                    envelope: { attack: 0.001, decay: 0.08, sustain: 0.2, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -12;
+                synth.triggerAttackRelease('C5', '16n', now);
+                synth.triggerAttackRelease('E5', '16n', now + 0.08);
+                synth.triggerAttackRelease('G5', '16n', now + 0.16);
+                break;
+            }
+            case 'beep-robot': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.005, decay: 0.05, sustain: 0.3, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -12;
+                synth.triggerAttackRelease('C4', '32n', now);
+                synth.triggerAttackRelease('E4', '32n', now + 0.06);
+                synth.triggerAttackRelease('G4', '32n', now + 0.12);
+                synth.triggerAttackRelease('C5', '32n', now + 0.18);
+                break;
+            }
+            case 'beep-countdown': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 }
+                }).toDestination();
+                synth.volume.value = -8;
+                synth.triggerAttackRelease('G4', '32n', now);
+                synth.triggerAttackRelease('G4', '32n', now + 0.15);
+                synth.triggerAttackRelease('G4', '32n', now + 0.30);
+                synth.triggerAttackRelease('C5', '16n', now + 0.45);
+                break;
+            }
+            default: {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.1 }
+                }).toDestination();
+                synth.triggerAttackRelease('C5', '8n', now);
+            }
+        }
+    }
+
+    renderFxOffline(sampleId, now, duration) {
+        switch (sampleId) {
+            case 'fx-impact': {
+                const synth = new Tone.MembraneSynth({
+                    pitchDecay: 0.4, octaves: 8,
+                    envelope: { attack: 0.001, decay: duration * 0.6, sustain: 0, release: duration * 0.4 }
+                }).toDestination();
+                synth.volume.value = -4;
+                synth.triggerAttackRelease('C1', duration, now);
+                break;
+            }
+            case 'fx-atmosphere': {
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: duration * 0.3, decay: duration * 0.2, sustain: 0.6, release: duration * 0.3 }
+                }).toDestination();
+                synth.volume.value = -12;
+                synth.triggerAttackRelease(['C3', 'Eb3', 'G3'], duration * 0.8, now);
+                break;
+            }
+            case 'fx-glitch': {
+                const bitCrusher = new Tone.BitCrusher(4).toDestination();
+                const noise = new Tone.Noise({ type: 'white', volume: -8 }).connect(bitCrusher);
+                // Stuttered playback
+                const stutterTimes = [0, 0.05, 0.12, 0.22];
+                const stutterDurations = [0.03, 0.03, 0.06, duration - 0.22];
+                stutterTimes.forEach((t, i) => {
+                    if (t + stutterDurations[i] <= duration) {
+                        noise.start(now + t);
+                        noise.stop(now + t + stutterDurations[i]);
+                    }
+                });
+                break;
+            }
+            case 'fx-vinyl-crackle': {
+                const filter = new Tone.Filter({ frequency: 3000, type: 'lowpass' }).toDestination();
+                const noise = new Tone.Noise({ type: 'brown', volume: -18 }).connect(filter);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'fx-downlifter': {
+                const filter = new Tone.Filter({ frequency: 10000, type: 'lowpass', rolloff: -24 }).toDestination();
+                const noise = new Tone.Noise({ type: 'pink', volume: -6 }).connect(filter);
+                filter.frequency.setValueAtTime(10000, now);
+                filter.frequency.exponentialRampToValueAtTime(50, now + duration * 0.9);
+                noise.start(now);
+                noise.stop(now + duration);
+                break;
+            }
+            case 'fx-stutter': {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.001, decay: 0.03, sustain: 0.5, release: 0.02 }
+                }).toDestination();
+                synth.volume.value = -10;
+                const numNotes = Math.floor(duration / 0.05);
+                for (let i = 0; i < numNotes; i++) {
+                    synth.triggerAttackRelease('C4', '64n', now + i * 0.05);
                 }
-            }).toDestination();
-            synth.triggerAttackRelease('C1', duration, now);
-        } else if (sampleId.includes('downlifter')) {
-            const filter = new Tone.Filter({
-                frequency: 8000,
-                type: 'lowpass'
-            }).toDestination();
-            const noise = new Tone.Noise({ type: 'pink', volume: -6 }).connect(filter);
-
-            filter.frequency.setValueAtTime(8000, now);
-            filter.frequency.exponentialRampToValueAtTime(100, now + duration);
-
-            noise.start(now);
-            noise.stop(now + duration);
-        } else {
-            const synth = new Tone.Synth({
-                oscillator: { type: 'sine' },
-                envelope: {
-                    attack: 0.3,
-                    decay: 0.2,
-                    sustain: 0.5,
-                    release: 0.8
-                }
-            }).toDestination();
-            synth.triggerAttackRelease('C3', duration * 0.8, now);
+                break;
+            }
+            default: {
+                const synth = new Tone.Synth({
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.3, decay: 0.2, sustain: 0.5, release: 0.8 }
+                }).toDestination();
+                synth.triggerAttackRelease('C3', duration * 0.8, now);
+            }
         }
     }
 
     /**
+     * Pre-warm cache by fetching common samples from backend
+     */
+    async prewarmCache(samples, bpm = 120) {
+        try {
+            const response = await fetch(`${API_BASE}/audiopack/batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ samples, bpm })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log(`Pre-warmed ${result.generated} samples on backend`);
+                return result;
+            }
+        } catch (error) {
+            console.warn('Could not pre-warm cache:', error.message);
+        }
+        return null;
+    }
+
+    /**
      * Parse duration string to seconds
-     * @param {string} durationStr - Duration like "2 bars", "0.5s", "1 beat"
-     * @param {number} bpm - Beats per minute
-     * @returns {number} Duration in seconds
      */
     parseDuration(durationStr, bpm = 120) {
         const beatsPerSecond = bpm / 60;
 
         if (durationStr.includes('bar')) {
             const bars = parseFloat(durationStr);
-            return (bars * 4) / beatsPerSecond; // 4 beats per bar
+            return (bars * 4) / beatsPerSecond;
         } else if (durationStr.includes('beat')) {
             const beats = parseFloat(durationStr);
             return beats / beatsPerSecond;
         } else if (durationStr.includes('s')) {
             return parseFloat(durationStr);
         } else if (durationStr === 'loop') {
-            return 4; // Default loop length
+            return 4;
         }
-        return 1; // Default 1 second
+        return 1;
     }
 }
 
