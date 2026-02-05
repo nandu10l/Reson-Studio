@@ -67,6 +67,7 @@ class AudioEngine {
 
         // Setup Preview Synth - connect to master gain instead of destination
         this.previewSynth = new Tone.PolySynth(Tone.Synth, {
+            maxPolyphony: 128,
             oscillator: { type: "triangle" },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
         }).connect(this.masterGain);
@@ -509,7 +510,7 @@ class AudioEngine {
                 // Players are now keyed by clip instance ID (clip.id), not source ID
                 // Try to find the player using the targetClipId which should be an instance ID
                 let player = this.audioPlayers.get(automation.targetClipId);
-                
+
                 // Fallback: search through instanceToSourceMap for matching source
                 if (!player) {
                     for (const [instanceId, sourceId] of instanceToSourceMap.entries()) {
@@ -580,7 +581,7 @@ class AudioEngine {
         // Basic Synthesis logic based on name
         // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
         if (n.includes('kick')) {
-            source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
+            source = new Tone.PolySynth(Tone.MembraneSynth, { maxPolyphony: 128 }).connect(channel);
         } else if (n.includes('snare')) {
             source = new Tone.NoiseSynth({
                 noise: { type: 'pink' }, // Pink noise for more body
@@ -593,6 +594,7 @@ class AudioEngine {
             }).connect(channel);
         } else if (n.includes('hat') || n.includes('cymbal')) {
             source = new Tone.PolySynth(Tone.MetalSynth, {
+                maxPolyphony: 128,
                 frequency: 200, harmonicity: 5.1, modulationIndex: 32,
                 envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
                 volume: -10
@@ -637,12 +639,13 @@ class AudioEngine {
             }).connect(channel);
         } else if (n.includes('bass')) {
             source = new Tone.PolySynth(Tone.MonoSynth, {
+                maxPolyphony: 128,
                 oscillator: { type: "square" },
                 envelope: { attack: 0.1 }
             }).connect(channel);
         } else {
             // Default Synth
-            source = new Tone.PolySynth(Tone.Synth).connect(channel);
+            source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 128 }).connect(channel);
         }
 
         this.sources.set(id, source);

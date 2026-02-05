@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
-import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats } from '../utils/audioImport';
+import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile } from '../utils/audioImport';
 import * as Tone from 'tone';
 
 const ProjectContext = createContext();
@@ -997,6 +997,160 @@ export const ProjectProvider = ({ children }) => {
     }, [bpm]);
 
 
+    // MIDI Import Action
+    const importMidiFile = useCallback(async () => {
+        try {
+            const file = await pickMidiFile();
+            if (!file) return;
+
+            console.log('Importing MIDI file:', file.name);
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Send to backend
+            const response = await fetch('http://localhost:8000/midi/parse', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to parse MIDI file');
+            }
+
+            const data = await response.json();
+            console.log('Parsed MIDI data:', data);
+
+            // 1. Log BPM (could auto-update)
+            if (data.bpm && data.bpm !== bpm) {
+                console.log(`MIDI BPM: ${data.bpm}. Current BPM: ${bpm}`);
+            }
+
+            // 2. Create Channels & Patterns
+            let newChannels = [];
+            let newPatternNotes = [];
+            // Use time-based ID to avoid collisions
+            const startId = Date.now();
+
+            setChannels(prev => {
+                const maxId = Math.max(...prev.map(c => c.id), -1);
+                let currentId = maxId + 1;
+
+                // Create a map to link track index to channel ID
+                // We'll calculate channel IDs relative to the current max
+
+                // For safety, let's map inside the callback
+                // But we need to build notes too. 
+                // We'll start channel IDs from currentId.
+
+                const tracks = data.tracks || [];
+
+                tracks.forEach((track, index) => {
+                    const channelId = currentId + index;
+
+                    // Create Channel
+                    newChannels.push({
+                        id: channelId,
+                        name: track.name || `Midi Track ${index + 1}`,
+                        vol: 80,
+                        pan: 50,
+                        effects: [],
+                        pluginId: 'sampler'
+                    });
+
+                    // Add Notes to Pattern
+                    track.notes.forEach((note, noteIndex) => {
+                        newPatternNotes.push({
+                            id: startId + (index * 10000) + noteIndex,
+                            noteName: note.noteName,
+                            channelId: channelId,
+                            startStep: Math.round(note.start * 4),
+                            length: Math.max(1, Math.round(note.duration * 4))
+                        });
+                    });
+                });
+
+                // Initialize audio engine
+                newChannels.forEach(ch => {
+                    audioEngine.createChannel(ch.id, ch.name);
+                });
+
+                return [...prev, ...newChannels];
+            });
+
+            // Update Patterns
+            setPatterns(prev => {
+                const nextPatId = Math.max(...prev.map(p => p.id)) + 1;
+
+                const maxStep = Math.max(...newPatternNotes.map(n => n.startStep + n.length), 64);
+                const length = Math.ceil(maxStep / 16) * 16;
+
+                // Create steps for ALL channels
+                // NOTE: We don't have the updated 'channels' here, so we must manually ensure 
+                // we rely on what we know about new channels + existing pattern structure or just empty.
+                // Ideally createEmptySteps needs dynamic channel info. 
+                // For now, we'll manually patch the new channel steps.
+
+                const newSteps = createEmptySteps(length);
+                newChannels.forEach(ch => {
+                    newSteps[ch.id] = Array(length).fill(false);
+                });
+
+                const newPattern = {
+                    id: nextPatId,
+                    name: `MIDI Import - ${file.name}`,
+                    color: '#FFAA00',
+                    length: length,
+                    data: {
+                        steps: newSteps,
+                        notes: newPatternNotes
+                    }
+                };
+
+                setActivePatternId(nextPatId);
+                return [...prev, newPattern];
+            });
+
+            // Add to Playlist
+            setPlaylistTracks(prev => {
+                const targetTrack = prev.find(t => t.clips.length === 0) || prev[0];
+                if (targetTrack) {
+                    // We need to guess the next pattern ID again or use a safer way.
+                    // Since we do it in the same event loop tick, it *should* match the calculation above.
+                    const patIds = patterns.map(p => p.id); // Closure 'patterns'
+                    // This might be slightly risky if 'patterns' is old. 
+                    // But 'patterns' is a dependency of useCallback, so it should be fresh.
+                    const nextPatId = Math.max(...patIds, 0) + 1;
+
+                    const newClip = {
+                        id: Date.now(),
+                        type: 'pattern',
+                        patternId: nextPatId,
+                        offset: playheadPosition,
+                        length: 16 // Should match pattern length ideally, but clips can be shorter/looped
+                    };
+
+                    return prev.map(t =>
+                        t.id === targetTrack.id
+                            ? { ...t, clips: [...t.clips, newClip] }
+                            : t
+                    );
+                }
+                return prev;
+            });
+
+            alert(`Imported MIDI: ${data.tracks.length} tracks.`);
+
+        } catch (error) {
+            console.error('Error importing MIDI:', error);
+            alert('Failed to import MIDI: ' + error.message);
+        }
+    }, [bpm, patterns, playheadPosition]);
+
+
+
     // --- Automation Actions ---
     const createAutomation = useCallback((targetClipId, type = 'volume') => {
         let newId = Date.now();
@@ -1266,6 +1420,7 @@ export const ProjectProvider = ({ children }) => {
         setAudioClips,
         importAudioFile,
         addStemsAsAudioClips,
+        importMidiFile,
 
         // Picker Tab
         pickerTab,

@@ -16,3 +16,6 @@ numpy>=1.24.0
 
 # Note: Demucs (stem separation) requires Python 3.10
 # Install separately with: py -3.10 -m pip install demucs torch torchaudio
+
+# MIDI Processing
+mido>=1.2.10

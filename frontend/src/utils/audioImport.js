@@ -21,6 +21,23 @@ export const pickAudioFile = () => {
 };
 
 /**
+ * Open file picker for MIDI files
+ * @returns {Promise<File|null>}
+ */
+export const pickMidiFile = () => {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.mid,.midi,audio/midi,audio/x-midi';
+    input.onchange = (e) => {
+      const file = e.target.files?.[0] || null;
+      resolve(file);
+    };
+    input.click();
+  });
+};
+
+/**
  * Decode audio file to AudioBuffer
  * @param {File} file
  * @returns {Promise<AudioBuffer>}
