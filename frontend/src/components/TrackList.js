@@ -7,9 +7,10 @@ import { useProject } from '../contexts/ProjectContext';
 import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 import AutomationClip from './AutomationClip';
+import audioPackSynth from '../audio/AudioPackSynth';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -454,6 +455,25 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
         }}
         onDrop={(e) => {
           e.preventDefault();
+
+          // First check for audio pack samples
+          const audioSampleStr = e.dataTransfer.getData('audioSample');
+          if (audioSampleStr) {
+            try {
+              const sampleData = JSON.parse(audioSampleStr);
+              if (sampleData.type === 'audioPackSample' && onAddAudioPackSample) {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const offset = Math.floor(x / pixelsPerBeat);
+                onAddAudioPackSample(track.id, offset, sampleData);
+                return;
+              }
+            } catch (err) {
+              console.error("Audio sample drop failed", err);
+            }
+          }
+
+          // Then check for standard application/json data
           const dataStr = e.dataTransfer.getData('application/json');
           if (!dataStr) return;
           try {
@@ -1079,6 +1099,74 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     setPlaylistTracks(prev => prev.filter(t => t.id !== trackId));
   };
 
+  // Handle dropping audio pack samples onto tracks
+  const handleAddAudioPackSample = async (trackId, offset, sampleData) => {
+    try {
+      // Parse duration string to get seconds
+      const durationSeconds = audioPackSynth.parseDuration(sampleData.duration, 120); // TODO: use actual BPM
+
+      // Generate the audio buffer
+      const buffer = await audioPackSynth.generateSampleBuffer(
+        sampleData.id,
+        sampleData.packId,
+        durationSeconds
+      );
+
+      // Convert Tone.ToneAudioBuffer to standard AudioBuffer if needed
+      const audioBuffer = buffer.get ? buffer.get() : buffer;
+
+      // Calculate duration in beats (assuming 120 BPM default)
+      const bpm = 120; // TODO: get from context
+      const beatsPerSecond = bpm / 60;
+      const durationBeats = Math.max(1, Math.ceil(durationSeconds * beatsPerSecond));
+
+      // Generate simple waveform data for visualization
+      const channelData = audioBuffer.getChannelData(0);
+      const waveformLength = 100;
+      const waveformData = [];
+      const samplesPerPoint = Math.floor(channelData.length / waveformLength);
+
+      for (let i = 0; i < waveformLength; i++) {
+        let sum = 0;
+        const start = i * samplesPerPoint;
+        for (let j = 0; j < samplesPerPoint; j++) {
+          sum += Math.abs(channelData[start + j] || 0);
+        }
+        waveformData.push(sum / samplesPerPoint);
+      }
+
+      // Create a new audio clip ID
+      const newClipId = `audiopack-${Date.now()}`;
+
+      // Add to playlist track
+      setPlaylistTracks(prev => prev.map(t => {
+        if (t.id !== trackId) return t;
+
+        const newClip = {
+          id: Date.now(),
+          type: 'audio',
+          audioClipId: newClipId,
+          offset: offset,
+          length: durationBeats,
+          name: sampleData.name,
+          color: sampleData.color,
+          // Store generated audio data directly on the clip
+          generatedAudio: {
+            buffer: audioBuffer,
+            waveformData: waveformData,
+            duration: durationSeconds,
+            sampleRate: audioBuffer.sampleRate
+          }
+        };
+        return { ...t, clips: [...t.clips, newClip] };
+      }));
+
+      console.log(`Added audio pack sample: ${sampleData.name} at beat ${offset}`);
+    } catch (error) {
+      console.error('Failed to add audio pack sample:', error);
+    }
+  };
+
   // Drag/drop state
   const dragState = useRef({ dragging: false, trackId: null, clipIndex: null, startX: 0, origOffset: 0 });
   const dragClone = useRef(null);
@@ -1273,6 +1361,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onAddClip={addClip}
           onAddAudioClip={onAddAudioClip}
           onAddAutomationClip={onAddAutomationClip}
+          onAddAudioPackSample={handleAddAudioPackSample}
           updateAutomationPoints={updateAutomationPoints}
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
