@@ -14,6 +14,7 @@ import TitleBar from '../components/TitleBar';
 import { GripVertical } from 'lucide-react';
 import { useProject } from '../contexts/ProjectContext';
 import * as Tone from 'tone';
+import { generateWaveform, audioDurationToBeats, audioBufferToWav } from '../utils/audioImport';
 import '../styles/daw.css';
 
 import DraggableWindow from '../components/DraggableWindow';
@@ -26,7 +27,7 @@ import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
 
 function Dashboard() {
-  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek, createTemplateProject } = useProject();
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek, createTemplateProject, setAudioClips } = useProject();
   const [showWelcome, setShowWelcome] = useState(true);
   const [activeTour, setActiveTour] = useState(null); // 'main', 'pianoRoll', 'channelRack', 'mixer'
 
@@ -58,6 +59,47 @@ function Dashboard() {
   const openSampleEditor = (audioClip) => {
     setEditingSample(audioClip);
     setActiveWindows(prev => ({ ...prev, sampleEditor: true }));
+  };
+
+  const handleSaveSample = async (audioBuffer, name) => {
+    if (!editingSample || !audioBuffer) return;
+
+    try {
+      // 1. Convert buffer to WAV Blob/File
+      const wavBlob = audioBufferToWav(audioBuffer);
+      const fileName = (name || editingSample.fileName || 'edited_sample.wav').replace(/\.wav$/i, '') + '.wav';
+      const file = new File([wavBlob], fileName, { type: 'audio/wav' });
+
+      // 2. Generate props
+      const waveform = generateWaveform(audioBuffer, 2000);
+      const durationBeats = audioDurationToBeats(audioBuffer, bpm);
+
+      // 3. Create updated clip object
+      const updatedClip = {
+        ...editingSample,
+        name: name || editingSample.name,
+        fileName: fileName,
+        file: file,
+        audioBuffer: audioBuffer,
+        waveform: waveform,
+        duration: audioBuffer.duration,
+        durationBeats: durationBeats,
+        sampleRate: audioBuffer.sampleRate,
+        url: URL.createObjectURL(wavBlob) // New URL for playback
+      };
+
+      // 4. Update audioClips state
+      setAudioClips(prev => prev.map(clip =>
+        clip.id === editingSample.id ? updatedClip : clip
+      ));
+
+      // 5. Update editingSample to reflect changes
+      setEditingSample(updatedClip);
+
+      console.log('Sample saved and updated in project:', updatedClip.name);
+    } catch (error) {
+      console.error("Error saving sample:", error);
+    }
   };
 
   const [playing, setPlaying] = useState(false);
@@ -389,6 +431,7 @@ function Dashboard() {
               toggleWindow('sampleEditor');
               setEditingSample(null);
             }}
+            onSave={handleSaveSample}
           />
         </DraggableWindow>
       )}

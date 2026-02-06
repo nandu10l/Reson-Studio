@@ -73,6 +73,108 @@
     border-color: rgba(255, 255, 255, 0.12);
 }
 
+.filter-group {
+    position: relative;
+}
+
+/* Filter Dropdown Menu */
+.filter-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 120px;
+    background: #2a2a2a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    overflow: hidden;
+    animation: dropdownFadeIn 0.15s ease;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.filter-dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #b3b3b3;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.filter-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.filter-dropdown-item.active {
+    background: rgba(96, 165, 250, 0.2);
+    color: #60a5fa;
+}
+
+.filter-dropdown-item.active:hover {
+    background: rgba(96, 165, 250, 0.3);
+}
+
+.filter-item-label {
+    flex: 1;
+}
+
+/* No channels message */
+.no-channels-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60px;
+    color: #6b7280;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Audio Channel Row */
+.audio-channel-row {
+    background: linear-gradient(90deg, #1e1e1e 0%, #1a2520 100%);
+}
+
+.audio-channel-row:hover {
+    background: linear-gradient(90deg, #2a2a2a 0%, #223530 100%) !important;
+}
+
+.audio-channel-name {
+    color: #4ade80;
+}
+
+/* Audio Waveform Container */
+.audio-waveform-container {
+    flex: 1;
+    height: 24px;
+    background: #1e1e1e;
+    border: 1px solid rgba(74, 222, 128, 0.2);
+    border-radius: 2px;
+    margin: 0 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.audio-waveform-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
 /* Main Content */
 .rack-content {
     flex: 1;
@@ -198,6 +300,30 @@
     outline: none;
 }
 
+/* Channel Selector Indicator */
+.channel-selector {
+    width: 6px;
+    height: 16px;
+    background: #333;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1px;
+    margin-right: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.1s ease;
+}
+
+.channel-selector:hover {
+    background: #444;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.channel-selector.selected {
+    background: #4ade80;
+    border-color: #4ade80;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+}
+
 /* Step Sequencer */
 .step-sequencer {
     flex: 1;
@@ -283,9 +409,11 @@
     0% {
         box-shadow: 0 0 4px rgba(96, 165, 250, 0.4);
     }
+
     50% {
         box-shadow: 0 0 12px rgba(96, 165, 250, 0.9);
     }
+
     100% {
         box-shadow: 0 0 8px rgba(96, 165, 250, 0.8);
     }

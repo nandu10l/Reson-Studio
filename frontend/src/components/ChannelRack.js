@@ -62,7 +62,7 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
     );
 };
 
-const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }) => {
+const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying, isSelected, onSelect }) => {
     const { toggleStepInActivePattern, updateChannelVolume, updateChannelPan, previewChannelSound } = useProject();
     const { useGuideHandlers } = useGuide();
     const handleToggleStep = (index) => {
@@ -139,6 +139,13 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
                 </div>
             </div>
 
+            {/* Selection Indicator */}
+            <div
+                className={`channel-selector ${isSelected ? 'selected' : ''}`}
+                onClick={onSelect}
+                title="Select Channel"
+            />
+
             {/* Step Sequencer Grid */}
             <div className="step-sequencer">
                 {steps.map((active, i) => {
@@ -161,9 +168,133 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying }
     );
 });
 
+// Audio Channel component - displays waveform instead of step sequencer
+const AudioChannel = React.memo(({ audioClip, isSelected, onSelect }) => {
+    const waveformRef = useRef(null);
+
+    return (
+        <div className="channel-row audio-channel-row">
+            {/* Left Controls Group */}
+            <div className="channel-controls-left">
+                {/* Color Indicator */}
+                <div
+                    className="channel-color-indicator"
+                    style={{ backgroundColor: '#4ade80' }}
+                    title="Audio Clip"
+                />
+
+                {/* Pan Knob */}
+                <div className="rack-knob pan-knob" title="Pan: 50%">
+                    <div className="knob-indicator" style={{ transform: 'translate(-50%, -50%) rotate(0deg)' }} />
+                </div>
+
+                {/* Volume Knob */}
+                <div className="rack-knob vol-knob" title="Vol: 100%">
+                    <div className="knob-indicator" style={{ transform: 'translate(-50%, -50%) rotate(135deg)' }} />
+                </div>
+            </div>
+
+            {/* Channel Name */}
+            <div className="channel-name-container">
+                <div className="channel-name audio-channel-name" title={audioClip.name}>
+                    {audioClip.name}
+                </div>
+            </div>
+
+            {/* Selection Indicator */}
+            <div
+                className={`channel-selector ${isSelected ? 'selected' : ''}`}
+                onClick={onSelect}
+                title="Select Channel"
+            />
+
+            {/* Waveform Display instead of Step Sequencer */}
+            <div className="audio-waveform-container" ref={waveformRef}>
+                <canvas
+                    className="audio-waveform-canvas"
+                    ref={(canvas) => {
+                        if (canvas && audioClip.waveform) {
+                            const ctx = canvas.getContext('2d');
+                            const dpr = window.devicePixelRatio || 1;
+                            const rect = canvas.getBoundingClientRect();
+                            canvas.width = rect.width * dpr;
+                            canvas.height = rect.height * dpr;
+                            ctx.scale(dpr, dpr);
+
+                            // Draw waveform
+                            ctx.clearRect(0, 0, rect.width, rect.height);
+                            ctx.fillStyle = '#1e1e1e';
+                            ctx.fillRect(0, 0, rect.width, rect.height);
+
+                            const waveform = audioClip.waveform;
+                            const barWidth = rect.width / waveform.length;
+                            const centerY = rect.height / 2;
+
+                            ctx.fillStyle = '#4ade80';
+                            waveform.forEach((val, i) => {
+                                const barHeight = val * rect.height * 0.8;
+                                ctx.fillRect(
+                                    i * barWidth,
+                                    centerY - barHeight / 2,
+                                    Math.max(1, barWidth - 0.5),
+                                    barHeight
+                                );
+                            });
+                        }
+                    }}
+                />
+            </div>
+        </div>
+    );
+});
+
 const ChannelRack = () => {
-    const { channels, activePattern, isPlaying, togglePlayback, bpm, addChannel } = useProject();
+    const { channels, activePattern, isPlaying, togglePlayback, bpm, addChannel, audioClips, selectedChannelIds, selectChannel } = useProject();
     const rackRef = useRef(null);
+    const [filterType, setFilterType] = useState('all'); // 'all', 'audio', 'unsorted'
+    const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+    const filterDropdownRef = useRef(null);
+
+    // Filter options similar to FL Studio
+    const filterOptions = [
+        { id: 'all', label: 'All', description: 'Show all channels' },
+        { id: 'audio', label: 'Audio', description: 'Audio clips and samplers' },
+        { id: 'unsorted', label: 'Unsorted', description: 'Synthesizers and other' }
+    ];
+
+    // Get the current filter label
+    const currentFilterLabel = filterOptions.find(opt => opt.id === filterType)?.label || 'All';
+
+    // Filter channels based on the selected filter type
+    const getFilteredItems = () => {
+        if (filterType === 'all') {
+            // Combine pattern channels and audio clips
+            const patternItems = channels.map(ch => ({ ...ch, itemType: 'pattern' }));
+            const audioItems = (audioClips || []).map(clip => ({ ...clip, itemType: 'audio' }));
+            return [...patternItems, ...audioItems];
+        } else if (filterType === 'audio') {
+            // Show only audio clips (with waveform display)
+            return (audioClips || []).map(clip => ({ ...clip, itemType: 'audio' }));
+        } else if (filterType === 'unsorted') {
+            // Show only pattern-based channels (with step sequencer)
+            return channels.map(ch => ({ ...ch, itemType: 'pattern' }));
+        }
+        return channels.map(ch => ({ ...ch, itemType: 'pattern' }));
+    };
+
+    const filteredItems = getFilteredItems();
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
+                setFilterDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleDragOver = (e) => {
         e.preventDefault();
@@ -308,9 +439,36 @@ const ChannelRack = () => {
                     >
                         <Music size={14} />
                     </button>
-                    <div className="filter-group">
-                        <span>All</span>
-                        <ChevronRight size={12} />
+                    <div
+                        className="filter-group"
+                        ref={filterDropdownRef}
+                        onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+                    >
+                        <span>{currentFilterLabel}</span>
+                        <ChevronRight
+                            size={12}
+                            style={{
+                                transform: filterDropdownOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                                transition: 'transform 0.2s ease'
+                            }}
+                        />
+                        {filterDropdownOpen && (
+                            <div className="filter-dropdown">
+                                {filterOptions.map(option => (
+                                    <div
+                                        key={option.id}
+                                        className={`filter-dropdown-item ${filterType === option.id ? 'active' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setFilterType(option.id);
+                                            setFilterDropdownOpen(false);
+                                        }}
+                                    >
+                                        <span className="filter-item-label">{option.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <button className="header-btn" title="Reset">
                         <RotateCcw size={14} />
@@ -326,18 +484,35 @@ const ChannelRack = () => {
 
             {/* Channels */}
             <div className="rack-content">
-                {channels.map((ch, index) => (
-                    <Channel
-                        key={ch.id}
-                        id={ch.id}
-                        name={ch.name}
-                        vol={ch.vol}
-                        pan={ch.pan}
-                        color={activePattern.color}
-                        steps={activePattern.data.steps[ch.id] || Array(activePattern.length).fill(false)}
-                        isPlaying={isPlaying}
-                    />
-                ))}
+                {filteredItems.length > 0 ? (
+                    filteredItems.map((item, index) => (
+                        item.itemType === 'audio' ? (
+                            <AudioChannel
+                                key={`audio-${item.id}`}
+                                audioClip={item}
+                                isSelected={selectedChannelIds.includes(`audio-${item.id}`)}
+                                onSelect={(e) => selectChannel(`audio-${item.id}`, e.ctrlKey || e.metaKey)}
+                            />
+                        ) : (
+                            <Channel
+                                key={`pattern-${item.id}`}
+                                id={item.id}
+                                name={item.name}
+                                vol={item.vol}
+                                pan={item.pan}
+                                color={activePattern.color}
+                                steps={activePattern.data.steps[item.id] || Array(activePattern.length).fill(false)}
+                                isPlaying={isPlaying}
+                                isSelected={selectedChannelIds.includes(item.id)}
+                                onSelect={(e) => selectChannel(item.id, e.ctrlKey || e.metaKey)}
+                            />
+                        )
+                    ))
+                ) : (
+                    <div className="no-channels-message">
+                        {filterType === 'audio' ? 'No audio clips imported' : 'No channels available'}
+                    </div>
+                )}
             </div>
 
             {/* Footer */}

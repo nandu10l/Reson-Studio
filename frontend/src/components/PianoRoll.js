@@ -13,7 +13,8 @@ const PianoRoll = () => {
     const {
         activePattern, activePatternId, updatePattern, addNoteToActivePattern, removeNoteFromActivePattern,
         isPlaying, playheadPosition, setPlayheadPosition, updateNote, setActiveTool, activeTool, bpm,
-        previewPianoNote, deleteNotes, togglePlayback, channels // Added channels
+        previewPianoNote, deleteNotes, togglePlayback, channels, addNotesToActivePattern,
+        pushNotesHistory, undoNotes, redoNotes // Added for undo/redo and batch paste
     } = useProject();
 
     // Local State
@@ -40,6 +41,12 @@ const PianoRoll = () => {
     // Drag State
     // type: 'MOVE' | 'RESIZE' | 'SELECT' | 'CREATE'
     const [dragState, setDragState] = useState(null);
+
+    // Clipboard for copy/paste operations
+    const [clipboard, setClipboard] = useState([]);
+
+    // Track mouse position in grid for paste operations
+    const mouseGridPositionRef = useRef({ step: 0, key: null });
 
     // Constants
     const octaves = 8;
@@ -400,6 +407,32 @@ const PianoRoll = () => {
         }
     };
 
+    // Track mouse position in grid (for paste at cursor)
+    const handleGridMouseMove = useCallback((e) => {
+        if (!scrollContainerRef.current || !pianoKeysRef.current) return;
+
+        const scrollRect = scrollContainerRef.current.getBoundingClientRect();
+        const borderLeft = parseFloat(window.getComputedStyle(scrollContainerRef.current).borderLeftWidth) || 0;
+        const borderTop = parseFloat(window.getComputedStyle(scrollContainerRef.current).borderTopWidth) || 0;
+
+        const viewportX = e.clientX - scrollRect.left - borderLeft;
+        const viewportY = e.clientY - scrollRect.top - borderTop;
+
+        const globalX = viewportX + scrollContainerRef.current.scrollLeft;
+        const globalY = viewportY + scrollContainerRef.current.scrollTop;
+
+        const currentKeysWidth = pianoKeysRef.current.offsetWidth || KEYS_WIDTH;
+        const gridX = globalX - currentKeysWidth;
+
+        // Calculate step and key from grid position
+        const step = Math.max(0, Math.floor(gridX / pixelsPerStep));
+        const keyIndex = Math.floor(globalY / keyHeight);
+        const keyName = allKeys[keyIndex]?.fullName || null;
+
+        // Update the ref (no re-render needed)
+        mouseGridPositionRef.current = { step, key: keyName };
+    }, [pixelsPerStep, keyHeight, allKeys]);
+
     const handleMouseMove = (e) => {
         if (!dragState) return;
 
@@ -407,7 +440,11 @@ const PianoRoll = () => {
             const dxPixels = e.clientX - dragState.startX;
             const dyPixels = e.clientY - dragState.startY;
             const rawDxSteps = Math.round(dxPixels / pixelsPerStep);
-            const dxSteps = snapEnabled ? Math.round(rawDxSteps / snapStrength) * snapStrength : rawDxSteps;
+
+            // Alt key bypasses snap (snapStrength becomes 1)
+            const effectiveSnap = (snapEnabled && !e.altKey) ? snapStrength : 1;
+            const dxSteps = snapEnabled ? Math.round(rawDxSteps / effectiveSnap) * effectiveSnap : rawDxSteps;
+
             const dyKeys = Math.round(dyPixels / keyHeight);
 
             // Apply delta to all dragged notes
@@ -432,7 +469,10 @@ const PianoRoll = () => {
         if (dragState.type === 'RESIZE') {
             const dxPixels = e.clientX - dragState.startX;
             const rawDxSteps = Math.round(dxPixels / pixelsPerStep);
-            const dxSteps = snapEnabled ? Math.round(rawDxSteps / snapStrength) * snapStrength : rawDxSteps;
+
+            // Alt key bypasses snap
+            const effectiveSnap = (snapEnabled && !e.altKey) ? snapStrength : 1;
+            const dxSteps = snapEnabled ? Math.round(rawDxSteps / effectiveSnap) * effectiveSnap : rawDxSteps;
 
             dragState.notes.forEach(id => {
                 const initLength = dragState.initialLengths[id];
@@ -678,19 +718,255 @@ const PianoRoll = () => {
         };
     }, [velocityDragState, updateNote]);
 
-    const handleDelete = useCallback((e) => {
+    // Comprehensive keyboard handler for FL Studio-style shortcuts
+    const handleKeyDown = useCallback((e) => {
+        // Don't handle if typing in an input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        const isCtrl = e.ctrlKey || e.metaKey;
+
+        // Delete/Backspace - Delete selected notes
         if (e.key === 'Delete' || e.key === 'Backspace') {
             if (selection.length > 0) {
+                pushNotesHistory(); // Save state before deletion
                 deleteNotes(selection);
                 setSelection([]);
             }
+            return;
         }
-    }, [selection, deleteNotes]);
+
+        // Ctrl+A - Select All
+        if (isCtrl && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            if (activePattern?.data?.notes) {
+                setSelection(activePattern.data.notes.map(n => n.id));
+            }
+            return;
+        }
+
+        // Ctrl+D - Deselect All
+        if (isCtrl && e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            setSelection([]);
+            return;
+        }
+
+        // Ctrl+C - Copy selected notes
+        if (isCtrl && e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            if (selection.length === 0 || !activePattern?.data?.notes) return;
+
+            const selectedNotes = activePattern.data.notes.filter(n => selection.includes(n.id));
+            if (selectedNotes.length === 0) return;
+
+            // Find the minimum startStep and key index to create relative positions
+            const minStep = Math.min(...selectedNotes.map(n => n.startStep));
+
+            // Store notes with relative positions
+            const clipboardNotes = selectedNotes.map(n => ({
+                ...n,
+                relativeStep: n.startStep - minStep
+            }));
+
+            setClipboard(clipboardNotes);
+            console.log('Copied', clipboardNotes.length, 'notes to clipboard');
+            return;
+        }
+
+        // Ctrl+X - Cut (copy + delete)
+        if (isCtrl && e.key.toLowerCase() === 'x') {
+            e.preventDefault();
+            if (selection.length === 0 || !activePattern?.data?.notes) return;
+
+            const selectedNotes = activePattern.data.notes.filter(n => selection.includes(n.id));
+            if (selectedNotes.length === 0) return;
+
+            // Copy to clipboard
+            const minStep = Math.min(...selectedNotes.map(n => n.startStep));
+            const clipboardNotes = selectedNotes.map(n => ({
+                ...n,
+                relativeStep: n.startStep - minStep
+            }));
+            setClipboard(clipboardNotes);
+
+            // Delete the notes
+            pushNotesHistory();
+            deleteNotes(selection);
+            setSelection([]);
+            console.log('Cut', clipboardNotes.length, 'notes');
+            return;
+        }
+
+        // Ctrl+V - Paste notes at mouse cursor position in grid
+        if (isCtrl && e.key.toLowerCase() === 'v') {
+            e.preventDefault();
+            if (clipboard.length === 0) return;
+
+            pushNotesHistory();
+
+            // Use the tracked mouse position in the grid, or fall back to playhead
+            const pasteStep = mouseGridPositionRef.current.step || Math.floor(playheadPosition * 4);
+
+            // Create new notes with new IDs and adjusted positions
+            const newNotes = clipboard.map(n => ({
+                id: Date.now() + Math.random(),
+                noteName: n.noteName,
+                channelId: n.channelId,
+                startStep: pasteStep + n.relativeStep,
+                length: n.length,
+                velocity: n.velocity || 100
+            }));
+
+            addNotesToActivePattern(newNotes);
+
+            // Select the newly pasted notes
+            setSelection(newNotes.map(n => n.id));
+            console.log('Pasted', newNotes.length, 'notes at step', pasteStep);
+            return;
+        }
+
+        // Ctrl+B - Duplicate (FL Studio style: paste after selection)
+        if (isCtrl && e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            if (selection.length === 0 || !activePattern?.data?.notes) return;
+
+            const selectedNotes = activePattern.data.notes.filter(n => selection.includes(n.id));
+            if (selectedNotes.length === 0) return;
+
+            pushNotesHistory();
+
+            // Find the rightmost end point of selected notes
+            const maxEndStep = Math.max(...selectedNotes.map(n => n.startStep + n.length));
+            const minStep = Math.min(...selectedNotes.map(n => n.startStep));
+
+            // Create duplicates placed right after the selection
+            const newNotes = selectedNotes.map(n => ({
+                id: Date.now() + Math.random(),
+                noteName: n.noteName,
+                channelId: n.channelId,
+                startStep: maxEndStep + (n.startStep - minStep),
+                length: n.length,
+                velocity: n.velocity || 100
+            }));
+
+            addNotesToActivePattern(newNotes);
+
+            // Select the newly duplicated notes
+            setSelection(newNotes.map(n => n.id));
+            console.log('Duplicated', newNotes.length, 'notes');
+            return;
+        }
+
+        // Ctrl+Z - Undo
+        if (isCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            undoNotes();
+            setSelection([]);
+            console.log('Undo');
+            return;
+        }
+
+        // Ctrl+Shift+Z or Ctrl+Y - Redo
+        if ((isCtrl && e.shiftKey && e.key.toLowerCase() === 'z') || (isCtrl && e.key.toLowerCase() === 'y')) {
+            e.preventDefault();
+            redoNotes();
+            setSelection([]);
+            console.log('Redo');
+            return;
+        }
+
+        // Arrow Key Movement
+        // Shift+Arrows = Semitone / Step
+        // Ctrl+Arrows = Octave / Step
+        if (selection.length > 0 && activePattern?.data?.notes) {
+            const isShift = e.shiftKey;
+
+            if (isShift || isCtrl) {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    pushNotesHistory();
+
+                    const selectedNotes = activePattern.data.notes.filter(n => selection.includes(n.id));
+
+                    // Collect all updates first, then apply in a single batch
+                    const noteUpdates = {};
+                    let previewNoteName = null;
+                    let previewChannelId = null;
+
+                    selectedNotes.forEach(note => {
+                        let updates = {};
+
+                        // Pitch Movement (Up/Down)
+                        if (e.key === 'ArrowUp') {
+                            const currentKeyIndex = allKeys.findIndex(k => k.fullName === note.noteName);
+                            const delta = isCtrl ? 12 : 1;
+                            const newIndex = Math.max(0, currentKeyIndex - delta);
+                            if (currentKeyIndex !== -1 && newIndex !== currentKeyIndex) {
+                                updates.noteName = allKeys[newIndex].fullName;
+                                if (!previewNoteName) {
+                                    previewNoteName = allKeys[newIndex].fullName;
+                                    previewChannelId = note.channelId;
+                                }
+                            }
+                        } else if (e.key === 'ArrowDown') {
+                            const currentKeyIndex = allKeys.findIndex(k => k.fullName === note.noteName);
+                            const delta = isCtrl ? 12 : 1;
+                            const newIndex = Math.min(allKeys.length - 1, currentKeyIndex + delta);
+                            if (currentKeyIndex !== -1 && newIndex !== currentKeyIndex) {
+                                updates.noteName = allKeys[newIndex].fullName;
+                                if (!previewNoteName) {
+                                    previewNoteName = allKeys[newIndex].fullName;
+                                    previewChannelId = note.channelId;
+                                }
+                            }
+                        }
+
+                        // Time Movement (Left/Right)
+                        if (e.key === 'ArrowLeft') {
+                            const moveStep = snapEnabled ? snapStrength : 1;
+                            updates.startStep = Math.max(0, note.startStep - moveStep);
+                        } else if (e.key === 'ArrowRight') {
+                            const moveStep = snapEnabled ? snapStrength : 1;
+                            updates.startStep = note.startStep + moveStep;
+                        }
+
+                        if (Object.keys(updates).length > 0) {
+                            noteUpdates[note.id] = updates;
+                        }
+                    });
+
+                    // Apply all updates in a single batch via updatePattern
+                    if (Object.keys(noteUpdates).length > 0) {
+                        const updatedNotes = activePattern.data.notes.map(n => {
+                            if (noteUpdates[n.id]) {
+                                return { ...n, ...noteUpdates[n.id] };
+                            }
+                            return n;
+                        });
+
+                        updatePattern(activePatternId, {
+                            data: {
+                                ...activePattern.data,
+                                notes: updatedNotes
+                            }
+                        });
+
+                        // Preview sound after batch update
+                        if (previewNoteName) {
+                            previewPianoNote(previewNoteName, previewChannelId);
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+
+    }, [selection, deleteNotes, activePattern, activePatternId, clipboard, playheadPosition, addNotesToActivePattern, pushNotesHistory, undoNotes, redoNotes, allKeys, updatePattern, snapEnabled, snapStrength, previewPianoNote]);
 
     useEffect(() => {
-        window.addEventListener('keydown', handleDelete);
-        return () => window.removeEventListener('keydown', handleDelete);
-    }, [handleDelete]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleKeyDown]);
 
     // Track current playback step for pulse animation (REMOVED - now handled in animateScroll)
 
@@ -970,6 +1246,7 @@ const PianoRoll = () => {
                 ref={scrollContainerRef}
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
+                onMouseMove={handleGridMouseMove}
             >
                 {/* Piano Keys Column - Fixed via sticky */}
                 <div className="piano-keys-column" ref={pianoKeysRef}>

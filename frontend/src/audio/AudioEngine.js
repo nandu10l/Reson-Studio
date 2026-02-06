@@ -67,6 +67,7 @@ class AudioEngine {
 
         // Setup Preview Synth - connect to master gain instead of destination
         this.previewSynth = new Tone.PolySynth(Tone.Synth, {
+            maxPolyphony: 128,
             oscillator: { type: "triangle" },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 }
         }).connect(this.masterGain);
@@ -310,15 +311,14 @@ class AudioEngine {
 
         Tone.Transport.loop = false;
 
-        // Cleanup: Stop all existing players to prevent overlap/duplication
+        // Cleanup: Dispose and clear all existing players to prevent overlap/duplication
         this.audioPlayers.forEach(player => {
             try {
                 player.stop();
-                // Reset volume for reused players
-                if (player.volume) player.volume.cancelScheduledValues(0);
-                player.volume.value = -6;
+                player.dispose();
             } catch (e) { }
         });
+        this.audioPlayers.clear();
 
         const isAnySolo = tracks.some(t => t.solo);
         const automationClipsToSchedule = [];
@@ -347,29 +347,27 @@ class AudioEngine {
                     const clipEndTime = clipStartTime + clipDuration;
                     const startOffset = clip.startOffset ? Tone.Time(`${clip.startOffset}q`).toSeconds() : 0;
 
-                    // Get or create audio player
-                    // Key by audioClipId (Source File ID) to reuse the same player instance for multiple slices
-                    let player = this.audioPlayers.get(clip.audioClipId);
+                    // Create a NEW player for each clip instance to avoid start time conflicts
+                    // Use clip.id (instance ID) as the key, not audioClipId (source ID)
+                    let player = null;
 
-                    if (!player) {
-                        // Create new player using the pre-decoded buffer if available
-                        if (audioClip.audioBuffer) {
-                            player = new Tone.Player(audioClip.audioBuffer);
-                        } else if (audioClip.url) {
-                            player = new Tone.Player(audioClip.url);
+                    // Create new player using the pre-decoded buffer if available
+                    if (audioClip.audioBuffer) {
+                        player = new Tone.Player(audioClip.audioBuffer);
+                    } else if (audioClip.url) {
+                        player = new Tone.Player(audioClip.url);
+                    }
+
+                    if (player) {
+                        player.volume.value = -6;
+
+                        if (this.masterGain) {
+                            player.connect(this.masterGain);
+                        } else {
+                            player.toDestination();
                         }
-
-                        if (player) {
-                            player.volume.value = -6;
-
-                            if (this.masterGain) {
-                                player.connect(this.masterGain);
-                            } else {
-                                player.toDestination();
-                            }
-                            // Store by Source ID
-                            this.audioPlayers.set(clip.audioClipId, player);
-                        }
+                        // Store by Instance ID (clip.id) for unique player per clip placement
+                        this.audioPlayers.set(clip.id, player);
                     }
 
                     if (player && player.loaded) {
@@ -384,14 +382,21 @@ class AudioEngine {
 
                                 // Schedule to play immediately at the transport's start time
                                 Tone.Transport.scheduleOnce((t) => {
-                                    player.start(t, currentOffset, remainingDuration);
+                                    try {
+                                        player.start(t, currentOffset, remainingDuration);
+                                    } catch (e) {
+                                        console.warn('Player start error (overlap):', e.message);
+                                    }
                                 }, startTime);
                             }
-
                             // 2. Future Check: Is this clip in the future?
-                            if (clipStartTime > startTime) {
+                            else if (clipStartTime > startTime) {
                                 Tone.Transport.schedule((time) => {
-                                    player.start(time, startOffset, clipDuration);
+                                    try {
+                                        player.start(time, startOffset, clipDuration);
+                                    } catch (e) {
+                                        console.warn('Player start error (future):', e.message);
+                                    }
                                 }, clipStartTime);
                             }
 
@@ -502,15 +507,20 @@ class AudioEngine {
             const automation = automations.find(a => a.id === clip.automationId);
             if (automation && automation.points) {
                 // Resolve Target Player ID
-                // 1. Try direct Source ID match (New System)
-                let targetSourceId = automation.targetClipId;
+                // Players are now keyed by clip instance ID (clip.id), not source ID
+                // Try to find the player using the targetClipId which should be an instance ID
+                let player = this.audioPlayers.get(automation.targetClipId);
 
-                // 2. If not found in Players, check if it's an Instance ID and map to Source ID (Legacy)
-                if (!this.audioPlayers.has(targetSourceId) && instanceToSourceMap.has(targetSourceId)) {
-                    targetSourceId = instanceToSourceMap.get(targetSourceId);
+                // Fallback: search through instanceToSourceMap for matching source
+                if (!player) {
+                    for (const [instanceId, sourceId] of instanceToSourceMap.entries()) {
+                        if (sourceId === automation.targetClipId) {
+                            player = this.audioPlayers.get(instanceId);
+                            if (player) break;
+                        }
+                    }
                 }
 
-                const player = this.audioPlayers.get(targetSourceId);
                 if (player) {
                     const clipStartTime = Tone.Time(`${clip.offset}q`).toSeconds();
                     const clipDuration = Tone.Time(`${clip.length}q`).toSeconds();
@@ -571,7 +581,7 @@ class AudioEngine {
         // Basic Synthesis logic based on name
         // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
         if (n.includes('kick')) {
-            source = new Tone.PolySynth(Tone.MembraneSynth).connect(channel);
+            source = new Tone.PolySynth(Tone.MembraneSynth, { maxPolyphony: 128 }).connect(channel);
         } else if (n.includes('snare')) {
             source = new Tone.NoiseSynth({
                 noise: { type: 'pink' }, // Pink noise for more body
@@ -584,6 +594,7 @@ class AudioEngine {
             }).connect(channel);
         } else if (n.includes('hat') || n.includes('cymbal')) {
             source = new Tone.PolySynth(Tone.MetalSynth, {
+                maxPolyphony: 128,
                 frequency: 200, harmonicity: 5.1, modulationIndex: 32,
                 envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
                 volume: -10
@@ -628,12 +639,13 @@ class AudioEngine {
             }).connect(channel);
         } else if (n.includes('bass')) {
             source = new Tone.PolySynth(Tone.MonoSynth, {
+                maxPolyphony: 128,
                 oscillator: { type: "square" },
                 envelope: { attack: 0.1 }
             }).connect(channel);
         } else {
             // Default Synth
-            source = new Tone.PolySynth(Tone.Synth).connect(channel);
+            source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 128 }).connect(channel);
         }
 
         this.sources.set(id, source);

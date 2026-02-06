@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
-import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats } from '../utils/audioImport';
+import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile } from '../utils/audioImport';
 import * as Tone from 'tone';
 
 const ProjectContext = createContext();
@@ -66,6 +66,9 @@ export const ProjectProvider = ({ children }) => {
     const [activeAudioClipId, setActiveAudioClipId] = useState(null);
     const [activeAutomationId, setActiveAutomationId] = useState(null);
 
+    // 8. Selection State
+    const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
 
@@ -81,6 +84,11 @@ export const ProjectProvider = ({ children }) => {
     const playheadIntervalRef = useRef(null);
     const [currentProjectPath, setCurrentProjectPath] = useState(null);
     const needsScheduling = useRef(true);
+
+    // Undo/Redo History for Pattern Notes
+    const [notesHistory, setNotesHistory] = useState([]);
+    const [notesHistoryIndex, setNotesHistoryIndex] = useState(-1);
+    const isUndoRedoAction = useRef(false);
 
     // Audio Recording Refs
     const mediaRecorderRef = useRef(null);
@@ -294,6 +302,120 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
+    // Batch add notes (for paste operations)
+    const addNotesToActivePattern = useCallback((notes) => {
+        if (!notes || notes.length === 0) return;
+
+        setPatterns(prev => prev.map(p => {
+            if (p.id === activePatternId) {
+                // Calculate new pattern length if needed
+                const maxNoteEnd = Math.max(...notes.map(n => n.startStep + n.length));
+                let newLength = p.length;
+                if (maxNoteEnd > p.length) {
+                    newLength = Math.ceil(maxNoteEnd / 16) * 16;
+                }
+
+                return {
+                    ...p,
+                    length: newLength,
+                    data: {
+                        ...p.data,
+                        notes: [...p.data.notes, ...notes]
+                    }
+                };
+            }
+            return p;
+        }));
+    }, [activePatternId]);
+
+    // Push current notes state to history (for undo/redo)
+    const pushNotesHistory = useCallback(() => {
+        const activePattern = patterns.find(p => p.id === activePatternId);
+        if (!activePattern || isUndoRedoAction.current) return;
+
+        const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
+
+        setNotesHistory(prev => {
+            // Trim any future history if we're not at the end
+            const newHistory = prev.slice(0, notesHistoryIndex + 1);
+            // Add current state
+            newHistory.push({ patternId: activePatternId, notes: currentNotes });
+            // Limit history size to 50 entries
+            if (newHistory.length > 50) {
+                newHistory.shift();
+            }
+            return newHistory;
+        });
+        setNotesHistoryIndex(prev => Math.min(prev + 1, 49));
+    }, [patterns, activePatternId, notesHistoryIndex]);
+
+    // Undo action
+    const undoNotes = useCallback(() => {
+        if (notesHistoryIndex < 0) return;
+
+        const historyEntry = notesHistory[notesHistoryIndex];
+        if (!historyEntry) return;
+
+        isUndoRedoAction.current = true;
+
+        // First, save current state to enable redo
+        const activePattern = patterns.find(p => p.id === activePatternId);
+        if (activePattern) {
+            const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
+            setNotesHistory(prev => {
+                const newHistory = [...prev];
+                // Store current state at next position for redo
+                newHistory[notesHistoryIndex + 1] = { patternId: activePatternId, notes: currentNotes };
+                return newHistory;
+            });
+        }
+
+        // Restore previous state
+        setPatterns(prev => prev.map(p => {
+            if (p.id === historyEntry.patternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: historyEntry.notes
+                    }
+                };
+            }
+            return p;
+        }));
+
+        setNotesHistoryIndex(prev => prev - 1);
+
+        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
+    }, [notesHistory, notesHistoryIndex, patterns, activePatternId]);
+
+    // Redo action
+    const redoNotes = useCallback(() => {
+        if (notesHistoryIndex >= notesHistory.length - 1) return;
+
+        const nextEntry = notesHistory[notesHistoryIndex + 1];
+        if (!nextEntry) return;
+
+        isUndoRedoAction.current = true;
+
+        setPatterns(prev => prev.map(p => {
+            if (p.id === nextEntry.patternId) {
+                return {
+                    ...p,
+                    data: {
+                        ...p.data,
+                        notes: nextEntry.notes
+                    }
+                };
+            }
+            return p;
+        }));
+
+        setNotesHistoryIndex(prev => prev + 1);
+
+        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
+    }, [notesHistory, notesHistoryIndex]);
+
     // Track Actions
     const toggleTrackMute = useCallback((trackId) => {
         setPlaylistTracks(prev => prev.map(t =>
@@ -305,6 +427,22 @@ export const ProjectProvider = ({ children }) => {
         setPlaylistTracks(prev => prev.map(t =>
             t.id === trackId ? { ...t, solo: !t.solo } : t
         ));
+    }, []);
+
+    const selectChannel = useCallback((channelId, isMultiSelect = false) => {
+        setSelectedChannelIds(prev => {
+            if (isMultiSelect) {
+                // Toggle selection
+                if (prev.includes(channelId)) {
+                    return prev.filter(id => id !== channelId);
+                } else {
+                    return [...prev, channelId];
+                }
+            } else {
+                // Single selection
+                return [channelId];
+            }
+        });
     }, []);
 
     // Optimization: Track if scheduling is needed
@@ -859,6 +997,160 @@ export const ProjectProvider = ({ children }) => {
     }, [bpm]);
 
 
+    // MIDI Import Action
+    const importMidiFile = useCallback(async () => {
+        try {
+            const file = await pickMidiFile();
+            if (!file) return;
+
+            console.log('Importing MIDI file:', file.name);
+
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Send to backend
+            const response = await fetch('http://localhost:8000/midi/parse', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || 'Failed to parse MIDI file');
+            }
+
+            const data = await response.json();
+            console.log('Parsed MIDI data:', data);
+
+            // 1. Log BPM (could auto-update)
+            if (data.bpm && data.bpm !== bpm) {
+                console.log(`MIDI BPM: ${data.bpm}. Current BPM: ${bpm}`);
+            }
+
+            // 2. Create Channels & Patterns
+            let newChannels = [];
+            let newPatternNotes = [];
+            // Use time-based ID to avoid collisions
+            const startId = Date.now();
+
+            setChannels(prev => {
+                const maxId = Math.max(...prev.map(c => c.id), -1);
+                let currentId = maxId + 1;
+
+                // Create a map to link track index to channel ID
+                // We'll calculate channel IDs relative to the current max
+
+                // For safety, let's map inside the callback
+                // But we need to build notes too. 
+                // We'll start channel IDs from currentId.
+
+                const tracks = data.tracks || [];
+
+                tracks.forEach((track, index) => {
+                    const channelId = currentId + index;
+
+                    // Create Channel
+                    newChannels.push({
+                        id: channelId,
+                        name: track.name || `Midi Track ${index + 1}`,
+                        vol: 80,
+                        pan: 50,
+                        effects: [],
+                        pluginId: 'sampler'
+                    });
+
+                    // Add Notes to Pattern
+                    track.notes.forEach((note, noteIndex) => {
+                        newPatternNotes.push({
+                            id: startId + (index * 10000) + noteIndex,
+                            noteName: note.noteName,
+                            channelId: channelId,
+                            startStep: Math.round(note.start * 4),
+                            length: Math.max(1, Math.round(note.duration * 4))
+                        });
+                    });
+                });
+
+                // Initialize audio engine
+                newChannels.forEach(ch => {
+                    audioEngine.createChannel(ch.id, ch.name);
+                });
+
+                return [...prev, ...newChannels];
+            });
+
+            // Update Patterns
+            setPatterns(prev => {
+                const nextPatId = Math.max(...prev.map(p => p.id)) + 1;
+
+                const maxStep = Math.max(...newPatternNotes.map(n => n.startStep + n.length), 64);
+                const length = Math.ceil(maxStep / 16) * 16;
+
+                // Create steps for ALL channels
+                // NOTE: We don't have the updated 'channels' here, so we must manually ensure 
+                // we rely on what we know about new channels + existing pattern structure or just empty.
+                // Ideally createEmptySteps needs dynamic channel info. 
+                // For now, we'll manually patch the new channel steps.
+
+                const newSteps = createEmptySteps(length);
+                newChannels.forEach(ch => {
+                    newSteps[ch.id] = Array(length).fill(false);
+                });
+
+                const newPattern = {
+                    id: nextPatId,
+                    name: `MIDI Import - ${file.name}`,
+                    color: '#FFAA00',
+                    length: length,
+                    data: {
+                        steps: newSteps,
+                        notes: newPatternNotes
+                    }
+                };
+
+                setActivePatternId(nextPatId);
+                return [...prev, newPattern];
+            });
+
+            // Add to Playlist
+            setPlaylistTracks(prev => {
+                const targetTrack = prev.find(t => t.clips.length === 0) || prev[0];
+                if (targetTrack) {
+                    // We need to guess the next pattern ID again or use a safer way.
+                    // Since we do it in the same event loop tick, it *should* match the calculation above.
+                    const patIds = patterns.map(p => p.id); // Closure 'patterns'
+                    // This might be slightly risky if 'patterns' is old. 
+                    // But 'patterns' is a dependency of useCallback, so it should be fresh.
+                    const nextPatId = Math.max(...patIds, 0) + 1;
+
+                    const newClip = {
+                        id: Date.now(),
+                        type: 'pattern',
+                        patternId: nextPatId,
+                        offset: playheadPosition,
+                        length: 16 // Should match pattern length ideally, but clips can be shorter/looped
+                    };
+
+                    return prev.map(t =>
+                        t.id === targetTrack.id
+                            ? { ...t, clips: [...t.clips, newClip] }
+                            : t
+                    );
+                }
+                return prev;
+            });
+
+            alert(`Imported MIDI: ${data.tracks.length} tracks.`);
+
+        } catch (error) {
+            console.error('Error importing MIDI:', error);
+            alert('Failed to import MIDI: ' + error.message);
+        }
+    }, [bpm, patterns, playheadPosition]);
+
+
+
     // --- Automation Actions ---
     const createAutomation = useCallback((targetClipId, type = 'volume') => {
         let newId = Date.now();
@@ -1094,6 +1386,10 @@ export const ProjectProvider = ({ children }) => {
         // New Actions
         updateNote,
         deleteNotes,
+        addNotesToActivePattern,
+        pushNotesHistory,
+        undoNotes,
+        redoNotes,
         addChannel,
         addEffect,
         removeEffect,
@@ -1116,11 +1412,15 @@ export const ProjectProvider = ({ children }) => {
         setPlayheadPosition,
         seek,
 
+        // Selection
+        selectedChannelIds, selectChannel,
+
         // Audio Clips
         audioClips,
         setAudioClips,
         importAudioFile,
         addStemsAsAudioClips,
+        importMidiFile,
 
         // Picker Tab
         pickerTab,

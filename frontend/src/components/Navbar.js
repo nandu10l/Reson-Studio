@@ -23,6 +23,7 @@ function Navbar({
     currentProjectPath,
     setCurrentProjectPath,
     importAudioFile,
+    importMidiFile,
     loadProject
   } = useProject();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -144,6 +145,11 @@ function Navbar({
         await importAudioFile();
       }
     }
+    if (action === 'import_midi') {
+      if (importMidiFile) {
+        await importMidiFile();
+      }
+    }
     if (action === 'exit' && window.electronAPI) {
       window.electronAPI.close();
     }
@@ -223,6 +229,9 @@ function Navbar({
   };
 
   const SUBMENUS = {
+    import: [
+      { label: "MIDI File...", action: "import_midi", shortcut: "Ctrl+Shift+I" },
+    ],
     export: [
       { type: "header", label: "Audio" },
       { label: "Wave file...", action: "export_wave", shortcut: "Ctrl+R" },
@@ -248,7 +257,7 @@ function Navbar({
       { label: "Save to new project folder...", action: "save_new_folder" },
       { label: "Save as template...", action: "save_template" },
       { type: "divider" },
-      { label: "Import", action: "import", right: ">" },
+      { label: "Import", action: "import", right: ">", hasSubmenu: true },
       { label: "Export", action: "export", right: ">", hasSubmenu: true },
       { type: "divider" },
       { label: "Revert to last backup", action: "revert_backup" },
