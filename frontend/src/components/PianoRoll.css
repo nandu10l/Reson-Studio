@@ -411,19 +411,7 @@
     background-color: #0f1215;
 }
 
-.grid-bg-cell {
-    height: 100%;
-    border-right: 1px solid rgba(255, 255, 255, 0.15);
-    position: relative;
-}
 
-.grid-bg-cell.beat {
-    border-right: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.grid-bg-cell.bar {
-    border-right: 2px solid rgba(255, 255, 255, 0.35);
-}
 
 /* Notes */
 .piano-note {
