@@ -51,7 +51,7 @@ const PianoRoll = () => {
     // Constants
     const octaves = 8;
     const startOctave = 8;
-    const totalBars = 8;
+    const totalBars = 256;
     const stepsPerBar = 16;
     const keyHeight = 32; // increased row height for bigger UI
 
@@ -1312,20 +1312,24 @@ const PianoRoll = () => {
                                     className={`piano-grid-row ${k.isBlack ? 'black-row' : 'white-row'}`}
                                     key={k.fullName}
                                     data-key={k.fullName}
-                                    style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${keyHeight}px` }}
+                                    style={{
+                                        width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
+                                        height: `${keyHeight}px`,
+                                        backgroundImage: `
+                                            linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+                                            linear-gradient(to right, rgba(255, 255, 255, 0.25) 1px, transparent 1px),
+                                            linear-gradient(to right, rgba(255, 255, 255, 0.15) 1px, transparent 1px)
+                                        `,
+                                        backgroundSize: `
+                                            ${pixelsPerStep * 16}px 100%,
+                                            ${pixelsPerStep * 4}px 100%,
+                                            ${pixelsPerStep}px 100%
+                                        `,
+                                        backgroundPosition: '0 0'
+                                    }}
                                 >
                                     {/* Render Grid Background Cells */}
-                                    {Array.from({ length: totalBars * stepsPerBar }).map((_, step) => {
-                                        const isBar = step % 16 === 0;
-                                        const isBeat = step % 4 === 0;
-                                        return (
-                                            <div
-                                                key={step}
-                                                className={`grid-bg-cell ${isBar ? 'bar' : isBeat ? 'beat' : ''}`}
-                                                style={{ width: `${pixelsPerStep}px` }}
-                                            ></div>
-                                        );
-                                    })}
+                                    {/* Grid rendered via CSS background on the row for performance */}
                                 </div>
                             );
                         })}
