@@ -734,7 +734,7 @@ class AudioEngine {
         if (!effectNode) return;
 
         // Store in slot
-        effects[slotIndex] = { node: effectNode, type: effectType, enabled: true };
+        effects[slotIndex] = { node: effectNode, type: effectType, enabled: true, mix: 1 };
 
         // Rebuild the effect chain
         this.rebuildEffectChain(channelId);
@@ -768,8 +768,10 @@ class AudioEngine {
         const effects = this.channelEffects.get(channelId);
         if (!effects || !effects[slotIndex]) return;
 
+        effects[slotIndex].mix = mix; // Store current mix
+
         const effect = effects[slotIndex].node;
-        if (effect && effect.wet) {
+        if (effect && effect.wet && effects[slotIndex].enabled) {
             effect.wet.rampTo(mix, 0.1);
         }
     }
@@ -785,8 +787,9 @@ class AudioEngine {
 
         const effect = effects[slotIndex].node;
         if (effect && effect.wet) {
-            // Set wet to 0 when bypassed
-            effect.wet.rampTo(enabled ? 0.5 : 0, 0.05);
+            // Set wet to 0 when bypassed, restore to previous mix when enabled
+            const targetMix = enabled ? (effects[slotIndex].mix ?? 1) : 0;
+            effect.wet.rampTo(targetMix, 0.05);
         }
     }
 
@@ -984,8 +987,19 @@ class AudioEngine {
                 }
             },
             setDamping: (v) => damping.frequency.rampTo(v, 0.1),
-            setDiffusion: (v) => { /* Tone.Reverb doesn't support diffusion easily */ },
-            setSize: (v) => { /* Tone.Reverb doesn't support size easily */ },
+            setDiffusion: (v) => {
+                // Map diffusion to high/low cut spread or pre-delay jitter?
+                // Visual feedback: ramp preDelay slightly?
+                // Actually, let's map diffusion to the highCut filter to darken the tail
+                // 0 = Bright (20kHz), 1 = Dark (1kHz)
+                const freq = 20000 - (v * 19000);
+                damping.frequency.rampTo(freq, 0.1);
+            },
+            setSize: (v) => {
+                // Map size to pre-delay scaling
+                // Large room = longer pre-delay (up to 0.1s)
+                preDelay.delayTime.rampTo(v * 0.1, 0.1);
+            },
 
             setDryVol: (v) => dryGain.gain.rampTo(v, 0.1),
             setErVol: (v) => erGain.gain.rampTo(v, 0.1),
@@ -1196,7 +1210,16 @@ class AudioEngine {
             setFreqRange: (v) => { state.rangeMode = v; updateDepth(); },
             setStereo: (v) => {
                 // Tone.Phaser doesn't expose easy stereo phase offset. 
-                // We could modulate it slightly or leave blank for stability. 
+                // We can approximate stereo width by modulating the baseFrequency slightly between channels if possible?
+                // Or use a StereoWidener after the phaser?
+                // For now, let's just modulation the depth slightly based on stereo param?
+                // No, let's leave it as a placeholder or implement a widener node if we want true stereo.
+                // Assuming v is 0-1 (or 0-360)
+                // Let's implement a simple frequency offset if possible.
+                // Since this is a single node, we can't split L/R easily without rebuilding the graph.
+                // We'll map stereo to feedback for now as a "color" change? No, that's confusing.
+                // Let's just log it for now to acknowledge the param exists.
+                // console.log('Phaser Stereo not fully implemented in Tone.Phaser wrapper', v);
             },
             setStages: (v) => {
                 // Changing stages may be glitchy, stick to even numbers or just update
@@ -1304,35 +1327,28 @@ class AudioEngine {
         const input = new Tone.Gain(1);
         const output = new Tone.Gain(1);
 
-        // Dry/Wet splitting
+        // Standard Dry/Wet architecture for Tone.js compatibility
         const dryNode = new Tone.Gain(0);
-        const wetChain = new Tone.Gain(1);
-        const outputMix = new Tone.Gain(1);
+        const wetNode = new Tone.Gain(1);
+        const effectReturn = new Tone.Gain(1);
 
         input.connect(dryNode);
-        dryNode.connect(outputMix);
+        dryNode.connect(output);
 
-        input.connect(wetChain);
+        input.connect(wetNode);
 
-        // Chain: Pre -> Gate -> Shaper -> Post -> WetChain -> OutputMix
+        // Chain: WetNode -> PreGain -> Gate -> Shaper -> PostGain -> EffectReturn -> Output
         const preGain = new Tone.Gain(1);
-
-        // Threshold (Noise Gate behavior as per Fruity Fast Dist)
-        const gate = new Tone.Gate(-60, 0.1); // default low
-
-        // Distortion Shaper
-        // We use WaveShaper for custom Types A/B
+        const gate = new Tone.Gate(-60, 0.1);
         const shaper = new Tone.WaveShaper((x) => x, 4096);
-
         const postGain = new Tone.Gain(1);
 
-        wetChain.connect(preGain);
+        wetNode.connect(preGain);
         preGain.connect(gate);
         gate.connect(shaper);
         shaper.connect(postGain);
-        postGain.connect(outputMix);
-
-        outputMix.connect(output);
+        postGain.connect(effectReturn);
+        effectReturn.connect(output);
 
         const state = {
             type: 'A',
@@ -1340,53 +1356,57 @@ class AudioEngine {
         };
 
         const updateCurve = () => {
-            // Generate curve based on Type
-            // Type A: Soft/Warm saturation (Tanh-like)
-            // Type B: Harder/Foldback 
-
             if (state.type === 'A') {
-                // Soft Clip
                 shaper.setMap((x) => Math.tanh(x * 2));
             } else {
-                // Harder / Asymmetric
                 shaper.setMap((x) => {
-                    // Simple foldback-ish or harder clip
-                    const k = 2; // drive
+                    const k = 2;
                     const y = x * k;
-                    return Math.max(-1, Math.min(1, y)); // Hard clip
+                    return Math.max(-1, Math.min(1, y));
                 });
             }
         };
-
-        // Init Curve
         updateCurve();
 
+        // Facade object mimicking Tone.Effect interface for generic handling
         return {
             input, output,
-            wet: { value: 1, rampTo: () => { } }, // Mock
+            // Expose "wet" for bypass logic (ramping to 0 mutes effect path)
+            wet: {
+                value: 1,
+                rampTo: (v, t) => {
+                    // When bypassing/enabling, we want to control the MIX
+                    // If v is 0 (bypass), mix should effectively be 0 (dry only)
+                    // If v is >0 (enable), we restore the user's mix setting
+
+                    // However, our generic bypass logic calls .wet.rampTo(0) or .wet.rampTo(1)
+                    // We need to interpret '1' as "restore state.mix"
+
+                    const targetMix = v > 0.5 ? state.mix : 0;
+
+                    // Crossfade logic
+                    dryNode.gain.rampTo(1 - targetMix, t);
+                    effectReturn.gain.rampTo(targetMix, t);
+                }
+            },
 
             // Setters
             setPreGain: (v) => preGain.gain.rampTo(v, 0.1),
             setThreshold: (v) => {
-                // v is 0-1. Map to dB range for Gate.
-                // 0 = no gate (-Infinity or very low), 1 = high thresh (-10dB?)
-                // Default 0.5
-                const db = -80 + (v * 70); // -80 to -10 dB
+                const db = -80 + (v * 70);
                 gate.threshold = db;
             },
             setDistType: (v) => { state.type = v; updateCurve(); },
             setMix: (v) => {
                 state.mix = v;
-                // Dry gain = 1 - v
-                dryNode.gain.value = 1 - v;
-                // Wet line gain logic:
-                wetChain.gain.value = v;
+                dryNode.gain.rampTo(1 - v, 0.1);
+                effectReturn.gain.rampTo(v, 0.1);
             },
             setPostGain: (v) => postGain.gain.rampTo(v, 0.1),
 
             dispose: () => {
                 input.dispose(); output.dispose();
-                dryNode.dispose(); wetChain.dispose(); outputMix.dispose();
+                dryNode.dispose(); wetNode.dispose(); effectReturn.dispose();
                 preGain.dispose(); gate.dispose(); shaper.dispose(); postGain.dispose();
             },
             connect: (d) => output.connect(d),

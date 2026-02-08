@@ -411,8 +411,11 @@ const MixerDetailPanel = React.memo(({
   const handleUpdateParams = (params) => {
     if (onUpdateEffectParams && editingSlotIndex !== null) {
       onUpdateEffectParams(selectedChannel.id, editingSlotIndex, params);
-      // Update local editing effect to reflect changes
-      setEditingEffect(prev => prev ? { ...prev, params } : null);
+      // Update local editing effect to reflect changes, merging with existing params
+      setEditingEffect(prev => prev ? {
+        ...prev,
+        params: { ...prev.params, ...params }
+      } : null);
     }
   };
 
