@@ -1,36 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import './EffectEditor.css';
 
 // Effect parameters configuration for each effect type
 const EFFECT_PARAMS = {
-    spatial: {
-        name: 'Reverb',
-        params: [
-            { id: 'decay', name: 'Decay', min: 0.1, max: 10, default: 1.5, unit: 's' },
-            { id: 'preDelay', name: 'Pre-Delay', min: 0, max: 0.1, default: 0.01, unit: 's' },
-            { id: 'wet', name: 'Mix', min: 0, max: 1, default: 0.5, unit: '' }
-        ]
-    },
-    reverb: {
-        name: 'Reeverb 2',
-        params: [
-            // Filters
-            { id: 'lowCut', name: 'L.Cut', min: 20, max: 2000, default: 100, unit: 'Hz' },
-            { id: 'highCut', name: 'H.Cut', min: 1000, max: 20000, default: 6000, unit: 'Hz' },
-            // Time / Space
-            { id: 'preDelay', name: 'Del', min: 0, max: 0.5, default: 0.02, unit: 's' },
-            { id: 'size', name: 'Size', min: 0.1, max: 1, default: 0.7, unit: '' }, // Virtual param for ReverbGen
-            { id: 'diffusion', name: 'Diff', min: 0, max: 1, default: 0.8, unit: '' }, // Virtual
-            // Color
-            { id: 'decay', name: 'Dec', min: 0.1, max: 20, default: 2.5, unit: 's' },
-            { id: 'damping', name: 'Damp', min: 100, max: 20000, default: 5000, unit: 'Hz' },
-            // Mix (Sliders)
-            { id: 'dryVol', name: 'Dry', min: 0, max: 1, default: 0.8, unit: '', type: 'slider' },
-            { id: 'erVol', name: 'ER', min: 0, max: 1, default: 0.3, unit: '', type: 'slider' }, // Simulation
-            { id: 'wet', name: 'Wet', min: 0, max: 1, default: 0.6, unit: '', type: 'slider' },
-            { id: 'separation', name: 'Sep', min: -1, max: 1, default: 0, unit: '' } // Knob for separation
-        ]
-    },
+    // Reverb (Spatial)
     spatial: {
         name: 'Reeverb 2',
         params: [
@@ -47,6 +20,7 @@ const EFFECT_PARAMS = {
             { id: 'separation', name: 'Sep', min: -1, max: 1, default: 0, unit: '' }
         ]
     },
+    // Delay (Temporal)
     temporal: {
         name: 'Delay',
         params: [
@@ -60,27 +34,7 @@ const EFFECT_PARAMS = {
             { id: 'dryVol', name: 'Vol', min: 0, max: 1, default: 0.5, unit: '' }
         ]
     },
-    delay: {
-        name: 'Delay',
-        params: [
-            { id: 'inputPan', name: 'Pan', min: -50, max: 50, default: 0, unit: '' },
-            { id: 'inputVol', name: 'Vol', min: 0, max: 1, default: 1, unit: '' },
-            { id: 'feedbackMode', name: 'Mode', type: 'mode', options: ['Normal', 'Invert', 'P.Pong'], default: 'Normal' },
-            { id: 'feedbackVol', name: 'Vol', min: 0, max: 1, default: 0.4, unit: '' },
-            { id: 'cut', name: 'Cut', min: 100, max: 20000, default: 10000, unit: 'Hz' },
-            { id: 'delayTime', name: 'Time', min: 0.01, max: 1, default: 0.3, unit: 's' },
-            { id: 'offset', name: 'Ofs', min: -0.5, max: 0.5, default: 0, unit: 's' },
-            { id: 'dryVol', name: 'Vol', min: 0, max: 1, default: 0.5, unit: '' }
-        ]
-    },
-    modulation: {
-        name: 'Chorus/Phaser',
-        params: [
-            { id: 'frequency', name: 'Rate', min: 0.1, max: 10, default: 1.5, unit: 'Hz' },
-            { id: 'depth', name: 'Depth', min: 0, max: 1, default: 0.7, unit: '' },
-            { id: 'wet', name: 'Mix', min: 0, max: 1, default: 0.5, unit: '' }
-        ]
-    },
+    // Chorus
     chorus: {
         name: 'Fruity Chorus',
         params: [
@@ -102,6 +56,7 @@ const EFFECT_PARAMS = {
             { id: 'wet', name: 'Wet Only', min: 0, max: 1, default: 0.5, unit: '' }
         ]
     },
+    // Phaser (Modulation)
     phaser: {
         name: 'Fruity Phaser',
         params: [
@@ -110,22 +65,16 @@ const EFFECT_PARAMS = {
             { id: 'minDepth', name: 'Min Depth', min: 0, max: 1, default: 0.1, unit: '' },
             { id: 'maxDepth', name: 'Max Depth', min: 0, max: 1, default: 0.8, unit: '' },
             // Row 2
-            { id: 'freqRange', name: 'Freq Range', type: 'mode', options: ['Small', 'Large'], default: 'Large' }, // Simplified range
+            { id: 'freqRange', name: 'Freq Range', type: 'mode', options: ['Small', 'Large'], default: 'Large' },
             { id: 'stereo', name: 'Stereo', min: 0, max: 1, default: 0.5, unit: 'phase' },
             { id: 'stages', name: 'Nr. Stages', min: 2, max: 12, default: 8, unit: '' },
             // Row 3
-            { id: 'feedback', name: 'Feedback', min: 0, max: 1, default: 0.4, unit: '' }, // amount
+            { id: 'feedback', name: 'Feedback', min: 0, max: 1, default: 0.4, unit: '' },
             { id: 'wet', name: 'Dry-Wet', min: 0, max: 1, default: 0.5, unit: '%' },
-            { id: 'outGain', name: 'Out Gain', min: -20, max: 20, default: 4, unit: 'dB' } // dB
+            { id: 'outGain', name: 'Out Gain', min: -20, max: 20, default: 4, unit: 'dB' }
         ]
     },
-    saturation: {
-        name: 'Distortion',
-        params: [
-            { id: 'distortion', name: 'Drive', min: 0, max: 1, default: 0.4, unit: '' },
-            { id: 'wet', name: 'Mix', min: 0, max: 1, default: 0.5, unit: '' }
-        ]
-    },
+    // Distortion
     distortion: {
         name: 'Fruity Fast Dist',
         params: [
@@ -136,36 +85,19 @@ const EFFECT_PARAMS = {
             { id: 'postGain', name: 'Post', min: 0, max: 2, default: 1, unit: '' }
         ]
     },
-    dynamics: {
-        name: 'Compressor',
-        params: [
-            { id: 'threshold', name: 'Threshold', min: -60, max: 0, default: -24, unit: 'dB' },
-            { id: 'ratio', name: 'Ratio', min: 1, max: 20, default: 4, unit: ':1' },
-            { id: 'attack', name: 'Attack', min: 0.001, max: 0.5, default: 0.003, unit: 's' },
-            { id: 'release', name: 'Release', min: 0.01, max: 1, default: 0.25, unit: 's' }
-        ]
-    },
+    // Compressor
     compressor: {
         name: 'Fruity Compressor',
         params: [
-            // Row 1
             { id: 'threshold', name: 'Threshold', min: -60, max: 0, default: -15, unit: 'dB' },
             { id: 'ratio', name: 'Ratio', min: 1, max: 30, default: 2.4, unit: ':1' },
             { id: 'gain', name: 'Gain', min: 0, max: 30, default: 0, unit: 'dB' },
-            // Row 2
             { id: 'attack', name: 'Attack', min: 0, max: 500, default: 15, unit: 'ms' },
             { id: 'release', name: 'Release', min: 0, max: 2000, default: 200, unit: 'ms' },
-            { id: 'type', name: 'Type', type: 'mode', options: ['Hard', 'Medium', 'Soft', 'Vintage'], default: 'Vintage' } // Knee control
+            { id: 'type', name: 'Type', type: 'mode', options: ['Hard', 'Medium', 'Soft', 'Vintage'], default: 'Vintage' }
         ]
     },
-    filter: {
-        name: 'Parametric EQ',
-        params: [
-            { id: 'low', name: 'Low', min: -24, max: 24, default: 0, unit: 'dB' },
-            { id: 'mid', name: 'Mid', min: -24, max: 24, default: 0, unit: 'dB' },
-            { id: 'high', name: 'High', min: -24, max: 24, default: 0, unit: 'dB' }
-        ]
-    },
+    // EQ
     eq: {
         name: 'Parametric EQ',
         params: [
@@ -173,16 +105,35 @@ const EFFECT_PARAMS = {
             { id: 'mid', name: 'Mid', min: -24, max: 24, default: 0, unit: 'dB' },
             { id: 'high', name: 'High', min: -24, max: 24, default: 0, unit: 'dB' }
         ]
-    }
+    },
+    // Alias to support legacy types if needed
+    reverb: { /* Aliased below */ },
+    delay: { /* Aliased below */ },
+    modulation: { /* Aliased below */ },
+    dynamics: { /* Aliased below */ },
+    filter: { /* Aliased below */ }
 };
 
-/**
- * EffectEditor - Modal component for editing effect parameters
- * Opens when clicking on a filled effect slot in the mixer detail panel
- */
-// --- EQ HELPER FUNCTIONS ---
+// Map Aliases
+EFFECT_PARAMS.reverb = EFFECT_PARAMS.spatial;
+EFFECT_PARAMS.delay = EFFECT_PARAMS.temporal;
+EFFECT_PARAMS.modulation = EFFECT_PARAMS.phaser;
+EFFECT_PARAMS.dynamics = EFFECT_PARAMS.compressor;
+EFFECT_PARAMS.filter = EFFECT_PARAMS.eq;
 
-// Map Frequency to Canvas X (Logarithmic)
+// --- Helper Functions ---
+
+const formatValue = (param, value) => {
+    if (value === undefined) return param.default.toFixed(2);
+    if (param.unit === 'dB') return Math.round(value) + param.unit;
+    if (param.unit === ':1') return value.toFixed(1) + param.unit;
+    if (param.unit === 'Hz') return Math.round(value) + ' ' + param.unit;
+    if (param.unit === 'ms') return Math.round(value) + param.unit;
+    if (param.unit === 's') return value.toFixed(2) + param.unit;
+    if (param.unit === '') return value.toFixed(2);
+    return value.toFixed(2) + (param.unit ? ' ' + param.unit : '');
+};
+
 const freqToX = (freq, width) => {
     const minF = 20;
     const maxF = 20000;
@@ -192,7 +143,6 @@ const freqToX = (freq, width) => {
     return (Math.log10(freq) - minLog) * scale;
 };
 
-// Map Canvas X to Frequency
 const xToFreq = (x, width) => {
     const minF = 20;
     const maxF = 20000;
@@ -201,17 +151,14 @@ const xToFreq = (x, width) => {
     return Math.pow(10, minLog + (x / width) * (maxLog - minLog));
 };
 
-// Map dB to Canvas Y
 const dbToY = (db, height) => {
     const maxDb = 18;
-    const minDb = -18; // Range +/- 18dB
-    // 0dB is vertically centered
+    const minDb = -18;
     const range = maxDb - minDb;
     const ratio = (maxDb - db) / range;
     return ratio * height;
 };
 
-// Map Canvas Y to dB
 const yToDb = (y, height) => {
     const maxDb = 18;
     const minDb = -18;
@@ -219,55 +166,173 @@ const yToDb = (y, height) => {
     return maxDb - (ratio * (maxDb - minDb));
 };
 
-// Biquad Magnitude Response Calculation (Approximation)
+// Curve calculation for EQ visualization
 const getFilterResponse = (f, type, f0, Q, gainDb) => {
-    // f: frequency to evaluate
-    // f0: center frequency
-    // type: lowshelf, highshelf, peaking, lowpass, highpass
-    // gainDb: gain for peaking/shelf
-
-    // Simplifed curve logic for visualization
-    const x = Math.log10(f / f0); // log distance from center
-
+    const x = Math.log10(f / f0);
     if (type === 'peaking') {
         const width = 1 / (2 * Math.max(0.1, Q));
         const g = gainDb * Math.exp(-(x * x) / (2 * width * width));
         return g;
     }
-
     if (type === 'lowshelf') {
         const k = 4;
-        const scale = 1 / (1 + Math.exp(k * x));
-        return gainDb * scale;
+        return gainDb / (1 + Math.exp(k * x));
     }
-
     if (type === 'highshelf') {
-        const scale = 1 / (1 + Math.exp(-4 * x));
-        return gainDb * scale;
+        return gainDb / (1 + Math.exp(-4 * x));
     }
-
     if (type === 'lowpass') {
         if (f <= f0) return 0;
         const octaves = Math.log2(f / f0);
         return -12 * octaves * octaves;
     }
-
     if (type === 'highpass') {
         if (f >= f0) return 0;
         const octaves = Math.log2(f0 / f);
         return -12 * octaves * octaves;
     }
-
     return 0;
 };
 
-// Main EQ Component
+// --- Sub-Components ---
+
+const EffectKnob = memo(({ param, value, onChange }) => {
+    const handleMouseDown = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startY = e.clientY;
+        const startValue = value ?? param.default;
+        const range = param.max - param.min;
+
+        const handleMouseMove = (moveEvent) => {
+            moveEvent.preventDefault();
+            const deltaY = startY - moveEvent.clientY;
+            const sensitivity = range / 100;
+            const newValue = Math.max(param.min, Math.min(param.max, startValue + deltaY * sensitivity));
+            onChange(param.id, newValue);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [param, value, onChange]);
+
+    const displayValue = value ?? param.default;
+    const percent = ((displayValue - param.min) / (param.max - param.min)) * 100;
+    const rotation = (percent / 100) * 270 - 135;
+
+    return (
+        <div className="effect-param">
+            <div
+                className="effect-param-knob"
+                onMouseDown={handleMouseDown}
+                style={{ '--rotation': `${rotation}deg` }}
+                title={`${param.name}: Drag up/down to adjust`}
+            >
+                <div className="effect-param-knob-bg" />
+                <div className="effect-param-knob-indicator" />
+                <svg className="effect-param-knob-track" viewBox="0 0 40 40">
+                    <circle
+                        cx="20" cy="20" r="16"
+                        fill="none"
+                        stroke="#1a1a1a"
+                        strokeWidth="2"
+                        strokeDasharray="75 25"
+                        transform="rotate(135 20 20)"
+                    />
+                    <circle
+                        cx="20" cy="20" r="16"
+                        fill="none"
+                        stroke="#4ade80"
+                        strokeWidth="2"
+                        strokeDasharray={`${percent * 0.75} 100`}
+                        transform="rotate(135 20 20)"
+                    />
+                </svg>
+            </div>
+            <div className="effect-param-info">
+                <span className="effect-param-name">{param.name}</span>
+                <span className="effect-param-value">{formatValue(param, displayValue)}</span>
+            </div>
+        </div>
+    );
+});
+
+const EffectSlider = memo(({ param, value, onChange }) => {
+    const handleMouseDown = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startY = e.clientY;
+        const startValue = value ?? param.default;
+        const range = param.max - param.min;
+
+        const handleMouseMove = (moveEvent) => {
+            moveEvent.preventDefault();
+            const deltaY = startY - moveEvent.clientY;
+            const sensitivity = range / 200;
+            const newValue = Math.max(param.min, Math.min(param.max, startValue + deltaY * sensitivity));
+            onChange(param.id, newValue);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [param, value, onChange]);
+
+    const displayValue = value ?? param.default;
+    const percent = ((displayValue - param.min) / (param.max - param.min)) * 100;
+
+    return (
+        <div className="effect-param effect-param-slider">
+            <div
+                className="effect-slider-track"
+                onMouseDown={handleMouseDown}
+            >
+                <div className="effect-slider-fill" style={{ height: `${percent}%` }} />
+                <div className="effect-slider-handle" style={{ bottom: `${percent}%` }} />
+            </div>
+            <div className="effect-param-info">
+                <span className="effect-param-name">{param.name}</span>
+                <span className="effect-param-value">{formatValue(param, displayValue)}</span>
+            </div>
+        </div>
+    );
+});
+
+const EffectMode = memo(({ param, value, onChange }) => {
+    const currentMode = value || param.default;
+    return (
+        <div className="effect-mode-group">
+            {param.options.map(option => (
+                <div
+                    key={option}
+                    className={`effect-mode-option ${currentMode === option ? 'active' : ''}`}
+                    onClick={() => onChange(param.id, option)}
+                >
+                    <div className="effect-mode-radio" />
+                    <span className="effect-mode-label">{option}</span>
+                </div>
+            ))}
+        </div>
+    );
+});
+
+// --- EQ Component ---
 const ParametricEQEditor = ({ bands, onBandChange }) => {
     const canvasRef = useRef(null);
     const [dragging, setDragging] = useState(null);
     const [hoverBand, setHoverBand] = useState(null);
 
-    // Helper to extract band data from flattened params
     const getBand = (i) => ({
         freq: bands[`b${i}Freq`] ?? (i === 0 ? 60 : (i === 6 ? 12000 : [130, 300, 800, 2000, 5000][i - 1])),
         gain: bands[`b${i}Gain`] ?? 0,
@@ -291,31 +356,26 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
         ctx.strokeStyle = '#444';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        // Freq Grid
         [100, 1000, 10000].forEach(f => {
             const x = freqToX(f, w);
             ctx.moveTo(x, 0); ctx.lineTo(x, h);
         });
-        // dB Grid
         [12, 6, 0, -6, -12].forEach(db => {
             const y = dbToY(db, h);
             ctx.moveTo(0, y); ctx.lineTo(w, y);
         });
         ctx.stroke();
 
-        // Zero Line
         ctx.beginPath();
         const y0 = dbToY(0, h);
         ctx.strokeStyle = '#666';
         ctx.moveTo(0, y0); ctx.lineTo(w, y0);
         ctx.stroke();
 
-        // Calculate Curve
+        // Curve
         ctx.beginPath();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
-
-        // Step size for drawing
         for (let x = 0; x < w; x += 2) {
             const f = xToFreq(x, w);
             let totalDb = 0;
@@ -329,13 +389,12 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
         }
         ctx.stroke();
 
-        // Draw Tokens
+        // Tokens
         for (let i = 0; i < 7; i++) {
             const b = getBand(i);
             const x = freqToX(b.freq, w);
             const y = dbToY(b.gain, h);
 
-            // Token Circle
             ctx.beginPath();
             ctx.arc(x, y, 10, 0, Math.PI * 2);
             ctx.fillStyle = dragging?.index === i ? '#fff' : (hoverBand === i ? '#ddd' : `hsla(${i * 50}, 70%, 50%, 0.8)`);
@@ -344,7 +403,6 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
             ctx.strokeStyle = '#000';
             ctx.stroke();
 
-            // Number
             ctx.fillStyle = '#000';
             ctx.font = 'bold 9px sans-serif';
             ctx.textAlign = 'center';
@@ -358,19 +416,21 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
     }, [bands, dragging, hoverBand]);
 
     const handleMouseDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         const cvs = canvasRef.current;
+        if (!cvs) return;
         const rect = cvs.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
 
-        // Check hits
-        for (let i = 6; i >= 0; i--) { // Reverse order to select top first
+        for (let i = 6; i >= 0; i--) {
             const b = getBand(i);
             const x = freqToX(b.freq, cvs.width);
             const y = dbToY(b.gain, cvs.height);
             const dx = mx - x;
             const dy = my - y;
-            if (dx * dx + dy * dy < 144) { // radius 12 squared
+            if (dx * dx + dy * dy < 144) {
                 setDragging({ index: i, startX: mx, startY: my, startFreq: b.freq, startGain: b.gain });
                 return;
             }
@@ -379,22 +439,19 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
 
     const handleMouseMove = (e) => {
         const cvs = canvasRef.current;
+        if (!cvs) return;
         const rect = cvs.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
 
         if (dragging) {
-            // Update Band
-            const newFreq = xToFreq(mx, cvs.width); // Raw freq
-            const newGain = yToDb(my, cvs.height); // Raw gain
-
-            // Limiters
+            e.preventDefault();
+            const newFreq = xToFreq(mx, cvs.width);
+            const newGain = yToDb(my, cvs.height);
             const clampedFreq = Math.max(20, Math.min(20000, newFreq));
             const clampedGain = Math.max(-18, Math.min(18, newGain));
-
             onBandChange(dragging.index, { freq: clampedFreq, gain: clampedGain });
         } else {
-            // Hover check
             let hovered = null;
             for (let i = 6; i >= 0; i--) {
                 const b = getBand(i);
@@ -411,22 +468,21 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
         }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
         setDragging(null);
     };
 
     const handleWheel = (e) => {
         if (hoverBand !== null) {
-            e.preventDefault(); // Stop page scroll
+            e.preventDefault();
             const b = getBand(hoverBand);
-            // Scroll Up (neg delta) -> Increase Q
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             const newBW = Math.max(0.1, Math.min(10, b.bw * delta));
             onBandChange(hoverBand, { bw: newBW });
         }
     };
 
-    // Prevent scrolling when over canvas
     useEffect(() => {
         const cvs = canvasRef.current;
         if (cvs) {
@@ -436,10 +492,8 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
         }
     }, [hoverBand]);
 
-
     return (
         <div className="eq-editor-container" style={{ display: 'flex', gap: '10px', height: '320px', padding: '10px' }}>
-            {/* Graph */}
             <div style={{ flex: 1, position: 'relative' }}>
                 <canvas
                     ref={canvasRef}
@@ -448,7 +502,7 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
                     style={{
                         background: '#222', borderRadius: '4px',
                         cursor: dragging ? 'grabbing' : (hoverBand !== null ? 'grab' : 'default'),
-                        width: '100%', height: '100%' // Responsive to container
+                        width: '100%', height: '100%'
                     }}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
@@ -457,30 +511,15 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
                     onWheel={handleWheel}
                 />
             </div>
-
-            {/* Faders */}
-            <div className="eq-faders" style={{
-                display: 'flex', gap: '4px', padding: '4px',
-                background: '#1a1a1a', borderRadius: '4px',
-                border: '1px solid #333'
-            }}>
+            <div className="eq-faders" style={{ display: 'flex', gap: '4px', padding: '4px', background: '#1a1a1a', borderRadius: '4px', border: '1px solid #333' }}>
                 {Array(7).fill(0).map((_, i) => {
                     const b = getBand(i);
                     const percent = ((b.gain + 18) / 36) * 100;
                     return (
-                        <div key={i} className="eq-fader-col" style={{
-                            width: '30px', position: 'relative', height: '100%',
-                            background: '#222', borderRadius: '2px', display: 'flex', flexDirection: 'column'
-                        }}>
-                            {/* Color Header */}
+                        <div key={i} className="eq-fader-col" style={{ width: '30px', position: 'relative', height: '100%', background: '#222', borderRadius: '2px', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ height: '4px', background: `hsla(${i * 50}, 70%, 50%, 0.8)`, marginBottom: '2px' }} />
-
-                            {/* Slider Track Area */}
                             <div style={{ flex: 1, position: 'relative', margin: '0 8px' }}>
-                                {/* Center Line */}
                                 <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#444' }}></div>
-
-                                {/* Handle (Visual) */}
                                 <div style={{
                                     position: 'absolute',
                                     bottom: `${Math.max(0, Math.min(100, percent))}%`,
@@ -489,7 +528,6 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
                                     pointerEvents: 'none',
                                     boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
                                 }} />
-
                                 <input
                                     type="range"
                                     min="-18" max="18" step="0.1"
@@ -503,7 +541,6 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
                                     }}
                                 />
                             </div>
-
                             <div style={{ height: '16px', fontSize: '9px', textAlign: 'center', color: '#666' }}>{i + 1}</div>
                         </div>
                     );
@@ -513,6 +550,8 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
     );
 };
 
+// --- Main Component ---
+
 const EffectEditor = React.memo(({
     effect,
     onClose,
@@ -520,10 +559,11 @@ const EffectEditor = React.memo(({
     onUpdateMix,
     onToggleEnabled
 }) => {
+    // Local params state
     const [params, setParams] = useState({});
     const editorRef = useRef(null);
 
-    // Initialize params from effect
+    // Initialize params
     useEffect(() => {
         if (effect?.params) {
             setParams(effect.params);
@@ -532,402 +572,123 @@ const EffectEditor = React.memo(({
             if (config) {
                 const defaults = {};
                 config.params.forEach(p => {
-                    if (p.type === 'mode') {
-                        defaults[p.id] = p.default;
-                    } else {
-                        defaults[p.id] = p.default;
-                    }
+                    defaults[p.id] = p.default;
                 });
                 setParams(defaults);
             }
         }
     }, [effect]);
 
-    // Close when clicking outside
+    // Close handlers
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (editorRef.current && !editorRef.current.contains(e.target)) {
                 onClose();
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onClose]);
-
-    // Close on Escape key
-    useEffect(() => {
         const handleKeyDown = (e) => {
-            if (e.key === 'Escape') {
-                onClose();
-            }
+            if (e.key === 'Escape') onClose();
         };
+        document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, [onClose]);
 
     if (!effect) return null;
 
     const effectConfig = EFFECT_PARAMS[effect.type];
-    if (!effectConfig) {
-        console.warn(`No config for effect type: ${effect.type}`);
-        return null;
-    }
+    if (!effectConfig) return null;
 
-    const handleParamChange = (paramId, value) => {
-        const newParams = { ...params, [paramId]: value };
-        setParams(newParams);
-        if (onUpdateParams) {
-            onUpdateParams({ [paramId]: value });
-        }
-    };
+    // Param Change Handler
+    const handleParamChange = useCallback((paramId, value) => {
+        setParams(prev => {
+            const newParams = { ...prev, [paramId]: value };
+            // Debounce or immediate update?
+            // For dragging, we want immediate UI feedback.
+            // onUpdateParams handles backend throttling if needed, or we throttle here.
+            // React state update is async but we need sync for smoothness.
+            if (onUpdateParams) {
+                onUpdateParams({ [paramId]: value });
+            }
+            return newParams;
+        });
+    }, [onUpdateParams]);
 
-    const createKnobHandler = (param) => (e) => {
-        e.preventDefault();
-        const startY = e.clientY;
-        const startValue = params[param.id] ?? param.default;
-        const range = param.max - param.min;
-
-        const handleMouseMove = (moveEvent) => {
-            const deltaY = startY - moveEvent.clientY;
-            const sensitivity = range / 100;
-            const newValue = Math.max(param.min, Math.min(param.max, startValue + deltaY * sensitivity));
-            handleParamChange(param.id, newValue);
-        };
-
-        const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-    };
-
-    const createSliderHandler = (param) => (e) => {
-        e.preventDefault();
-        const startY = e.clientY;
-        const startValue = params[param.id] ?? param.default;
-        const range = param.max - param.min;
-
-        const handleMouseMove = (moveEvent) => {
-            const deltaY = startY - moveEvent.clientY;
-            // Faders have more linear travel perception
-            const sensitivity = range / 200;
-            const newValue = Math.max(param.min, Math.min(param.max, startValue + deltaY * sensitivity));
-            handleParamChange(param.id, newValue);
-        };
-
-        const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-    };
-
-    const formatValue = (param, value) => {
-        if (value === undefined) return param.default.toFixed(2);
-        if (param.unit === 'dB') return Math.round(value) + param.unit;
-        if (param.unit === ':1') return value.toFixed(1) + param.unit;
-        if (param.unit === 'Hz') return Math.round(value) + ' ' + param.unit;
-        if (param.unit === 'ms') return Math.round(value) + param.unit;
-        if (param.unit === 's') return value.toFixed(2) + param.unit;
-        if (param.unit === '') return value.toFixed(2);
-        return value.toFixed(2) + (param.unit ? ' ' + param.unit : '');
-    };
-
-    // Organize parameters into sections based on effect type
+    // Render Sections Logic
     const renderSections = () => {
         const { type } = effect;
 
-        // Define section layouts for different effect types
+        // Define section layouts
+        // ... (Same as before but simplified to just filtered params) ...
         const sectionLayouts = {
             delay: [
-                {
-                    title: 'INPUT',
-                    params: effectConfig.params.filter(p => p.id === 'inputPan' || p.id === 'inputVol')
-                },
-                {
-                    title: 'FEEDBACK',
-                    params: effectConfig.params.filter(p => p.id === 'feedbackMode' || p.id === 'feedbackVol' || p.id === 'cut')
-                },
-                {
-                    title: 'TIME',
-                    params: effectConfig.params.filter(p => p.id === 'delayTime' || p.id === 'offset')
-                },
-                {
-                    title: 'DRY',
-                    params: effectConfig.params.filter(p => p.id === 'dryVol')
-                }
+                { title: 'INPUT', params: ['inputPan', 'inputVol'] },
+                { title: 'FEEDBACK', params: ['feedbackMode', 'feedbackVol', 'cut'] },
+                { title: 'TIME', params: ['delayTime', 'offset'] },
+                { title: 'DRY', params: ['dryVol'] }
             ],
             temporal: [
-                {
-                    title: 'INPUT',
-                    params: effectConfig.params.filter(p => p.id === 'inputPan' || p.id === 'inputVol')
-                },
-                {
-                    title: 'FEEDBACK',
-                    params: effectConfig.params.filter(p => p.id === 'feedbackMode' || p.id === 'feedbackVol' || p.id === 'cut')
-                },
-                {
-                    title: 'TIME',
-                    params: effectConfig.params.filter(p => p.id === 'delayTime' || p.id === 'offset')
-                },
-                {
-                    title: 'DRY',
-                    params: effectConfig.params.filter(p => p.id === 'dryVol')
-                }
-            ],
-            reverb: [
-                {
-                    title: 'FILTERS',
-                    params: effectConfig.params.filter(p => p.id === 'lowCut' || p.id === 'highCut')
-                },
-                {
-                    title: 'SPACE',
-                    params: effectConfig.params.filter(p => p.id === 'preDelay' || p.id === 'size' || p.id === 'diffusion')
-                },
-                {
-                    title: 'COLOR',
-                    params: effectConfig.params.filter(p => p.id === 'decay' || p.id === 'damping')
-                },
-                {
-                    title: 'MIX',
-                    params: effectConfig.params.filter(p => ['dryVol', 'erVol', 'wet', 'separation'].includes(p.id))
-                }
+                { title: 'INPUT', params: ['inputPan', 'inputVol'] },
+                { title: 'FEEDBACK', params: ['feedbackMode', 'feedbackVol', 'cut'] },
+                { title: 'TIME', params: ['delayTime', 'offset'] },
+                { title: 'DRY', params: ['dryVol'] }
             ],
             spatial: [
-                {
-                    title: 'FILTERS',
-                    params: effectConfig.params.filter(p => p.id === 'lowCut' || p.id === 'highCut')
-                },
-                {
-                    title: 'SPACE',
-                    params: effectConfig.params.filter(p => p.id === 'preDelay' || p.id === 'size' || p.id === 'diffusion')
-                },
-                {
-                    title: 'COLOR',
-                    params: effectConfig.params.filter(p => p.id === 'decay' || p.id === 'damping')
-                },
-                {
-                    title: 'MIX',
-                    params: effectConfig.params.filter(p => ['dryVol', 'erVol', 'wet', 'separation'].includes(p.id))
-                }
+                { title: 'FILTERS', params: ['lowCut', 'highCut'] },
+                { title: 'SPACE', params: ['preDelay', 'size', 'diffusion'] },
+                { title: 'COLOR', params: ['decay', 'damping'] },
+                { title: 'MIX', params: ['dryVol', 'erVol', 'wet', 'separation'] }
             ],
             chorus: [
-                {
-                    title: 'DELAY / STEREO',
-                    params: effectConfig.params.filter(p => ['delayTime', 'depth', 'stereo'].includes(p.id))
-                },
-                {
-                    title: 'LFO FREQUENCY',
-                    params: effectConfig.params.filter(p => ['lfo1Freq', 'lfo2Freq', 'lfo3Freq'].includes(p.id))
-                },
-                {
-                    title: 'LFO WAVEFORM',
-                    params: effectConfig.params.filter(p => ['lfo1Wave', 'lfo2Wave', 'lfo3Wave'].includes(p.id))
-                },
-                {
-                    title: 'OUTPUT',
-                    params: effectConfig.params.filter(p => ['crossType', 'crossCutoff', 'wet'].includes(p.id))
-                }
+                { title: 'DELAY / STEREO', params: ['delayTime', 'depth', 'stereo'] },
+                { title: 'LFO FREQUENCY', params: ['lfo1Freq', 'lfo2Freq', 'lfo3Freq'] },
+                { title: 'LFO WAVEFORM', params: ['lfo1Wave', 'lfo2Wave', 'lfo3Wave'] },
+                { title: 'OUTPUT', params: ['crossType', 'crossCutoff', 'wet'] }
             ],
             phaser: [
-                {
-                    title: 'SWEEP',
-                    params: effectConfig.params.filter(p => ['sweepFreq', 'minDepth', 'maxDepth'].includes(p.id))
-                },
-                {
-                    title: 'STAGES / COLOR',
-                    params: effectConfig.params.filter(p => ['freqRange', 'stereo', 'stages'].includes(p.id))
-                },
-                {
-                    title: 'OUTPUT',
-                    params: effectConfig.params.filter(p => ['feedback', 'wet', 'outGain'].includes(p.id))
-                }
-            ],
-            modulation: [
-                {
-                    title: 'MODULATION',
-                    params: effectConfig.params.filter(p => p.id === 'frequency' || p.id === 'depth')
-                },
-                {
-                    title: 'MIX',
-                    params: effectConfig.params.filter(p => p.id === 'wet')
-                }
+                { title: 'SWEEP', params: ['sweepFreq', 'minDepth', 'maxDepth'] },
+                { title: 'STAGES / COLOR', params: ['freqRange', 'stereo', 'stages'] },
+                { title: 'OUTPUT', params: ['feedback', 'wet', 'outGain'] }
             ],
             distortion: [
-                {
-                    title: 'INPUT',
-                    params: effectConfig.params.filter(p => ['preGain', 'threshold'].includes(p.id))
-                },
-                {
-                    title: 'TYPE',
-                    params: effectConfig.params.filter(p => ['distType'].includes(p.id))
-                },
-                {
-                    title: 'OUTPUT',
-                    params: effectConfig.params.filter(p => ['mix', 'postGain'].includes(p.id))
-                }
-            ],
-            saturation: [
-                {
-                    title: 'DRIVE',
-                    params: effectConfig.params.filter(p => p.id === 'distortion')
-                },
-                {
-                    title: 'MIX',
-                    params: effectConfig.params.filter(p => p.id === 'wet')
-                }
+                { title: 'INPUT', params: ['preGain', 'threshold'] },
+                { title: 'TYPE', params: ['distType'] },
+                { title: 'OUTPUT', params: ['mix', 'postGain'] }
             ],
             compressor: [
-                {
-                    title: 'LEVELS',
-                    params: effectConfig.params.filter(p => ['threshold', 'ratio', 'gain'].includes(p.id))
-                },
-                {
-                    title: 'ENVELOPE / TYPE',
-                    params: effectConfig.params.filter(p => ['attack', 'release', 'type'].includes(p.id))
-                }
+                { title: 'LEVELS', params: ['threshold', 'ratio', 'gain'] },
+                { title: 'ENVELOPE / TYPE', params: ['attack', 'release', 'type'] }
             ],
-            dynamics: [
-                {
-                    title: 'THRESHOLD',
-                    params: effectConfig.params.filter(p => p.id === 'threshold' || p.id === 'ratio')
-                },
-                {
-                    title: 'TIMING',
-                    params: effectConfig.params.filter(p => p.id === 'attack' || p.id === 'release')
-                }
-            ],
-            eq: [
-                {
-                    title: 'LOW',
-                    params: effectConfig.params.filter(p => p.id === 'low')
-                },
-                {
-                    title: 'MID',
-                    params: effectConfig.params.filter(p => p.id === 'mid')
-                },
-                {
-                    title: 'HIGH',
-                    params: effectConfig.params.filter(p => p.id === 'high')
-                }
-            ],
-            filter: [
-                {
-                    title: 'LOW',
-                    params: effectConfig.params.filter(p => p.id === 'low')
-                },
-                {
-                    title: 'MID',
-                    params: effectConfig.params.filter(p => p.id === 'mid')
-                },
-                {
-                    title: 'HIGH',
-                    params: effectConfig.params.filter(p => p.id === 'high')
-                }
-            ]
+            eq: [{ title: 'BANDS', params: ['low', 'mid', 'high'] }] // Fallback for simple EQ
         };
 
-        const sections = sectionLayouts[type] || [{
-            title: 'PARAMETERS',
-            params: effectConfig.params
-        }];
+        // Normalize layout keys
+        const layout = sectionLayouts[type] || sectionLayouts[type === 'reverb' ? 'spatial' : type] || [{ title: 'PARAMETERS', params: effectConfig.params.map(p => p.id) }];
 
-        return sections.map((section, idx) => (
-            <div key={idx} className="effect-section">
-                <div className="effect-section-header">{section.title}</div>
-                <div className="effect-section-content">
-                    {section.params.map(param => {
-                        // Handle mode selector (radio buttons)
-                        if (param.type === 'mode') {
-                            const currentMode = params[param.id] || param.default;
-                            return (
-                                <div key={param.id} className="effect-mode-group">
-                                    {param.options.map(option => (
-                                        <div
-                                            key={option}
-                                            className={`effect-mode-option ${currentMode === option ? 'active' : ''}`}
-                                            onClick={() => handleParamChange(param.id, option)}
-                                        >
-                                            <div className="effect-mode-radio" />
-                                            <span className="effect-mode-label">{option}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        }
+        return layout.map((section, idx) => {
+            // Find full param objects
+            const sectionParams = section.params.map(pid => effectConfig.params.find(p => p.id === pid)).filter(Boolean);
 
-                        // Handle sliders
-                        if (param.type === 'slider') {
-                            const value = params[param.id] ?? param.default;
-                            const percent = ((value - param.min) / (param.max - param.min)) * 100;
-
-                            return (
-                                <div key={param.id} className="effect-param effect-param-slider">
-                                    <div
-                                        className="effect-slider-track"
-                                        onMouseDown={createSliderHandler(param)}
-                                    >
-                                        <div className="effect-slider-fill" style={{ height: `${percent}%` }} />
-                                        <div className="effect-slider-handle" style={{ bottom: `${percent}%` }} />
-                                    </div>
-                                    <div className="effect-param-info">
-                                        <span className="effect-param-name">{param.name}</span>
-                                        <span className="effect-param-value">{formatValue(param, value)}</span>
-                                    </div>
-                                </div>
-                            );
-                        }
-
-                        // Handle regular knob parameters
-                        const value = params[param.id] ?? param.default;
-                        const percent = ((value - param.min) / (param.max - param.min)) * 100;
-                        const rotation = (percent / 100) * 270 - 135;
-
-                        return (
-                            <div key={param.id} className="effect-param">
-                                <div
-                                    className="effect-param-knob"
-                                    onMouseDown={createKnobHandler(param)}
-                                    style={{ '--rotation': `${rotation}deg` }}
-                                    title={`${param.name}: Drag up/down to adjust`}
-                                >
-                                    <div className="effect-param-knob-bg" />
-                                    <div className="effect-param-knob-indicator" />
-                                    <svg className="effect-param-knob-track" viewBox="0 0 40 40">
-                                        <circle
-                                            cx="20" cy="20" r="16"
-                                            fill="none"
-                                            stroke="#1a1a1a"
-                                            strokeWidth="2"
-                                            strokeDasharray="75 25"
-                                            transform="rotate(135 20 20)"
-                                        />
-                                        <circle
-                                            cx="20" cy="20" r="16"
-                                            fill="none"
-                                            stroke="#4ade80"
-                                            strokeWidth="2"
-                                            strokeDasharray={`${percent * 0.75} 100`}
-                                            transform="rotate(135 20 20)"
-                                        />
-                                    </svg>
-                                </div>
-                                <div className="effect-param-info">
-                                    <span className="effect-param-name">{param.name}</span>
-                                    <span className="effect-param-value">{formatValue(param, value)}</span>
-                                </div>
-                            </div>
-                        );
-                    })}
+            return (
+                <div key={idx} className="effect-section">
+                    <div className="effect-section-header">{section.title}</div>
+                    <div className="effect-section-content">
+                        {sectionParams.map(param => {
+                            if (param.type === 'mode') {
+                                return <EffectMode key={param.id} param={param} value={params[param.id]} onChange={handleParamChange} />;
+                            }
+                            if (param.type === 'slider') {
+                                return <EffectSlider key={param.id} param={param} value={params[param.id]} onChange={handleParamChange} />;
+                            }
+                            return <EffectKnob key={param.id} param={param} value={params[param.id]} onChange={handleParamChange} />;
+                        })}
+                    </div>
                 </div>
-            </div>
-        ));
+            );
+        });
     };
 
     return (
@@ -946,7 +707,6 @@ const EffectEditor = React.memo(({
                         <button onClick={onClose} className="effect-editor-close">×</button>
                     </div>
                 </div>
-
                 <div className="effect-editor-body">
                     {effect.type === 'eq' ? (
                         <ParametricEQEditor
@@ -954,13 +714,13 @@ const EffectEditor = React.memo(({
                             onBandChange={(index, changes) => {
                                 const updates = {};
                                 Object.entries(changes).forEach(([k, v]) => {
-                                    updates[`b${index}${k.charAt(0).toUpperCase() + k.slice(1)}`] = v; // b0Freq, b0Gain etc
+                                    updates[`b${index}${k.charAt(0).toUpperCase() + k.slice(1)}`] = v;
                                 });
-                                // Keep raw flat params
-                                const newParams = { ...params, ...updates };
-                                setParams(newParams);
-                                // Flattened keys map to AudioEngine expectations
-                                if (onUpdateParams) onUpdateParams(updates);
+                                setParams(prev => {
+                                    const newP = { ...prev, ...updates };
+                                    if (onUpdateParams) onUpdateParams(updates);
+                                    return newP;
+                                });
                             }}
                         />
                     ) : (
