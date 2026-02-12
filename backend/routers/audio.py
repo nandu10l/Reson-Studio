@@ -62,7 +62,7 @@ async def convert_wav_to_mp3(
 @router.post("/separate-stems")
 async def separate_stems(file: UploadFile = File(...)):
     """
-    Separate audio into stems using Spleeter AI model.
+    Separate audio into stems using Demucs AI model.
     
     Args:
         file: Audio file (WAV or MP3)
@@ -72,7 +72,9 @@ async def separate_stems(file: UploadFile = File(...)):
         - vocals: Isolated vocal track
         - drums: Isolated drums track
         - bass: Isolated bass track
-        - other: Other instruments (guitars, synths, etc.)
+        - other: Other instruments (synths, etc.)
+        - guitar: Isolated guitar track
+        - piano: Isolated piano track
     """
     temp_dir = None
     try:
@@ -88,13 +90,13 @@ async def separate_stems(file: UploadFile = File(...)):
             f.write(file_content)
         
         # Run Demucs separation using Python 3.10 (where demucs is installed)
-        # Using htdemucs model for 4 stems: vocals, drums, bass, other
+        # Using htdemucs_6s model for 6 stems: vocals, drums, bass, guitar, piano, other
         # Using --mp3 for better audio backend compatibility
         try:
             result = subprocess.run(
                 [
                     "py", "-3.10", "-m", "demucs",
-                    "-n", "htdemucs",
+                    "-n", "htdemucs_6s",
                     "--mp3",  # Use MP3 output for better compatibility
                     "-o", output_dir,
                     input_path
@@ -121,12 +123,12 @@ async def separate_stems(file: UploadFile = File(...)):
                 detail="Stem separation timed out. Try with a shorter audio file."
             )
         
-        # Find output files (Demucs outputs to: output_dir/htdemucs/filename/)
+        # Find output files (Demucs outputs to: output_dir/htdemucs_6s/filename/)
         base_name = os.path.splitext(file.filename)[0]
-        model_output = os.path.join(output_dir, "htdemucs", base_name)
+        model_output = os.path.join(output_dir, "htdemucs_6s", base_name)
         
         stems = {}
-        stem_names = ["vocals", "drums", "bass", "other"]
+        stem_names = ["vocals", "drums", "bass", "other", "guitar", "piano"]
         
         for stem_name in stem_names:
             # Try MP3 first (when using --mp3 flag), then WAV as fallback

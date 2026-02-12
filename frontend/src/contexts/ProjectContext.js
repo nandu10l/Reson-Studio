@@ -1149,6 +1149,107 @@ export const ProjectProvider = ({ children }) => {
         }
     }, [bpm, patterns, playheadPosition]);
 
+    // Midify: Convert audio clip to MIDI pattern
+    const midifyAudioClip = useCallback(async (audioClipId) => {
+        const clip = audioClips.find(c => c.id === audioClipId);
+        if (!clip) throw new Error('Audio clip not found');
+
+        // Need the actual audio file/blob to send to backend
+        let fileToSend = clip.file;
+        if (!fileToSend && clip.url) {
+            // Fetch from blob URL if file ref is missing
+            const resp = await fetch(clip.url);
+            const blob = await resp.blob();
+            fileToSend = new File([blob], clip.fileName || 'audio.wav', { type: blob.type });
+        }
+        if (!fileToSend) throw new Error('No audio data available for this clip');
+
+        // Send to backend
+        const formData = new FormData();
+        formData.append('file', fileToSend);
+
+        const response = await fetch(`http://localhost:8000/midify/convert?bpm=${bpm}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Midify conversion failed');
+        }
+
+        const data = await response.json();
+        console.log('Midify result:', data);
+
+        if (!data.notes || data.notes.length === 0) {
+            throw new Error('No notes detected in audio. Try a clearer monophonic melody.');
+        }
+
+        const clipName = clip.name || clip.fileName?.replace(/\.[^/.]+$/, '') || 'Audio';
+        const startId = Date.now();
+
+        // Create new channel for the midified instrument
+        let newChannelId;
+        setChannels(prev => {
+            newChannelId = Math.max(...prev.map(c => c.id), -1) + 1;
+            const newChannel = {
+                id: newChannelId,
+                name: `Midify: ${clipName}`,
+                vol: 80,
+                pan: 50,
+                effects: [],
+                pluginId: 'sampler'
+            };
+
+            // Register with audio engine
+            audioEngine.createChannel(newChannelId, newChannel.name);
+
+            return [...prev, newChannel];
+        });
+
+        // Create pattern notes from detected notes
+        const patternNotes = data.notes.map((note, idx) => ({
+            id: startId + idx,
+            noteName: note.noteName,
+            channelId: newChannelId,
+            startStep: Math.round(note.start * 4), // beats to steps (4 steps per beat)
+            length: Math.max(1, Math.round(note.duration * 4)),
+            velocity: note.velocity || 0.8
+        }));
+
+        // Calculate pattern length
+        const maxStep = Math.max(...patternNotes.map(n => n.startStep + n.length), 16);
+        const patternLength = Math.ceil(maxStep / 16) * 16;
+
+        // Create steps
+        const newSteps = createEmptySteps(patternLength);
+        newSteps[newChannelId] = Array(patternLength).fill(false);
+
+        // Create the pattern
+        setPatterns(prev => {
+            const nextPatId = Math.max(...prev.map(p => p.id), 0) + 1;
+
+            const newPattern = {
+                id: nextPatId,
+                name: `Midify - ${clipName}`,
+                color: '#8b5cf6', // Purple to match the Midify branding
+                length: patternLength,
+                data: {
+                    steps: newSteps,
+                    notes: patternNotes
+                }
+            };
+
+            setActivePatternId(nextPatId);
+            return [...prev, newPattern];
+        });
+
+        // Switch to patterns tab
+        setPickerTab('PAT');
+
+        console.log(`Midify: Created pattern "Midify - ${clipName}" with ${patternNotes.length} notes`);
+    }, [bpm, audioClips]);
+
 
 
     // --- Automation Actions ---
@@ -1421,6 +1522,7 @@ export const ProjectProvider = ({ children }) => {
         importAudioFile,
         addStemsAsAudioClips,
         importMidiFile,
+        midifyAudioClip,
 
         // Picker Tab
         pickerTab,

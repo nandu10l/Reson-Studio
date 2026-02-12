@@ -5,6 +5,7 @@ import {
   Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2
 } from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
+import MidifyDialog from './MidifyDialog';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
 import '../styles/blender-icons.css';
@@ -20,6 +21,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
 
   const { useGuideHandlers } = useGuide();
   const [displayBeats, setDisplayBeats] = useState(playheadPosition);
+  const [isMidifyOpen, setIsMidifyOpen] = useState(false);
 
   // Sync display with playheadPosition when NOT playing (seeking/stopped)
   useEffect(() => {
@@ -245,6 +247,16 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           <span className="transport-bpm-label">BPM</span>
         </div>
 
+        {/* Midify Button */}
+        <button
+          className={`transport-midify-btn ${isMidifyOpen ? 'active' : ''}`}
+          onClick={() => setIsMidifyOpen(prev => !prev)}
+          title="Midify — Convert Audio to MIDI"
+        >
+          <span className="transport-midify-icon">🎵</span>
+          <span className="transport-midify-label">Midify</span>
+        </button>
+
         {/* View Controls - Secondary */}
         <div className="transport-views-cluster">
           <button
@@ -281,6 +293,9 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           </button>
         </div>
       </div>
+
+      {/* Midify Dialog */}
+      <MidifyDialog isOpen={isMidifyOpen} onClose={() => setIsMidifyOpen(false)} />
     </div>
   );
 }

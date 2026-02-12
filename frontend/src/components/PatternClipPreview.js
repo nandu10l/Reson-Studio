@@ -45,7 +45,7 @@ const PatternClipPreview = ({ pattern, startStep = 0, lengthStep = 16 }) => {
         const maxNote = 84; // C7 roughly
         const range = maxNote - minNote;
 
-        return notes.map(note => {
+        return notes.map((note, idx) => {
             // Check visibility
             // Note start or part of note should be in window.
             // Simplified: just check intersection.
@@ -77,7 +77,7 @@ const PatternClipPreview = ({ pattern, startStep = 0, lengthStep = 16 }) => {
             }
 
             return {
-                id: `note-${note.id}`,
+                id: `note-${note.id}-${idx}`,
                 x: (relativeStart / lengthStep) * 100,
                 width: (visibleLength / lengthStep) * 100,
                 y: y,
