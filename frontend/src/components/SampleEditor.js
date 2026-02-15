@@ -32,6 +32,12 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingMessage, setProcessingMessage] = useState('');
 
+    // Undo/Redo state
+    const undoStackRef = useRef([]);
+    const redoStackRef = useRef([]);
+    const [canUndo, setCanUndo] = useState(false);
+    const [canRedo, setCanRedo] = useState(false);
+
     // Refs
     const canvasRef = useRef(null);
     const overviewCanvasRef = useRef(null);
@@ -427,15 +433,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Effect processing failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Effect processing failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            setDuration(buffer.duration);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
 
         } catch (error) {
             console.error('Effect failed:', error);
@@ -471,15 +478,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Cut failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Cut failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            setDuration(buffer.duration);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
             setSelection({ start: 0, end: 0 });
         } catch (error) {
             console.error('Cut failed:', error);
@@ -515,15 +523,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Trim failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Trim failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            setDuration(buffer.duration);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
             setSelection({ start: 0, end: 0 });
         } catch (error) {
             console.error('Trim failed:', error);
@@ -554,15 +563,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Reverse failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Reverse failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            setDuration(buffer.duration);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
         } catch (error) {
             console.error('Reverse failed:', error);
             alert(`Reverse failed: ${error.message}`);
@@ -591,14 +601,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Fade in failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Fade in failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
         } catch (error) {
             console.error('Fade in failed:', error);
             alert(`Fade in failed: ${error.message}`);
@@ -627,14 +639,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Fade out failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Fade out failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
         } catch (error) {
             console.error('Fade out failed:', error);
             alert(`Fade out failed: ${error.message}`);
@@ -656,16 +670,88 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         high_freq: 3000
     });
 
-    // Denoise (placeholder - needs backend implementation)
+    // Denoise - calls backend spectral gating
     const handleDenoise = async () => {
-        alert('Denoise: This feature requires advanced audio processing. Coming soon!');
+        if (!audioClip?.file) {
+            console.error('No audio file available');
+            return;
+        }
+
+        setIsProcessing(true);
+        setProcessingMessage('Removing noise...');
+
+        try {
+            const formData = new FormData();
+            formData.append('file', audioClip.file);
+
+            const response = await fetch('http://localhost:8000/audio/denoise?strength=1.0', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Denoise failed (${response.status})`);
+            }
+
+            const processedBlob = await response.blob();
+            const arrayBuffer = await processedBlob.arrayBuffer();
+            const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+            updateAudioBuffer(buffer);
+        } catch (error) {
+            console.error('Denoise failed:', error);
+            alert(`Denoise failed: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessingMessage('');
+        }
     };
 
-    // Time stretch (placeholder - needs backend implementation)
+    // Time stretch - calls backend librosa processing
     const handleTimeStretch = async () => {
-        const factor = prompt('Enter time stretch factor (0.5 = half speed, 2.0 = double speed):', '1.0');
-        if (!factor) return;
-        alert(`Time Stretch: Factor ${factor}. This feature requires advanced audio processing. Coming soon!`);
+        if (!audioClip?.file) {
+            console.error('No audio file available');
+            return;
+        }
+
+        const factorStr = prompt('Enter time stretch factor (0.5 = half speed, 2.0 = double speed):', '1.0');
+        if (!factorStr) return;
+        const factor = parseFloat(factorStr);
+        if (isNaN(factor) || factor <= 0 || factor > 10) {
+            alert('Invalid factor. Please enter a number between 0.01 and 10.');
+            return;
+        }
+
+        setIsProcessing(true);
+        setProcessingMessage(`Time stretching (${factor}x)...`);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', audioClip.file);
+
+            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Time stretch failed (${response.status})`);
+            }
+
+            const processedBlob = await response.blob();
+            const arrayBuffer = await processedBlob.arrayBuffer();
+            const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+            updateAudioBuffer(buffer);
+        } catch (error) {
+            console.error('Time stretch failed:', error);
+            alert(`Time stretch failed: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessingMessage('');
+        }
     };
 
     // Add marker at current position
@@ -687,21 +773,139 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         setMarkers(prev => prev.filter(m => m !== closest));
     };
 
-    // Tune loop (placeholder)
+    // Tune loop - snap selection/loop points to nearest beat boundary
     const handleTuneLoop = () => {
-        alert('Tune Loop: Adjust loop points to match musical tempo. Coming soon!');
+        if (!audioBuffer || duration === 0) {
+            alert('No audio loaded');
+            return;
+        }
+
+        // Estimate BPM from audio using zero-crossing rate
+        const channelData = audioBuffer.getChannelData(0);
+        const sr = audioBuffer.sampleRate;
+
+        // Simple onset detection: split into windows, find energy peaks
+        const windowSize = Math.floor(sr * 0.02); // 20ms windows
+        const energies = [];
+        for (let i = 0; i < channelData.length - windowSize; i += windowSize) {
+            let energy = 0;
+            for (let j = 0; j < windowSize; j++) {
+                energy += channelData[i + j] * channelData[i + j];
+            }
+            energies.push(energy / windowSize);
+        }
+
+        // Find energy peaks (onsets)
+        const avgEnergy = energies.reduce((a, b) => a + b, 0) / energies.length;
+        const onsets = [];
+        for (let i = 1; i < energies.length - 1; i++) {
+            if (energies[i] > avgEnergy * 1.5 && energies[i] > energies[i - 1] && energies[i] > energies[i + 1]) {
+                onsets.push(i * windowSize / sr); // time in seconds
+            }
+        }
+
+        if (onsets.length < 2) {
+            alert('Could not detect enough beats to tune loop. Try a more rhythmic section.');
+            return;
+        }
+
+        // Estimate beat interval from onset differences
+        const intervals = [];
+        for (let i = 1; i < Math.min(onsets.length, 50); i++) {
+            intervals.push(onsets[i] - onsets[i - 1]);
+        }
+        intervals.sort((a, b) => a - b);
+        const medianInterval = intervals[Math.floor(intervals.length / 2)];
+        const estimatedBPM = Math.round(60 / medianInterval);
+        const beatDuration = 60 / estimatedBPM; // seconds per beat
+
+        // Snap selection to beat boundaries
+        const selStart = Math.min(selection.start, selection.end) * duration;
+        const selEnd = Math.max(selection.start, selection.end) * duration;
+
+        const snappedStart = Math.round(selStart / beatDuration) * beatDuration;
+        const snappedEnd = Math.round(selEnd / beatDuration) * beatDuration;
+
+        // Ensure at least 1 beat
+        const finalEnd = snappedEnd <= snappedStart ? snappedStart + beatDuration : snappedEnd;
+
+        setSelection({
+            start: Math.max(0, snappedStart / duration),
+            end: Math.min(1, finalEnd / duration)
+        });
+
+        alert(`Loop tuned! Estimated ${estimatedBPM} BPM. Selection snapped to ${Math.round((finalEnd - snappedStart) / beatDuration)} beat(s).`);
     };
 
-    // Copy selection to clipboard / drag
+    // Copy selection - extract selected region as WAV blob
     const handleCopySelection = async () => {
         if (selection.start === selection.end) {
             alert('Please select a region to copy');
             return;
         }
-        // For now, just log - full implementation would copy to clipboard
-        const startMs = Math.round(Math.min(selection.start, selection.end) * duration * 1000);
-        const endMs = Math.round(Math.max(selection.start, selection.end) * duration * 1000);
-        alert(`Selection copied: ${startMs}ms - ${endMs}ms\nDrag to playlist to create new clip.`);
+        if (!audioBuffer || !audioContextRef.current) {
+            alert('No audio loaded');
+            return;
+        }
+
+        try {
+            const startSample = Math.floor(Math.min(selection.start, selection.end) * audioBuffer.length);
+            const endSample = Math.floor(Math.max(selection.start, selection.end) * audioBuffer.length);
+            const regionLength = endSample - startSample;
+
+            if (regionLength <= 0) return;
+
+            // Create a new buffer with just the selected region
+            const regionBuffer = audioContextRef.current.createBuffer(
+                audioBuffer.numberOfChannels,
+                regionLength,
+                audioBuffer.sampleRate
+            );
+
+            for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+                const sourceData = audioBuffer.getChannelData(ch);
+                const destData = regionBuffer.getChannelData(ch);
+                for (let i = 0; i < regionLength; i++) {
+                    destData[i] = sourceData[startSample + i];
+                }
+            }
+
+            // Convert to WAV blob
+            const wavBlob = audioBufferToWav(regionBuffer);
+
+            // Try to copy to clipboard
+            if (navigator.clipboard && navigator.clipboard.write) {
+                try {
+                    await navigator.clipboard.write([
+                        new ClipboardItem({ 'audio/wav': wavBlob })
+                    ]);
+                    const startMs = Math.round(Math.min(selection.start, selection.end) * duration * 1000);
+                    const endMs = Math.round(Math.max(selection.start, selection.end) * duration * 1000);
+                    alert(`Selection copied to clipboard! (${startMs}ms - ${endMs}ms)`);
+                } catch {
+                    // Clipboard API may not support audio, fallback to download
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `selection_${Date.now()}.wav`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    alert('Clipboard not supported for audio. Selection downloaded as WAV file.');
+                }
+            } else {
+                // Fallback: download the selection
+                const url = URL.createObjectURL(wavBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `selection_${Date.now()}.wav`;
+                a.click();
+                URL.revokeObjectURL(url);
+                alert('Selection downloaded as WAV file.');
+            }
+        } catch (error) {
+            console.error('Copy selection failed:', error);
+            alert(`Copy failed: ${error.message}`);
+        }
     };
 
     // Trim side noise (remove silence from start/end)
@@ -745,15 +949,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                 body: formData
             });
 
-            if (!response.ok) throw new Error('Trim side noise failed');
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Trim side noise failed (${response.status})`);
+            }
 
             const processedBlob = await response.blob();
             const arrayBuffer = await processedBlob.arrayBuffer();
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
-            setAudioBuffer(buffer);
-            setDuration(buffer.duration);
-            generateWaveformData(buffer);
+            updateAudioBuffer(buffer);
         } catch (error) {
             console.error('Trim side noise failed:', error);
             alert(`Trim side noise failed: ${error.message}`);
@@ -765,11 +970,133 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
 
     // Send to playlist/channel
     const handleSendToPlaylist = () => {
-        if (onSave) {
-            // Create a blob from current audio buffer
-            onSave(audioBuffer, audioClip?.name || 'Edited Sample');
+        if (!audioBuffer) {
+            alert('No audio to send');
+            return;
         }
-        alert('Sample ready to add to playlist. Drag from here or use the file menu.');
+
+        // Convert current audioBuffer to a WAV blob
+        const wavBlob = audioBufferToWav(audioBuffer);
+        const fileName = audioClip?.name || 'Edited Sample';
+
+        if (onSave) {
+            onSave(wavBlob, fileName);
+        }
+
+        if (onClose) {
+            onClose();
+        }
+    };
+
+    // Helper: Convert AudioBuffer to WAV Blob
+    const audioBufferToWav = (buffer) => {
+        const numChannels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const length = buffer.length;
+        const bytesPerSample = 2; // 16-bit
+        const blockAlign = numChannels * bytesPerSample;
+        const dataSize = length * blockAlign;
+        const bufferSize = 44 + dataSize;
+
+        const arrayBuffer = new ArrayBuffer(bufferSize);
+        const view = new DataView(arrayBuffer);
+
+        // WAV header
+        const writeString = (offset, str) => {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset + i, str.charCodeAt(i));
+            }
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true); // chunk size
+        view.setUint16(20, 1, true); // PCM
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * blockAlign, true);
+        view.setUint16(32, blockAlign, true);
+        view.setUint16(34, 16, true); // bits per sample
+        writeString(36, 'data');
+        view.setUint32(40, dataSize, true);
+
+        // Write interleaved samples
+        let offset = 44;
+        const channels = [];
+        for (let ch = 0; ch < numChannels; ch++) {
+            channels.push(buffer.getChannelData(ch));
+        }
+
+        for (let i = 0; i < length; i++) {
+            for (let ch = 0; ch < numChannels; ch++) {
+                const sample = Math.max(-1, Math.min(1, channels[ch][i]));
+                const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(offset, int16, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([arrayBuffer], { type: 'audio/wav' });
+    };
+
+    // Undo/Redo helpers
+    const updateAudioBuffer = (newBuffer) => {
+        // Push current buffer to undo stack
+        if (audioBuffer) {
+            undoStackRef.current = [...undoStackRef.current, audioBuffer];
+            // Limit stack size to 20 to prevent memory issues
+            if (undoStackRef.current.length > 20) {
+                undoStackRef.current = undoStackRef.current.slice(-20);
+            }
+            setCanUndo(true);
+        }
+        // Clear redo stack on new action
+        redoStackRef.current = [];
+        setCanRedo(false);
+
+        setAudioBuffer(newBuffer);
+        setDuration(newBuffer.duration);
+        generateWaveformData(newBuffer);
+    };
+
+    const handleUndo = () => {
+        if (undoStackRef.current.length === 0) return;
+
+        const stack = [...undoStackRef.current];
+        const previousBuffer = stack.pop();
+        undoStackRef.current = stack;
+        setCanUndo(stack.length > 0);
+
+        // Push current to redo
+        if (audioBuffer) {
+            redoStackRef.current = [...redoStackRef.current, audioBuffer];
+            setCanRedo(true);
+        }
+
+        setAudioBuffer(previousBuffer);
+        setDuration(previousBuffer.duration);
+        generateWaveformData(previousBuffer);
+    };
+
+    const handleRedo = () => {
+        if (redoStackRef.current.length === 0) return;
+
+        const stack = [...redoStackRef.current];
+        const nextBuffer = stack.pop();
+        redoStackRef.current = stack;
+        setCanRedo(stack.length > 0);
+
+        // Push current to undo
+        if (audioBuffer) {
+            undoStackRef.current = [...undoStackRef.current, audioBuffer];
+            setCanUndo(true);
+        }
+
+        setAudioBuffer(nextBuffer);
+        setDuration(nextBuffer.duration);
+        generateWaveformData(nextBuffer);
     };
 
     // Format time display
@@ -846,10 +1173,10 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
 
                 {/* Undo/Redo */}
                 <div className="toolbar-group">
-                    <button className="toolbar-btn" title="Undo">
+                    <button className={`toolbar-btn ${!canUndo ? 'disabled' : ''}`} onClick={handleUndo} title="Undo" disabled={!canUndo}>
                         <RotateCcw size={14} />
                     </button>
-                    <button className="toolbar-btn" title="Redo">
+                    <button className={`toolbar-btn ${!canRedo ? 'disabled' : ''}`} onClick={handleRedo} title="Redo" disabled={!canRedo}>
                         <RotateCw size={14} />
                     </button>
                 </div>

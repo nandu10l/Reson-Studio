@@ -10,8 +10,43 @@ import tempfile
 import base64
 import subprocess
 import shutil
+import traceback
 
 router = APIRouter(prefix="/audio", tags=["audio"])
+
+
+def load_audio_flexible(audio_data: bytes, filename: str = "") -> AudioSegment:
+    """
+    Load audio data with robust format detection.
+    Tries multiple strategies to handle files from browser Blobs
+    that may not have proper extensions.
+    """
+    filename = (filename or "").lower()
+    
+    # Try based on filename extension first
+    ext_formats = {
+        '.mp3': 'mp3', '.wav': 'wav', '.ogg': 'ogg',
+        '.webm': 'webm', '.flac': 'flac', '.m4a': 'mp4'
+    }
+    for ext, fmt in ext_formats.items():
+        if filename.endswith(ext):
+            try:
+                return AudioSegment.from_file(io.BytesIO(audio_data), format=fmt)
+            except Exception:
+                break  # Extension matched but failed, try other formats
+    
+    # Try common formats
+    for fmt in ["wav", "mp3", "ogg", "webm", "flac"]:
+        try:
+            return AudioSegment.from_file(io.BytesIO(audio_data), format=fmt)
+        except Exception:
+            continue
+    
+    # Last resort: let ffmpeg auto-detect
+    try:
+        return AudioSegment.from_file(io.BytesIO(audio_data))
+    except Exception as e:
+        raise ValueError(f"Could not load audio file. Format not recognized. Filename: {filename}, Error: {str(e)}")
 
 
 @router.post("/convert-to-mp3")
@@ -29,33 +64,31 @@ async def convert_wav_to_mp3(
     Returns:
         MP3 audio file as binary response
     """
-    # Validate file type
-    if not file.filename.lower().endswith('.wav'):
-        # Still try to process it - pydub can handle various formats
-        pass
-    
     try:
-        # Read the uploaded WAV file
+        # Read the uploaded file
         wav_data = await file.read()
         
-        # Load audio using pydub
-        audio = AudioSegment.from_file(io.BytesIO(wav_data), format="wav")
+        # Load audio using flexible format detection
+        audio = load_audio_flexible(wav_data, file.filename)
         
         # Export as MP3
         mp3_buffer = io.BytesIO()
         audio.export(mp3_buffer, format="mp3", bitrate=bitrate)
         mp3_buffer.seek(0)
         
+        base_name = (file.filename or "audio").rsplit('.', 1)[0]
+        
         # Return MP3 as response
         return Response(
             content=mp3_buffer.read(),
             media_type="audio/mpeg",
             headers={
-                "Content-Disposition": f"attachment; filename={file.filename.rsplit('.', 1)[0]}.mp3"
+                "Content-Disposition": f"attachment; filename={base_name}.mp3"
             }
         )
     
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Audio conversion failed: {str(e)}")
 
 
@@ -185,12 +218,7 @@ async def trim_audio(
     """
     try:
         audio_data = await file.read()
-        
-        # Detect format and load
-        if file.filename.lower().endswith('.mp3'):
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        audio = load_audio_flexible(audio_data, file.filename)
         
         # Apply trim
         if end_ms == -1:
@@ -206,9 +234,10 @@ async def trim_audio(
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",
-            headers={"Content-Disposition": f"attachment; filename=trimmed_{file.filename}"}
+            headers={"Content-Disposition": f"attachment; filename=trimmed_{file.filename or 'audio.wav'}"}
         )
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Trim failed: {str(e)}")
 
 
@@ -231,11 +260,7 @@ async def cut_audio(
     """
     try:
         audio_data = await file.read()
-        
-        if file.filename.lower().endswith('.mp3'):
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        audio = load_audio_flexible(audio_data, file.filename)
         
         # Cut by combining before and after the cut region
         before = audio[:start_ms]
@@ -249,9 +274,10 @@ async def cut_audio(
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",
-            headers={"Content-Disposition": f"attachment; filename=cut_{file.filename}"}
+            headers={"Content-Disposition": f"attachment; filename=cut_{file.filename or 'audio.wav'}"}
         )
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Cut failed: {str(e)}")
 
 
@@ -274,11 +300,7 @@ async def fade_audio(
     """
     try:
         audio_data = await file.read()
-        
-        if file.filename.lower().endswith('.mp3'):
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        audio = load_audio_flexible(audio_data, file.filename)
         
         if fade_type == "in":
             result = audio.fade_in(duration_ms)
@@ -292,9 +314,10 @@ async def fade_audio(
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",
-            headers={"Content-Disposition": f"attachment; filename=fade_{file.filename}"}
+            headers={"Content-Disposition": f"attachment; filename=fade_{file.filename or 'audio.wav'}"}
         )
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Fade failed: {str(e)}")
 
 
@@ -311,11 +334,7 @@ async def reverse_audio(file: UploadFile = File(...)):
     """
     try:
         audio_data = await file.read()
-        
-        if file.filename.lower().endswith('.mp3'):
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        audio = load_audio_flexible(audio_data, file.filename)
         
         result = audio.reverse()
         
@@ -326,10 +345,189 @@ async def reverse_audio(file: UploadFile = File(...)):
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",
-            headers={"Content-Disposition": f"attachment; filename=reversed_{file.filename}"}
+            headers={"Content-Disposition": f"attachment; filename=reversed_{file.filename or 'audio.wav'}"}
         )
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Reverse failed: {str(e)}")
+
+
+@router.post("/time-stretch")
+async def time_stretch_audio(
+    file: UploadFile = File(...),
+    factor: float = 1.0
+):
+    """
+    Time-stretch audio without changing pitch.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        factor: Stretch factor (0.5 = half speed/double length, 2.0 = double speed/half length)
+    
+    Returns:
+        Time-stretched audio as WAV
+    """
+    if factor <= 0 or factor > 10:
+        raise HTTPException(status_code=400, detail="Factor must be between 0.01 and 10.0")
+    
+    try:
+        import numpy as np
+        import librosa
+        import soundfile as sf
+        
+        audio_data = await file.read()
+        audio = load_audio_flexible(audio_data, file.filename)
+        
+        # Convert pydub AudioSegment to numpy array for librosa
+        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+        sample_rate = audio.frame_rate
+        
+        # Handle stereo
+        if audio.channels == 2:
+            # Deinterleave stereo
+            left = samples[::2] / 32768.0
+            right = samples[1::2] / 32768.0
+            
+            # Time stretch each channel
+            left_stretched = librosa.effects.time_stretch(left, rate=factor)
+            right_stretched = librosa.effects.time_stretch(right, rate=factor)
+            
+            # Make same length
+            min_len = min(len(left_stretched), len(right_stretched))
+            left_stretched = left_stretched[:min_len]
+            right_stretched = right_stretched[:min_len]
+            
+            # Interleave back to stereo
+            stretched = np.empty(min_len * 2, dtype=np.float32)
+            stretched[::2] = left_stretched
+            stretched[1::2] = right_stretched
+        else:
+            samples_float = samples / 32768.0
+            stretched_mono = librosa.effects.time_stretch(samples_float, rate=factor)
+            stretched = stretched_mono
+        
+        # Write to WAV using soundfile
+        wav_buffer = io.BytesIO()
+        if audio.channels == 2:
+            # Reshape for stereo
+            stereo_data = np.column_stack([
+                stretched[::2],
+                stretched[1::2]
+            ])
+            sf.write(wav_buffer, stereo_data, sample_rate, format='WAV')
+        else:
+            sf.write(wav_buffer, stretched, sample_rate, format='WAV')
+        
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=stretched_{file.filename or 'audio.wav'}"}
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Time stretch failed: {str(e)}")
+
+
+@router.post("/denoise")
+async def denoise_audio(
+    file: UploadFile = File(...),
+    strength: float = 1.0
+):
+    """
+    Reduce noise from audio using spectral gating.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        strength: Noise reduction strength (0.5 = subtle, 1.0 = normal, 2.0 = aggressive)
+    
+    Returns:
+        Denoised audio as WAV
+    """
+    try:
+        import numpy as np
+        from scipy import signal as scipy_signal
+        
+        audio_data = await file.read()
+        audio = load_audio_flexible(audio_data, file.filename)
+        
+        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+        sample_rate = audio.frame_rate
+        
+        def spectral_gate(signal_data, sr, threshold_factor=1.0):
+            """Apply spectral gating noise reduction."""
+            # STFT parameters
+            n_fft = 2048
+            hop_length = 512
+            
+            # Compute STFT
+            f, t, Zxx = scipy_signal.stft(signal_data, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
+            magnitude = np.abs(Zxx)
+            phase = np.angle(Zxx)
+            
+            # Estimate noise floor from the quietest 10% of frames
+            frame_power = np.mean(magnitude ** 2, axis=0)
+            noise_frame_count = max(1, int(len(frame_power) * 0.1))
+            noise_frames = np.argsort(frame_power)[:noise_frame_count]
+            noise_profile = np.mean(magnitude[:, noise_frames], axis=1, keepdims=True)
+            
+            # Apply spectral gate
+            threshold = noise_profile * (1.0 + threshold_factor)
+            mask = np.maximum(0, 1 - (threshold / (magnitude + 1e-10)))
+            
+            # Smooth mask to avoid artifacts
+            for i in range(mask.shape[1]):
+                mask[:, i] = np.convolve(mask[:, i], np.ones(3)/3, mode='same')
+            
+            # Apply mask and reconstruct
+            cleaned_magnitude = magnitude * mask
+            cleaned_Zxx = cleaned_magnitude * np.exp(1j * phase)
+            
+            _, cleaned = scipy_signal.istft(cleaned_Zxx, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
+            
+            # Match original length
+            if len(cleaned) > len(signal_data):
+                cleaned = cleaned[:len(signal_data)]
+            elif len(cleaned) < len(signal_data):
+                cleaned = np.pad(cleaned, (0, len(signal_data) - len(cleaned)))
+            
+            return cleaned
+        
+        # Process each channel
+        if audio.channels == 2:
+            left = samples[::2]
+            right = samples[1::2]
+            
+            left_clean = spectral_gate(left, sample_rate, strength)
+            right_clean = spectral_gate(right, sample_rate, strength)
+            
+            output = np.empty(len(samples), dtype=np.float32)
+            output[::2] = left_clean
+            output[1::2] = right_clean
+        else:
+            output = spectral_gate(samples, sample_rate, strength)
+        
+        # Normalize to prevent clipping
+        max_val = np.max(np.abs(output))
+        if max_val > 0:
+            output = output / max_val * 0.95
+        output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
+        
+        result = audio._spawn(output.tobytes())
+        
+        wav_buffer = io.BytesIO()
+        result.export(wav_buffer, format="wav")
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=denoised_{file.filename or 'audio.wav'}"}
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Denoise failed: {str(e)}")
 
 
 @router.get("/health")

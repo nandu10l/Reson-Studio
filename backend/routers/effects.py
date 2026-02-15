@@ -113,7 +113,9 @@ def apply_reverb(audio: AudioSegment, decay: float = 1.5, mix: float = 50) -> Au
         output = samples * (1 - wet) + reverb * wet
     
     # Normalize to prevent clipping
-    output = output / np.max(np.abs(output)) * 0.95
+    max_val = np.max(np.abs(output))
+    if max_val > 0:
+        output = output / max_val * 0.95
     output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
     
     return audio._spawn(output.tobytes())
@@ -136,7 +138,9 @@ def apply_delay(audio: AudioSegment, time_ms: int = 300, feedback: float = 0.4, 
     output = samples * (1 - wet) + output * wet
     
     # Normalize
-    output = output / np.max(np.abs(output)) * 0.95
+    max_val = np.max(np.abs(output))
+    if max_val > 0:
+        output = output / max_val * 0.95
     output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
     
     return audio._spawn(output.tobytes())
@@ -167,7 +171,9 @@ def apply_eq(audio: AudioSegment, low_gain: float = 0, mid_gain: float = 0, high
     output = low_band + mid_band + high_band
     
     # Normalize
-    output = output / np.max(np.abs(output)) * 0.95
+    max_val = np.max(np.abs(output))
+    if max_val > 0:
+        output = output / max_val * 0.95
     output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
     
     return audio._spawn(output.tobytes())
@@ -190,11 +196,13 @@ async def apply_effect(
     Returns:
         Processed audio file as WAV
     """
+    import json
+    import traceback
+    
     if effect_type not in AVAILABLE_EFFECTS:
         raise HTTPException(status_code=400, detail=f"Unknown effect type: {effect_type}")
     
     try:
-        import json
         effect_params = json.loads(params) if params else {}
     except json.JSONDecodeError:
         effect_params = {}
@@ -203,11 +211,60 @@ async def apply_effect(
         # Read audio file
         audio_data = await file.read()
         
-        # Detect format and load
-        if file.filename.lower().endswith('.mp3'):
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
-        else:
-            audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+        if not audio_data or len(audio_data) == 0:
+            raise HTTPException(status_code=400, detail="Empty audio file received")
+        
+        print(f"[Effects] Received file: {file.filename}, size: {len(audio_data)} bytes, content_type: {file.content_type}")
+        print(f"[Effects] Effect: {effect_type}, params: {effect_params}")
+        
+        # Detect format and load - try multiple strategies
+        audio = None
+        filename = (file.filename or "").lower()
+        
+        # Try based on filename extension first
+        if filename.endswith('.mp3'):
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="mp3")
+            except Exception:
+                pass
+        elif filename.endswith('.wav'):
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="wav")
+            except Exception:
+                pass
+        elif filename.endswith('.ogg'):
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="ogg")
+            except Exception:
+                pass
+        elif filename.endswith('.webm'):
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_data), format="webm")
+            except Exception:
+                pass
+        
+        # If format detection by extension failed, try auto-detect
+        if audio is None:
+            for fmt in ["wav", "mp3", "ogg", "webm", "raw"]:
+                try:
+                    audio = AudioSegment.from_file(io.BytesIO(audio_data), format=fmt)
+                    print(f"[Effects] Successfully loaded as {fmt}")
+                    break
+                except Exception:
+                    continue
+        
+        # Last resort: let pydub auto-detect via ffmpeg
+        if audio is None:
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_data))
+                print(f"[Effects] Loaded via ffmpeg auto-detect")
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Could not load audio file. Format not recognized. Filename: {file.filename}, Error: {str(e)}"
+                )
+        
+        print(f"[Effects] Audio loaded: {audio.frame_rate}Hz, {audio.channels}ch, {len(audio)}ms")
         
         # Apply effect
         if effect_type == "reverb":
@@ -248,13 +305,19 @@ async def apply_effect(
         processed.export(wav_buffer, format="wav")
         wav_buffer.seek(0)
         
+        output_filename = f"processed_{file.filename}" if file.filename else "processed_audio.wav"
+        
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",
             headers={
-                "Content-Disposition": f"attachment; filename=processed_{file.filename}"
+                "Content-Disposition": f"attachment; filename={output_filename}"
             }
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"[Effects] ERROR processing effect '{effect_type}': {str(e)}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Effect processing failed: {str(e)}")
