@@ -361,6 +361,7 @@ const MixerDetailPanel = React.memo(({
     return (
       <div className="fl-detail-panel">
         <div className="fl-detail-header">Mixer - Master</div>
+        <div className="fl-detail-subheader" />
         <div className="fl-detail-content empty">
           <p>Select a channel to view details</p>
         </div>
@@ -481,6 +482,7 @@ const MixerDetailPanel = React.memo(({
   return (
     <div className="fl-detail-panel">
       <div className="fl-detail-header">Mixer - {channelName}</div>
+      <div className="fl-detail-subheader" />
 
       {/* Effect Selector Modal */}
       <EffectSelector
@@ -696,7 +698,7 @@ function Mixer() {
         {/* Channel Numbers Row */}
         <div className="fl-channel-nums-row">
           <div className="fl-num-cell master">M</div>
-          <div style={{ width: '3px' }} />
+          <div className="fl-divider" />
           {channels.map((ch, i) => (
             <div key={ch.id} className="fl-num-cell">{i + 1}</div>
           ))}
