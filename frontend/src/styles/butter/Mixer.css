@@ -1,4 +1,4 @@
-/* FL Studio-style Mixer - Exact Match */
+/* FL Studio-style Mixer - Exact Match - v2.0 ALIGNMENT FIX */
 
 /* Main Container */
 .fl-mixer-container {
@@ -101,8 +101,8 @@
 }
 
 .fl-num-cell {
-  width: 52px;
-  min-width: 52px;
+  width: 60px;
+  min-width: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -114,11 +114,10 @@
 }
 
 .fl-num-cell.master {
-  width: 56px;
-  min-width: 56px;
+  width: 60px;
+  min-width: 60px;
   background: #2a3a2a;
   color: #8f8;
-  border-right: 2px solid #4a4;
 }
 
 .fl-num-cell.insert {
@@ -150,8 +149,8 @@
    ========================================== */
 
 .fl-channel {
-  width: 52px;
-  min-width: 52px;
+  width: 60px;
+  min-width: 60px;
   display: flex;
   flex-direction: column;
   background: linear-gradient(to bottom, #404040 0%, #353535 50%, #303030 100%);
@@ -175,8 +174,8 @@
 }
 
 .fl-channel.master {
-  width: 56px;
-  min-width: 56px;
+  width: 60px;
+  min-width: 60px;
   background: linear-gradient(to bottom, #3a4a3a 0%, #2f3f2f 50%, #2a3a2a 100%);
   border-right: none;
 }
@@ -194,11 +193,16 @@
 /* Channel Label */
 .fl-channel-label {
   height: 52px;
+  min-height: 52px;
+  max-height: 52px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px 2px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .fl-channel-label-text {
@@ -229,7 +233,7 @@
 }
 
 .fl-insert-slot {
-  height: 10px;
+  height: 16px;
   background: #252525;
   border: 1px solid #1a1a1a;
   border-radius: 1px;
@@ -542,16 +546,22 @@
 
 .fl-routing-row {
   height: 14px;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
 .fl-route-arrow {
   font-size: 8px;
   color: #5a5;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .fl-channel.selected .fl-route-arrow {
@@ -586,8 +596,8 @@
    ========================================== */
 
 .fl-detail-panel {
-  width: 170px;
-  min-width: 170px;
+  width: 200px;
+  min-width: 200px;
   background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
   border-left: 1px solid #222;
   display: flex;
@@ -596,7 +606,7 @@
 }
 
 .fl-detail-header {
-  height: 22px;
+  height: 24px;
   background: linear-gradient(to bottom, #4a4a4a, #3a3a3a);
   border-bottom: 1px solid #222;
   display: flex;
@@ -605,6 +615,13 @@
   font-size: 11px;
   font-weight: 500;
   color: #ccc;
+}
+
+.fl-detail-subheader {
+  height: 18px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
 }
 
 .fl-detail-content.empty {
@@ -675,13 +692,21 @@
 .fl-slot-num {
   font-size: 9px;
   color: #666;
-  flex: 1;
+  width: 32px;
+  min-width: 32px;
+  text-align: center;
+  padding-right: 4px;
 }
 
 .fl-slot-name {
   font-size: 9px;
   color: #8b8;
   margin-right: 4px;
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fl-slot-led {
@@ -892,8 +917,8 @@
   border: 1px solid #444;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  min-width: 200px;
-  max-height: 300px;
+  min-width: 250px;
+  max-height: 350px;
   overflow: hidden;
   animation: fadeIn 0.1s ease;
 }
@@ -914,11 +939,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
   border-bottom: 1px solid #444;
   color: #ccc;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -945,7 +970,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   transition: background 0.1s;
 }
@@ -956,13 +981,13 @@
 
 .effect-selector-name {
   color: #ddd;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .effect-selector-type {
   color: #888;
-  font-size: 10px;
+  font-size: 11px;
   text-transform: capitalize;
 }
 

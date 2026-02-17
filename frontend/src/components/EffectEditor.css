@@ -1,4 +1,4 @@
-/* Effect Editor Modal Styles - Reson Theme */
+/* Effect Editor Modal Styles - Reson Theme - v2.0 ALIGNMENT FIX */
 
 .effect-editor-overlay {
     position: fixed;
@@ -18,7 +18,7 @@
     background: #2d2d2d;
     border: 1px solid #444;
     border-radius: 4px;
-    min-width: 620px;
+    min-width: 720px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
     font-family: 'Inter', system-ui, sans-serif;
     color: #eee;
@@ -129,7 +129,7 @@
     display: flex;
     flex-direction: column;
     background: #2d2d2d;
-    min-height: 140px;
+    min-height: 160px;
     padding-bottom: 10px;
 }
 
@@ -137,7 +137,7 @@
 .effect-section-header {
     font-family: 'Inter', system-ui, sans-serif;
     font-style: normal;
-    font-size: 10px;
+    font-size: 12px;
     color: #888;
     padding: 6px 0 0 10px;
     text-transform: uppercase;
@@ -164,15 +164,16 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    width: 50px;
+    width: 64px;
     position: relative;
+    justify-content: flex-start;
 }
 
 /* Knob Styling - Clean Reson Style */
 .effect-param-knob {
     position: relative;
-    width: 44px;
-    height: 44px;
+    width: 54px;
+    height: 54px;
     cursor: ns-resize;
 }
 
@@ -181,8 +182,8 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 38px;
-    height: 38px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: linear-gradient(135deg, #3d3d3d, #252525);
     border: 1px solid #111;
@@ -275,12 +276,17 @@
 
 /* Param Info */
 .effect-param-name {
-    font-size: 9px;
+    font-size: 11px;
     color: #aaa;
     font-family: inherit;
     font-weight: 500;
     letter-spacing: 0.2px;
     text-align: center;
+    line-height: 1.1;
+    height: 25px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 .effect-param-value {
@@ -362,7 +368,7 @@
 }
 
 .effect-mode-label {
-    font-size: 10px;
+    font-size: 11px;
     color: #888;
     font-weight: 500;
     text-transform: uppercase;
