@@ -975,12 +975,11 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
             return;
         }
 
-        // Convert current audioBuffer to a WAV blob
-        const wavBlob = audioBufferToWav(audioBuffer);
         const fileName = audioClip?.name || 'Edited Sample';
 
         if (onSave) {
-            onSave(wavBlob, fileName);
+            // Pass the raw AudioBuffer so the caller can generate waveform/metadata
+            onSave(audioBuffer, fileName);
         }
 
         if (onClose) {

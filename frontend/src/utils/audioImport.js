@@ -163,15 +163,17 @@ export const audioBufferToWav = (buffer) => {
   for (i = 0; i < buffer.numberOfChannels; i++)
     channels.push(buffer.getChannelData(i));
 
-  while (pos < buffer.length) {
+  let sampleIndex = 0;
+  offset = 44; // start writing sample data right after the 44-byte header
+  while (sampleIndex < buffer.length) {
     for (i = 0; i < numOfChan; i++) {
       // interleave channels
-      sample = Math.max(-1, Math.min(1, channels[i][pos])); // clamp
+      sample = Math.max(-1, Math.min(1, channels[i][sampleIndex])); // clamp
       sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale to 16-bit signed int
-      view.setInt16(44 + offset, sample, true); // write 16-bit sample
+      view.setInt16(offset, sample, true); // write 16-bit sample
       offset += 2;
     }
-    pos++;
+    sampleIndex++;
   }
 
   return new Blob([buffer1], { type: "audio/wav" });

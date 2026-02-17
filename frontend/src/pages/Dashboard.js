@@ -27,7 +27,7 @@ import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
 
 function Dashboard() {
-  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, seek, createTemplateProject, setAudioClips } = useProject();
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
   const [showWelcome, setShowWelcome] = useState(true);
   const [activeTour, setActiveTour] = useState(null); // 'main', 'pianoRoll', 'channelRack', 'mixer'
 
@@ -62,22 +62,24 @@ function Dashboard() {
   };
 
   const handleSaveSample = async (audioBuffer, name) => {
-    if (!editingSample || !audioBuffer) return;
+    if (!audioBuffer) return;
 
     try {
-      // 1. Convert buffer to WAV Blob/File
+      // 1. Convert AudioBuffer to WAV Blob/File
       const wavBlob = audioBufferToWav(audioBuffer);
-      const fileName = (name || editingSample.fileName || 'edited_sample.wav').replace(/\.wav$/i, '') + '.wav';
+      const clipName = (name || editingSample?.name || 'Edited Sample');
+      const fileName = clipName.replace(/\.wav$/i, '') + '.wav';
       const file = new File([wavBlob], fileName, { type: 'audio/wav' });
 
-      // 2. Generate props
+      // 2. Generate waveform & duration
       const waveform = generateWaveform(audioBuffer, 2000);
       const durationBeats = audioDurationToBeats(audioBuffer, bpm);
 
-      // 3. Create updated clip object
-      const updatedClip = {
-        ...editingSample,
-        name: name || editingSample.name,
+      // 3. Create a new audio clip object
+      const newAudioClipId = Date.now();
+      const newAudioClip = {
+        id: newAudioClipId,
+        name: clipName,
         fileName: fileName,
         file: file,
         audioBuffer: audioBuffer,
@@ -85,18 +87,31 @@ function Dashboard() {
         duration: audioBuffer.duration,
         durationBeats: durationBeats,
         sampleRate: audioBuffer.sampleRate,
-        url: URL.createObjectURL(wavBlob) // New URL for playback
+        url: URL.createObjectURL(wavBlob)
       };
 
-      // 4. Update audioClips state
-      setAudioClips(prev => prev.map(clip =>
-        clip.id === editingSample.id ? updatedClip : clip
-      ));
+      // 4. Add to audioClips state
+      setAudioClips(prev => [...prev, newAudioClip]);
 
-      // 5. Update editingSample to reflect changes
-      setEditingSample(updatedClip);
+      // 5. Place on first empty track (or first track as fallback)
+      const targetTrack = playlistTracks.find(t => t.clips.length === 0) || playlistTracks[0];
+      if (targetTrack) {
+        const trackClip = {
+          id: Date.now() + 1,
+          type: 'audio',
+          audioClipId: newAudioClipId,
+          offset: 0,
+          length: durationBeats,
+          name: clipName
+        };
+        setPlaylistTracks(prev => prev.map(t =>
+          t.id === targetTrack.id
+            ? { ...t, clips: [...t.clips, trackClip] }
+            : t
+        ));
+      }
 
-      console.log('Sample saved and updated in project:', updatedClip.name);
+      console.log('New audio clip created and added to playlist:', clipName);
     } catch (error) {
       console.error("Error saving sample:", error);
     }
