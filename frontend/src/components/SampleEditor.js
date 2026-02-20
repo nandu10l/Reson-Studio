@@ -3,8 +3,10 @@ import {
     Play, Pause, Square, SkipBack, SkipForward, Repeat,
     Scissors, Download, Upload, RotateCcw, RotateCw,
     ZoomIn, ZoomOut, Volume2, Maximize2, Clock, Music,
-    Flag, Copy, Send, Waves, Sliders, Mic, Timer, Eraser
+    Flag, Copy, Send, Waves, Sliders, Mic, Timer, Eraser, ChevronDown
 } from 'lucide-react';
+import Knob from './Knob';
+import EffectEditor from './EffectEditor';
 import './SampleEditor.css';
 
 /**
@@ -32,6 +34,17 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingMessage, setProcessingMessage] = useState('');
 
+    // Channel & Time Stretching state
+    const [isOn, setIsOn] = useState(true);
+    const [pan, setPan] = useState(0);
+    const [vol, setVol] = useState(80);
+    const [pitch, setPitch] = useState(0);
+    const [mul, setMul] = useState(100);
+    const [time, setTime] = useState(0);
+    const [stretchMode, setStretchMode] = useState('Resample');
+    const [editingEffect, setEditingEffect] = useState(null);
+    const [effectParams, setEffectParams] = useState({});
+
     // Undo/Redo state
     const undoStackRef = useRef([]);
     const redoStackRef = useRef([]);
@@ -43,6 +56,8 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     const overviewCanvasRef = useRef(null);
     const audioContextRef = useRef(null);
     const sourceNodeRef = useRef(null);
+    const gainNodeRef = useRef(null);
+    const pannerNodeRef = useRef(null);
     const animationFrameRef = useRef(null);
     const startTimeRef = useRef(0);
     const containerRef = useRef(null);
@@ -318,7 +333,17 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.loop = isLooping;
-        source.connect(audioContextRef.current.destination);
+
+        // Create gain and panner nodes for real-time vol/pan control
+        const gainNode = audioContextRef.current.createGain();
+        gainNode.gain.value = isOn ? vol / 100 : 0;
+        gainNodeRef.current = gainNode;
+
+        const pannerNode = audioContextRef.current.createStereoPanner();
+        pannerNode.pan.value = pan / 50; // Normalize -50..50 to -1..1
+        pannerNodeRef.current = pannerNode;
+
+        source.connect(gainNode).connect(pannerNode).connect(audioContextRef.current.destination);
 
         const startOffset = playbackPosition;
         source.start(0, startOffset);
@@ -357,12 +382,27 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
             sourceNodeRef.current.stop();
             sourceNodeRef.current = null;
         }
+        gainNodeRef.current = null;
+        pannerNodeRef.current = null;
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
         }
         setIsPlaying(false);
         setPlaybackPosition(0);
     };
+
+    // Sync vol/pan/isOn to audio nodes in real-time
+    useEffect(() => {
+        if (gainNodeRef.current) {
+            gainNodeRef.current.gain.value = isOn ? vol / 100 : 0;
+        }
+    }, [vol, isOn]);
+
+    useEffect(() => {
+        if (pannerNodeRef.current) {
+            pannerNodeRef.current.pan.value = pan / 50;
+        }
+    }, [pan]);
 
     const skipToStart = () => {
         setPlaybackPosition(0);
@@ -414,8 +454,8 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
 
     // Backend API calls for effects
     const applyEffect = async (effectType, params = {}) => {
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -423,8 +463,9 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         setProcessingMessage(`Applying ${effectType}...`);
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
             formData.append('effect_type', effectType);
             formData.append('params', JSON.stringify(params));
 
@@ -658,8 +699,36 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         }
     };
 
-    // Reverb effect
-    const handleReverb = () => applyEffect('reverb', { room_size: 0.5, damping: 0.5, wet_level: 0.3 });
+    // Reverb effect — open the EffectEditor window
+    const handleReverb = () => {
+        setEditingEffect({ type: 'reverb', enabled: true, params: effectParams['reverb'] || {} });
+    };
+
+    // Apply effect from EffectEditor and close
+    const handleApplyEffectEditor = async () => {
+        if (!editingEffect) return;
+        // Map EffectEditor param names to backend param names
+        const editorParams = editingEffect.params || {};
+        let backendParams = {};
+
+        if (editingEffect.type === 'reverb') {
+            backendParams = {
+                decay: editorParams.decay ?? 1.5,
+                mix: (editorParams.wet ?? 0.6) * 100  // EffectEditor wet is 0-1, backend mix is 0-100
+            };
+        } else if (editingEffect.type === 'delay') {
+            backendParams = {
+                time_ms: (editorParams.delayTime ?? 0.3) * 1000,
+                feedback: editorParams.feedback ?? 0.4,
+                mix: (editorParams.dryVol ?? 0.5) * 100
+            };
+        } else {
+            backendParams = editorParams;
+        }
+
+        await applyEffect(editingEffect.type, backendParams);
+        setEditingEffect(null);
+    };
 
     // EQ effect
     const handleEQ = () => applyEffect('eq', {
@@ -745,6 +814,89 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
             updateAudioBuffer(buffer);
+        } catch (error) {
+            console.error('Time stretch failed:', error);
+            alert(`Time stretch failed: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessingMessage('');
+        }
+    };
+
+    // Apply pitch shift from PITCH knob via backend
+    const handleApplyPitch = async () => {
+        if (!audioBuffer || pitch === 0) return;
+
+        setIsProcessing(true);
+        const semitones = pitch / 100; // Convert cents to semitones
+        setProcessingMessage(`Pitch shifting (${semitones > 0 ? '+' : ''}${semitones.toFixed(1)} st)...`);
+
+        try {
+            const wavBlob = audioBufferToWav(audioBuffer);
+            const formData = new FormData();
+            formData.append('file', wavBlob, 'audio.wav');
+
+            const response = await fetch(`http://localhost:8000/audio/pitch-shift?semitones=${semitones}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Pitch shift failed (${response.status})`);
+            }
+
+            const processedBlob = await response.blob();
+            const arrayBuffer = await processedBlob.arrayBuffer();
+            const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+            updateAudioBuffer(buffer);
+            setPitch(0); // Reset knob after applying
+        } catch (error) {
+            console.error('Pitch shift failed:', error);
+            alert(`Pitch shift failed: ${error.message}`);
+        } finally {
+            setIsProcessing(false);
+            setProcessingMessage('');
+        }
+    };
+
+    // Apply time stretch from TIME/MUL knobs via backend
+    const handleApplyTimeStretchKnob = async () => {
+        // MUL = speed multiplier (100 = normal, 50 = half speed, 200 = double speed)
+        // TIME = additional fine-tune (-50 to 50, negative = slower, positive = faster)
+        const mulFactor = mul / 100;  // 100% -> 1.0
+        const timeFactor = 1.0 + (time / 100); // -50 → 0.5x, 0 → 1.0x, 50 → 1.5x
+        const rawFactor = mulFactor * timeFactor;
+        const factor = Math.max(0.1, Math.min(10.0, rawFactor)); // Clamp to valid range
+
+        if (!audioBuffer || Math.abs(factor - 1.0) < 0.01) return;
+
+        setIsProcessing(true);
+        setProcessingMessage(`Time stretching (${factor.toFixed(2)}x)...`);
+
+        try {
+            const wavBlob = audioBufferToWav(audioBuffer);
+            const formData = new FormData();
+            formData.append('file', wavBlob, 'audio.wav');
+
+            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `Time stretch failed (${response.status})`);
+            }
+
+            const processedBlob = await response.blob();
+            const arrayBuffer = await processedBlob.arrayBuffer();
+            const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+
+            updateAudioBuffer(buffer);
+            setMul(100); // Reset knobs
+            setTime(0);
         } catch (error) {
             console.error('Time stretch failed:', error);
             alert(`Time stretch failed: ${error.message}`);
@@ -1192,7 +1344,7 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                     <button className="toolbar-btn" onClick={handleFadeIn} title="Fade In">
                         <span style={{ fontSize: '9px', fontWeight: 'bold' }}>↗FD</span>
                     </button>
-                    <button className="toolbar-btn" onClick={handleReverb} title="Reverb">
+                    <button className={`toolbar-btn ${editingEffect?.type === 'reverb' ? 'active' : ''}`} onClick={handleReverb} title="Reverb">
                         <Waves size={14} />
                     </button>
                     <button className="toolbar-btn" onClick={handleEQ} title="Equalize">
@@ -1233,6 +1385,146 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                     <button className="toolbar-btn" onClick={() => setZoom(1)} title="Zoom Fit">
                         <span style={{ fontSize: '9px', fontWeight: 'bold' }}>FIT</span>
                     </button>
+                </div>
+            </div>
+
+            {/* Effect Editor Modal */}
+            {editingEffect && (
+                <>
+                    <EffectEditor
+                        effect={editingEffect}
+                        onClose={() => setEditingEffect(null)}
+                        onUpdateParams={(params) => {
+                            queueMicrotask(() => {
+                                setEffectParams(prev => ({
+                                    ...prev,
+                                    [editingEffect.type]: { ...(prev[editingEffect.type] || {}), ...params }
+                                }));
+                                setEditingEffect(prev => prev ? {
+                                    ...prev,
+                                    params: { ...prev.params, ...params }
+                                } : null);
+                            });
+                        }}
+                        onUpdateMix={() => { }}
+                        onToggleEnabled={() => {
+                            setEditingEffect(prev => prev ? { ...prev, enabled: !prev.enabled } : null);
+                        }}
+                    />
+                    <div className="effect-apply-floating" onMouseDown={(e) => e.stopPropagation()}>
+                        <button className="apply-btn apply-btn-effect" onClick={handleApplyEffectEditor} disabled={isProcessing}>
+                            {isProcessing ? 'Processing...' : 'Apply to Audio'}
+                        </button>
+                        <button className="apply-btn apply-btn-cancel" onClick={() => setEditingEffect(null)}>Cancel</button>
+                    </div>
+                </>
+            )}
+
+            {/* Edison-style Settings Panel (Channel & Time Stretching) */}
+            <div className="sample-editor-settings">
+                {/* Channel Controls */}
+                <div className="settings-section channel-controls">
+                    <div className="setting-item">
+                        <div
+                            className={`led-switch ${isOn ? 'on' : ''}`}
+                            onClick={() => setIsOn(!isOn)}
+                        >
+                            <div className="led-indicator" />
+                        </div>
+                        <span className="setting-label">ON</span>
+                    </div>
+
+                    <Knob
+                        label="PAN"
+                        value={pan}
+                        onChange={(id, val) => setPan(val)}
+                        param={{ id: 'pan', min: -50, max: 50, default: 0 }}
+                        color="#60a5fa"
+                        size="small"
+                    />
+
+                    <Knob
+                        label="VOL"
+                        value={vol}
+                        onChange={(id, val) => setVol(val)}
+                        param={{ id: 'vol', min: 0, max: 100, default: 80 }}
+                        color="#4ade80"
+                        size="small"
+                    />
+                </div>
+
+                <div className="settings-divider" />
+
+                {/* Time Stretching */}
+                <div className="settings-section time-stretching">
+                    <div className="section-title-row">
+                        <div className="section-title">Time stretching</div>
+                        <button
+                            className="apply-btn"
+                            onClick={handleApplyTimeStretchKnob}
+                            disabled={isProcessing || (mul === 100 && time === 0)}
+                            title="Apply time stretch to audio (destructive)"
+                        >
+                            Apply
+                        </button>
+                    </div>
+
+                    <div className="stretch-controls">
+                        <div className="pitch-control">
+                            <Knob
+                                label="PITCH"
+                                value={pitch}
+                                onChange={(id, val) => setPitch(val)}
+                                param={{ id: 'pitch', min: -1200, max: 1200, default: 0 }}
+                                color="#fb923c"
+                                size="small"
+                            />
+                            <button
+                                className="apply-btn apply-btn-small"
+                                onClick={handleApplyPitch}
+                                disabled={isProcessing || pitch === 0}
+                                title="Apply pitch shift (destructive)"
+                            >
+                                Apply
+                            </button>
+                        </div>
+
+                        <Knob
+                            label="MUL"
+                            value={mul}
+                            onChange={(id, val) => setMul(val)}
+                            param={{ id: 'mul', min: 10, max: 200, default: 100 }}
+                            color="#9ca3af"
+                            size="small"
+                        />
+
+                        <Knob
+                            label="TIME"
+                            value={time}
+                            onChange={(id, val) => setTime(val)}
+                            param={{ id: 'time', min: -50, max: 50, default: 0 }}
+                            color="#fb923c"
+                            size="small"
+                        />
+
+                        <div className="mode-selector-container">
+                            <div className="mode-label">Mode</div>
+                            <div className="mode-selector">
+                                <span>{stretchMode}</span>
+                                <ChevronDown size={12} />
+                                <select
+                                    value={stretchMode}
+                                    onChange={(e) => setStretchMode(e.target.value)}
+                                    className="mode-select-hidden"
+                                >
+                                    <option>Resample</option>
+                                    <option>Pro Default</option>
+                                    <option>Pro Transient</option>
+                                    <option>E3 Generic</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

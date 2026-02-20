@@ -579,23 +579,44 @@ const EffectEditor = React.memo(({
         }
     }, [effect]);
 
-    // Close handlers
+    // Close handlers - only Escape key (no click-outside, so other windows remain usable)
     useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (editorRef.current && !editorRef.current.contains(e.target)) {
-                onClose();
-            }
-        };
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') onClose();
         };
-        document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('keydown', handleKeyDown);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, [onClose]);
+
+    // Drag support for repositioning
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const isDragging = useRef(false);
+    const dragStart = useRef({ x: 0, y: 0 });
+
+    const handleHeaderMouseDown = useCallback((e) => {
+        if (e.target.tagName === 'BUTTON') return; // Don't drag when clicking buttons
+        isDragging.current = true;
+        dragStart.current = { x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y };
+
+        const handleMouseMove = (moveEvent) => {
+            if (!isDragging.current) return;
+            setDragOffset({
+                x: moveEvent.clientX - dragStart.current.x,
+                y: moveEvent.clientY - dragStart.current.y
+            });
+        };
+
+        const handleMouseUp = () => {
+            isDragging.current = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    }, [dragOffset]);
 
     if (!effect) return null;
 
@@ -693,8 +714,8 @@ const EffectEditor = React.memo(({
 
     return (
         <div className="effect-editor-overlay">
-            <div ref={editorRef} className="effect-editor-modal">
-                <div className="effect-editor-header">
+            <div ref={editorRef} className="effect-editor-modal" style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}>
+                <div className="effect-editor-header" onMouseDown={handleHeaderMouseDown} style={{ cursor: 'grab' }}>
                     <span className="effect-editor-title">{effect.name || effectConfig.name}</span>
                     <div className="effect-editor-controls">
                         <button

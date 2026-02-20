@@ -430,6 +430,79 @@ async def time_stretch_audio(
         raise HTTPException(status_code=500, detail=f"Time stretch failed: {str(e)}")
 
 
+@router.post("/pitch-shift")
+async def pitch_shift_audio(
+    file: UploadFile = File(...),
+    semitones: float = 0.0
+):
+    """
+    Pitch-shift audio without changing tempo.
+    
+    Args:
+        file: Audio file (WAV/MP3)
+        semitones: Number of semitones to shift (-12 to +12).
+                   Positive = higher pitch, negative = lower pitch.
+                   Fractional values allowed (e.g. 0.5 for quarter tone).
+    
+    Returns:
+        Pitch-shifted audio as WAV
+    """
+    if semitones < -24 or semitones > 24:
+        raise HTTPException(status_code=400, detail="Semitones must be between -24 and 24")
+    
+    if semitones == 0.0:
+        # No change needed, return original
+        audio_data = await file.read()
+        return Response(
+            content=audio_data,
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=pitched_{file.filename or 'audio.wav'}"}
+        )
+    
+    try:
+        import numpy as np
+        import librosa
+        import soundfile as sf
+        
+        audio_data = await file.read()
+        audio = load_audio_flexible(audio_data, file.filename)
+        
+        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+        sample_rate = audio.frame_rate
+        
+        if audio.channels == 2:
+            left = samples[::2] / 32768.0
+            right = samples[1::2] / 32768.0
+            
+            left_shifted = librosa.effects.pitch_shift(left, sr=sample_rate, n_steps=semitones)
+            right_shifted = librosa.effects.pitch_shift(right, sr=sample_rate, n_steps=semitones)
+            
+            min_len = min(len(left_shifted), len(right_shifted))
+            left_shifted = left_shifted[:min_len]
+            right_shifted = right_shifted[:min_len]
+            
+            wav_buffer = io.BytesIO()
+            stereo_data = np.column_stack([left_shifted, right_shifted])
+            sf.write(wav_buffer, stereo_data, sample_rate, format='WAV')
+        else:
+            samples_float = samples / 32768.0
+            shifted_mono = librosa.effects.pitch_shift(samples_float, sr=sample_rate, n_steps=semitones)
+            
+            wav_buffer = io.BytesIO()
+            sf.write(wav_buffer, shifted_mono, sample_rate, format='WAV')
+        
+        wav_buffer.seek(0)
+        
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={"Content-Disposition": f"attachment; filename=pitched_{file.filename or 'audio.wav'}"}
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Pitch shift failed: {str(e)}")
+
+
 @router.post("/denoise")
 async def denoise_audio(
     file: UploadFile = File(...),
