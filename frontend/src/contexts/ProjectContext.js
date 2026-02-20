@@ -69,6 +69,9 @@ export const ProjectProvider = ({ children }) => {
     // 8. Selection State
     const [selectedChannelIds, setSelectedChannelIds] = useState([]);
 
+    // 9. Mixer Inserts (audio clips routed to mixer)
+    const [mixerInserts, setMixerInserts] = useState([]);
+
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
 
@@ -444,6 +447,55 @@ export const ProjectProvider = ({ children }) => {
             }
         });
     }, []);
+
+    // Add selected audio clips to a single mixer insert as a group
+    const addAudioClipsToMixerAsGroup = useCallback((clipIds) => {
+        if (!clipIds || clipIds.length === 0) return;
+        const clips = clipIds.map(cid => {
+            const rawId = typeof cid === 'string' && cid.startsWith('audio-') ? Number(cid.replace('audio-', '')) : cid;
+            return audioClips.find(ac => ac.id === rawId);
+        }).filter(Boolean);
+        if (clips.length === 0) return;
+
+        const groupName = clips.length === 1 ? clips[0].name : `Audio Group`;
+        setMixerInserts(prev => {
+            const nextNum = prev.length + 1;
+            return [...prev, {
+                id: `mixer-insert-${Date.now()}`,
+                name: clips.length === 1 ? groupName : `${groupName} ${nextNum}`,
+                type: 'group',
+                clipIds: clips.map(c => c.id),
+                clipNames: clips.map(c => c.name),
+                vol: 80,
+                pan: 0,
+                effects: []
+            }];
+        });
+    }, [audioClips]);
+
+    // Add selected audio clips each to their own mixer insert
+    const addAudioClipsToMixerSeparately = useCallback((clipIds) => {
+        if (!clipIds || clipIds.length === 0) return;
+        const clips = clipIds.map(cid => {
+            const rawId = typeof cid === 'string' && cid.startsWith('audio-') ? Number(cid.replace('audio-', '')) : cid;
+            return audioClips.find(ac => ac.id === rawId);
+        }).filter(Boolean);
+        if (clips.length === 0) return;
+
+        setMixerInserts(prev => [
+            ...prev,
+            ...clips.map(clip => ({
+                id: `mixer-insert-${clip.id}-${Date.now()}`,
+                name: clip.name,
+                type: 'audio',
+                clipIds: [clip.id],
+                clipNames: [clip.name],
+                vol: 80,
+                pan: 0,
+                effects: []
+            }))
+        ]);
+    }, [audioClips]);
 
     // Optimization: Track if scheduling is needed
     // (needsScheduling ref moved to top)
@@ -1515,6 +1567,9 @@ export const ProjectProvider = ({ children }) => {
 
         // Selection
         selectedChannelIds, selectChannel,
+
+        // Mixer Inserts
+        mixerInserts, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
 
         // Audio Clips
         audioClips,

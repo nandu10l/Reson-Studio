@@ -1054,3 +1054,70 @@
 .fl-slot-remove:hover {
   color: #f44;
 }
+
+/* ==========================================
+   Mixer Context Menu (Right-Click)
+   ========================================== */
+
+.mixer-context-menu {
+  background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
+  border: 1px solid #222;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.05);
+  min-width: 200px;
+  padding: 4px 0;
+  font-family: 'Segoe UI', 'DM Sans', system-ui, sans-serif;
+  user-select: none;
+}
+
+.mixer-context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: #ccc;
+  cursor: pointer;
+  transition: background 0.1s ease-out;
+}
+
+.mixer-context-item:hover:not(.disabled) {
+  background: linear-gradient(to right, #4a5a4a, #3a4a3a);
+  color: #fff;
+}
+
+.mixer-context-item.disabled {
+  color: #555;
+  cursor: default;
+}
+
+.mixer-context-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 4px;
+  background: rgba(74, 222, 128, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #4ade80;
+  margin-left: 8px;
+}
+
+.mixer-context-hint {
+  padding: 4px 14px 6px;
+  font-size: 9px;
+  color: #666;
+  font-style: italic;
+  border-top: 1px solid #333;
+  margin-top: 2px;
+}
+
+/* Active audio insert number cell highlight */
+.fl-num-cell.insert.has-audio {
+  color: #4ade80;
+  background: #2a3a2a;
+}

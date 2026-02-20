@@ -449,7 +449,6 @@ const MixerDetailPanel = React.memo(({
 
   const handleSlotWheel = (e, slotIndex) => {
     if (!onReorderEffect) return;
-    e.preventDefault();
     const direction = e.deltaY > 0 ? 1 : -1;
     const newSlot = Math.max(0, Math.min(9, slotIndex + direction));
     if (newSlot !== slotIndex) {
@@ -635,20 +634,43 @@ function Mixer() {
     updateEffectMix,
     updateEffectEnabled,
     reorderEffect,
-    updateEffectParams
+    updateEffectParams,
+    mixerInserts,
+    selectedChannelIds,
+    audioClips,
+    addAudioClipsToMixerAsGroup,
+    addAudioClipsToMixerSeparately
   } = useProject();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [mutedChannels, setMutedChannels] = useState({});
   const [soloedChannels, setSoloedChannels] = useState({});
+  const [contextMenu, setContextMenu] = useState({ open: false, x: 0, y: 0 });
+  const contextMenuRef = useRef(null);
 
-  // Generate insert tracks (16 empty insert channels)
-  const insertTracks = Array(16).fill(null).map((_, i) => ({
-    id: `insert-${i + 1}`,
-    name: `Insert ${i + 1}`,
+  // Determine which selected IDs are audio clips
+  const selectedAudioClipIds = selectedChannelIds.filter(id => typeof id === 'string' && id.startsWith('audio-'));
+  const hasSelectedAudioClips = selectedAudioClipIds.length > 0;
+
+  // Generate remaining empty insert tracks to fill up to 16 total
+  const remainingEmptyCount = Math.max(0, 16 - mixerInserts.length);
+  const emptyInsertTracks = Array(remainingEmptyCount).fill(null).map((_, i) => ({
+    id: `insert-empty-${i + 1}`,
+    name: `Insert ${mixerInserts.length + i + 1}`,
     vol: 80,
     pan: 0,
     effects: []
   }));
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenu.open && contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu({ open: false, x: 0, y: 0 });
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [contextMenu.open]);
 
   // Keep selectedChannel in sync with channels state
   useEffect(() => {
@@ -696,14 +718,23 @@ function Mixer() {
         </div>
 
         {/* Channel Numbers Row */}
-        <div className="fl-channel-nums-row">
+        <div
+          className="fl-channel-nums-row"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu({ open: true, x: e.clientX, y: e.clientY });
+          }}
+        >
           <div className="fl-num-cell master">M</div>
           <div className="fl-divider" />
           {channels.map((ch, i) => (
             <div key={ch.id} className="fl-num-cell">{i + 1}</div>
           ))}
-          {insertTracks.slice(0, 10).map((_, i) => (
-            <div key={`insert-${i}`} className="fl-num-cell insert">{channels.length + i + 1}</div>
+          {mixerInserts.map((ins, i) => (
+            <div key={ins.id} className="fl-num-cell insert has-audio">{channels.length + i + 1}</div>
+          ))}
+          {emptyInsertTracks.map((_, i) => (
+            <div key={`empty-insert-${i}`} className="fl-num-cell insert">{channels.length + mixerInserts.length + i + 1}</div>
           ))}
         </div>
 
@@ -753,13 +784,34 @@ function Mixer() {
             />
           ))}
 
-          {/* Insert Channels */}
-          {insertTracks.slice(0, 10).map((track, i) => (
+          {/* Audio Clip Mixer Inserts */}
+          {mixerInserts.map((ins, i) => (
+            <MixerChannel
+              key={ins.id}
+              id={ins.id}
+              name={ins.name}
+              channelNumber={channels.length + i + 1}
+              vol={ins.vol}
+              pan={ins.pan}
+              effects={ins.effects}
+              onVolChange={() => { }}
+              onPanChange={() => { }}
+              isSelected={selectedChannel?.id === ins.id}
+              onSelect={handleChannelSelect}
+              muted={mutedChannels[ins.id]}
+              soloed={soloedChannels[ins.id]}
+              onMuteToggle={handleMuteToggle}
+              onSoloToggle={handleSoloToggle}
+            />
+          ))}
+
+          {/* Remaining Empty Insert Channels */}
+          {emptyInsertTracks.map((track, i) => (
             <MixerChannel
               key={track.id}
               id={track.id}
               name={track.name}
-              channelNumber={channels.length + i + 1}
+              channelNumber={channels.length + mixerInserts.length + i + 1}
               vol={track.vol}
               pan={track.pan}
               effects={track.effects}
@@ -780,6 +832,50 @@ function Mixer() {
           </div>
         </div>
       </div>
+
+      {/* Right-Click Context Menu */}
+      {contextMenu.open && (
+        <div
+          className="mixer-context-menu"
+          ref={contextMenuRef}
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 10000
+          }}
+        >
+          <div
+            className={`mixer-context-item ${!hasSelectedAudioClips ? 'disabled' : ''}`}
+            onClick={() => {
+              if (hasSelectedAudioClips) {
+                addAudioClipsToMixerAsGroup(selectedAudioClipIds);
+                setContextMenu({ open: false, x: 0, y: 0 });
+              }
+            }}
+          >
+            Add Selected as Group
+            {hasSelectedAudioClips && <span className="mixer-context-badge">{selectedAudioClipIds.length}</span>}
+          </div>
+          <div
+            className={`mixer-context-item ${!hasSelectedAudioClips ? 'disabled' : ''}`}
+            onClick={() => {
+              if (hasSelectedAudioClips) {
+                addAudioClipsToMixerSeparately(selectedAudioClipIds);
+                setContextMenu({ open: false, x: 0, y: 0 });
+              }
+            }}
+          >
+            Add to Separate Inserts
+            {hasSelectedAudioClips && <span className="mixer-context-badge">{selectedAudioClipIds.length}</span>}
+          </div>
+          {!hasSelectedAudioClips && (
+            <div className="mixer-context-hint">
+              Select audio clips in Channel Rack first
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Detail Panel */}
       <MixerDetailPanel
