@@ -125,7 +125,7 @@ const Playhead = ({
         ref={timeLabelRef}
         className="playhead-time-label"
         style={{
-          color: '#60a5fa'
+          color: '#a855f7'
         }}
       >
         0:0:0

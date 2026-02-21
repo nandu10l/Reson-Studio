@@ -69,7 +69,7 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    background: linear-gradient(135deg, #a855f7, #6d28d9);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -240,7 +240,7 @@
 }
 
 .midify-convert-btn:hover {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
@@ -267,7 +267,7 @@
     gap: 8px;
     padding: 6px 12px;
     font-size: 11px;
-    color: #8b5cf6;
+    color: #a855f7;
     flex-shrink: 0;
 }
 
@@ -275,7 +275,7 @@
     width: 14px;
     height: 14px;
     border: 2px solid rgba(139, 92, 246, 0.2);
-    border-top-color: #8b5cf6;
+    border-top-color: #a855f7;
     border-radius: 50%;
     animation: midify-spin 0.8s linear infinite;
 }

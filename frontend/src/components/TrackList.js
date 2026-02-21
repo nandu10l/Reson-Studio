@@ -58,7 +58,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
   }, [isEditing]);
 
   // Generate or get track color (for visual identification)
-  const trackColor = track.color || `hsl(${(track.id * 137.5) % 360}, 45%, 45%)`;
+  const trackColor = track.color || `hsl(${(track.id * 137.5) % 360}, 75%, 55%)`;
   const isSelected = selected && selected.trackId === track.id;
   const isActive = isSelected;
 
@@ -111,7 +111,8 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
       style={{
         position: 'relative',
         display: 'flex',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.03)'
+        borderBottom: '1px solid rgba(255, 255, 255, 0.03)',
+        background: isActive ? `${trackColor}33` : `${trackColor}15`,
       }}
     >
       {/* Color Strip - Far Left */}
@@ -135,10 +136,10 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
           width: '197px', // Fixed width (200px total with 3px color strip)
           flex: 'none',
           background: isActive
-            ? 'rgba(96, 165, 250, 0.06)'
-            : '#1a1a1a',
+            ? `${trackColor}22` // Subtly tinted background when active
+            : `${trackColor}08`, // Very subtle tint when inactive
           borderLeft: isActive
-            ? '2px solid #60a5fa'
+            ? '2px solid #a855f7' // Purple active border
             : '2px solid transparent',
           borderRight: '1px solid rgba(255, 255, 255, 0.05)',
           padding: '0 6px',
@@ -202,8 +203,8 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
               onClick={(e) => e.stopPropagation()}
               style={{
                 flex: 1,
-                background: 'rgba(96, 165, 250, 0.12)',
-                border: '1px solid rgba(96, 165, 250, 0.4)',
+                background: 'rgba(139, 92, 246, 0.12)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
                 borderRadius: '2px',
                 padding: '2px 6px',
                 color: '#e5e7eb',
@@ -351,7 +352,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
                     const icon = e.currentTarget.querySelector('.blender-icon');
-                    if (icon) icon.style.color = '#60a5fa';
+                    if (icon) icon.style.color = '#a855f7';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = 'transparent';
@@ -441,7 +442,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
             <Volume2
               size={13}
               className="blender-icon"
-              style={{ color: '#60a5fa' }}
+              style={{ color: '#a855f7' }}
             />
           )}
         </button>
@@ -605,9 +606,9 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 left: `${clip.offset * pixelsPerBeat}px`,
                 width: `${clip.length * pixelsPerBeat}px`,
                 background: isClipSelected
-                  ? `linear-gradient(180deg, ${clipColor}E6 0%, ${clipColor}CC 100%)`
-                  : `linear-gradient(180deg, ${clipColor}80 0%, ${clipColor}60 100%)`,
-                borderColor: isClipSelected ? clipColor : `${clipColor}80`,
+                  ? `linear-gradient(180deg, ${clipColor}FF 0%, ${clipColor}D0 100%)`
+                  : `linear-gradient(180deg, ${clipColor}CC 0%, ${clipColor}A0 100%)`,
+                borderColor: isClipSelected ? clipColor : `${clipColor}BB`,
                 borderWidth: isClipSelected ? '2px' : '1px',
                 borderStyle: 'solid',
                 borderRadius: '8px',
@@ -620,7 +621,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                     ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3)`
                     : `inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2)`,
                 minHeight: '52px',
-                opacity: isClipSelected ? 1 : isClipHovered ? 0.95 : 0.85,
+                opacity: isClipSelected ? 1 : isClipHovered ? 1 : 0.95,
                 transition: 'all 0.2s ease',
                 filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
                 position: 'absolute',
@@ -727,39 +728,6 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                   zIndex: 20
                 }}
               />
-
-              <button
-                className="clip-delete"
-                onClick={(e) => { e.stopPropagation(); onRemoveClip(track.id, idx); }}
-                title="Delete clip"
-                style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  zIndex: 10,
-                  padding: '3px 6px',
-                  borderRadius: '3px',
-                  fontSize: '12px',
-                  lineHeight: 1,
-                  fontWeight: 600,
-                  transition: 'all 0.15s ease',
-                  opacity: 0.8
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = '1';
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = '0.8';
-                  e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
-                }}
-              >
-                ×
-              </button>
             </div>
           );
         })}
@@ -808,7 +776,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     const colors = [
       '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
       '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
-      '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+      '#3b82f6', '#6366f1', '#a855f7', '#a855f7', '#d946ef',
       '#ec4899', '#f43f5e'
     ];
     return colors[Math.floor(Math.random() * colors.length)];
@@ -977,7 +945,12 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         offset: offset,
         length: lengthBeats
       };
-      return { ...t, clips: [...t.clips, newClip] };
+      // Sync track color to pattern color
+      const updatedTrack = { ...t, clips: [...t.clips, newClip] };
+      if (pattern && pattern.color) {
+        updatedTrack.color = pattern.color;
+      }
+      return updatedTrack;
     }));
   };
 
@@ -1421,7 +1394,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
             width: '40px',
             height: '40px',
             border: '4px solid #374151',
-            borderTop: '4px solid #60a5fa',
+            borderTop: '4px solid #a855f7',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }} />
@@ -1466,7 +1439,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           {menu.type === 'audio' ? (
             <>
               {/* Audio Clip Header Section */}
-              <div className="clip-menu-header" style={{ color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Audio clip</div>
+              <div className="clip-menu-header" style={{ color: '#a855f7', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Audio clip</div>
 
               <div className="clip-menu-item" onClick={() => handleMenuAction('preview')}
                 style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
@@ -1533,7 +1506,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
               </div>
 
               {/* Automation Section */}
-              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Automation</div>
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#a855f7', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Automation</div>
               <div className="clip-menu-item"
                 onClick={(e) => { e.stopPropagation(); setActiveSubmenu(activeSubmenu === 'automation' ? null : 'automation'); }}
                 style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
@@ -1560,7 +1533,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
               <div className="clip-menu-item" style={{ color: '#6b7280', padding: '4px 12px', cursor: 'default', display: 'flex', alignItems: 'center' }}>Crossfade with</div>
 
               {/* Fades Section */}
-              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Fades</div>
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#a855f7', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Fades</div>
               <div className="clip-menu-item" style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>Reset fades</div>
               <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
                 Fade in curve <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
@@ -1570,7 +1543,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
               </div>
 
               {/* Region Section */}
-              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#60a5fa', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Region</div>
+              <div className="clip-menu-header" style={{ marginTop: '4px', color: '#a855f7', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Region</div>
               <div className="clip-menu-item" style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
                 Select region <ChevronDown size={10} style={{ transform: 'rotate(-90deg)', color: '#d1d5db' }} />
               </div>
@@ -1582,7 +1555,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
             <>
               {/* Pattern Menu - keeping dark or matching? Let's match for consistency but use existing logic if simpler. */}
               {/* Pattern menu was relying on global CSS .clip-menu probably. Let's start with matching Audio clip style roughly */}
-              <div className="clip-menu-header" style={{ color: '#60a5fa', padding: '4px 12px', fontWeight: 600 }}>Pattern Clip</div>
+              <div className="clip-menu-header" style={{ color: '#a855f7', padding: '4px 12px', fontWeight: 600 }}>Pattern Clip</div>
               <div className="clip-menu-item" onClick={() => handleMenuAction('edit')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
                 <Edit size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Edit pattern
               </div>
@@ -1774,7 +1747,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           }} onClick={e => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Choose Color</h3>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'].map(color => (
+              {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#a855f7', '#a855f7', '#d946ef', '#ec4899'].map(color => (
                 <div
                   key={color}
                   onClick={() => {

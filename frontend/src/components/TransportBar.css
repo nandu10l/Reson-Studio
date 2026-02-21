@@ -52,12 +52,12 @@
 }
 
 .transport-tool-btn.active {
-  background: rgba(96, 165, 250, 0.15);
-  color: #60a5fa;
+  background: rgba(139, 92, 246, 0.15);
+  color: #a855f7;
 }
 
 .transport-tool-btn.active .blender-icon {
-  color: #60a5fa;
+  color: #a855f7;
 }
 
 .transport-separator {
@@ -113,12 +113,12 @@
 }
 
 .transport-btn-play.active {
-  background: #60a5fa;
-  color: #1a1a1a;
+  background: #a855f7;
+  color: #ffffff;
 }
 
 .transport-btn-play.active .blender-icon {
-  color: #1a1a1a;
+  color: #ffffff;
 }
 
 .transport-btn-record.recording {
@@ -154,7 +154,7 @@
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   font-size: 16px;
   font-weight: 600;
-  color: #60a5fa;
+  color: #a78bfa;
   letter-spacing: 0.1em;
   min-width: 80px;
   text-align: center;
@@ -199,9 +199,8 @@
 }
 
 .transport-mode-btn.active {
-  background: rgba(96, 165, 250, 0.15);
-  color: #60a5fa;
-  /* Accent color for active mode */
+  background: rgba(139, 92, 246, 0.15);
+  color: #a855f7;
 }
 
 /* BPM Cluster - Secondary */
@@ -272,12 +271,11 @@
 }
 
 .transport-view-btn.active {
-  background: rgba(96, 165, 250, 0.12);
-  /* Subtle accent for active view */
+  background: rgba(139, 92, 246, 0.12);
 }
 
 .transport-view-btn.active .blender-icon {
-  color: #60a5fa;
+  color: #a855f7;
 }
 
 /* Ensure icons are properly styled */

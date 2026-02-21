@@ -395,7 +395,7 @@ function Dashboard() {
         <DraggableWindow
           title="Piano Roll"
           onClose={() => toggleWindow('pianoRoll')}
-          initialPosition={{ x: 100, y: 100 }}
+          initialPosition={{ x: 100, y: 180 }}
           width={800}
           height={400}
           onHelp={() => startTour('pianoRoll')}
@@ -419,9 +419,9 @@ function Dashboard() {
         <DraggableWindow
           title="Mixer"
           onClose={() => toggleWindow('mixer')}
-          initialPosition={{ x: 100, y: 150 }}
-          width={1120}
-          height={400}
+          initialPosition={{ x: 0, y: window.innerHeight - 580 }}
+          width={window.innerWidth - 8}
+          height={560}
           onHelp={() => startTour('mixer')}
         >
           <Mixer />

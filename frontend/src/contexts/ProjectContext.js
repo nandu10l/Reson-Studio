@@ -38,7 +38,7 @@ export const ProjectProvider = ({ children }) => {
         {
             id: 1,
             name: 'Pattern 1',
-            color: '#4C8DB0',
+            color: '#8b5cf6',
             length: 16,
             data: {
                 steps: createEmptySteps(16),
@@ -121,12 +121,33 @@ export const ProjectProvider = ({ children }) => {
     // --- Actions ---
 
     const createPattern = useCallback(() => {
+        // Curated vibrant palette — no whites, no greys, all saturated
+        const VIBRANT_COLORS = [
+            '#8b5cf6', // violet
+            '#ec4899', // pink
+            '#f97316', // orange
+            '#eab308', // yellow
+            '#22c55e', // green
+            '#06b6d4', // cyan
+            '#3b82f6', // blue
+            '#ef4444', // red
+            '#a855f7', // purple
+            '#14b8a6', // teal
+            '#f43f5e', // rose
+            '#84cc16', // lime
+            '#0ea5e9', // sky
+            '#fb923c', // amber-orange
+            '#d946ef', // fuchsia
+            '#10b981', // emerald
+        ];
         setPatterns(prev => {
             const nextId = Math.max(...prev.map(p => p.id)) + 1;
+            // Rotate through palette so consecutive patterns differ
+            const color = VIBRANT_COLORS[(prev.length) % VIBRANT_COLORS.length];
             const newPattern = {
                 id: nextId,
                 name: `Pattern ${nextId}`,
-                color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+                color,
                 length: 16,
                 data: {
                     steps: createEmptySteps(16),
