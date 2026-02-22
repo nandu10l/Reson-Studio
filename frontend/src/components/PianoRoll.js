@@ -3,6 +3,7 @@ import './PianoRoll.css';
 import * as Tone from 'tone';
 import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit, Brush, Scissors } from './icons/BlenderIcons';
 import Playhead from './Playhead';
+import ChordProgressionGenerator from './ChordProgressionGenerator';
 import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
 
@@ -37,6 +38,7 @@ const PianoRoll = () => {
     const [isEditingName, setIsEditingName] = useState(false);
     const [editName, setEditName] = useState(activePattern?.name || '');
     const nameInputRef = useRef(null);
+    const [isChordGeneratorOpen, setIsChordGeneratorOpen] = useState(false);
 
     // Drag State
     // type: 'MOVE' | 'RESIZE' | 'SELECT' | 'CREATE'
@@ -1243,6 +1245,20 @@ const PianoRoll = () => {
                     </button>
                 </div>
 
+                {/* Chord Generator */}
+                <div className="toolbar-separator"></div>
+                <div className="tool-group">
+                    <button
+                        className="tool-btn"
+                        onClick={() => setIsChordGeneratorOpen(true)}
+                        title="Generate chord progression"
+                        style={{ width: 'auto', padding: '0 12px', gap: '6px' }}
+                    >
+                        <Music size={16} className="blender-icon" />
+                        <span style={{ fontSize: '11px', fontWeight: 500 }}>Generate chord progression</span>
+                    </button>
+                </div>
+
                 {/* Zoom Group */}
                 <div className="toolbar-separator"></div>
                 <div className="tool-group">
@@ -1579,6 +1595,29 @@ const PianoRoll = () => {
                 >
                     ▶ Control
                 </div>
+            )}
+
+            {/* Chord Progression Generator Modal */}
+            {isChordGeneratorOpen && (
+                <ChordProgressionGenerator
+                    channelId={selectedChannelId}
+                    onClose={() => setIsChordGeneratorOpen(false)}
+                    onAccept={(notes) => {
+                        pushNotesHistory();
+                        // Replace existing notes for this channel
+                        const otherNotes = activePattern.data.notes.filter(n => {
+                            const nId = n.channelId !== undefined ? n.channelId : 0;
+                            return nId !== selectedChannelId;
+                        });
+
+                        updatePattern(activePatternId, {
+                            data: {
+                                ...activePattern.data,
+                                notes: [...otherNotes, ...notes]
+                            }
+                        });
+                    }}
+                />
             )}
         </div>
     );

@@ -1528,7 +1528,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const value = {
-        patterns,
+        patterns, setPatterns,
         activePatternId, setActivePatternId,
         activeClipType, setActiveClipType,
         activeAudioClipId, setActiveAudioClipId,

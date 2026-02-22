@@ -364,6 +364,7 @@ function Dashboard() {
                     pixelsPerBeat={pixelsPerBeat}
                     playheadPosition={playheadPosition}
                     onOpenSampleEditor={openSampleEditor}
+                    onOpenPianoRoll={() => toggleWindow('pianoRoll')}
                   />
                 </div>
               </div>

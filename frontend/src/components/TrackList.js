@@ -9,9 +9,10 @@ import PatternClipPreview from './PatternClipPreview';
 import AudioClip from './AudioClip';
 import AutomationClip from './AutomationClip';
 import audioPackSynth from '../audio/AudioPackSynth';
+import { audioEngine } from '../audio/AudioEngine';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -553,7 +554,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
                 onOpenMenu={(menuData) => onOpenMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
-                isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
+                isSelected={(selected?.trackId === track.id && selected?.clipIndex === idx) || selectedClips.some(sc => sc.trackId === track.id && sc.clipIndex === idx)}
                 activeTool={activeTool}
                 automation={automations ? automations.find(a => a.targetClipId === clip.id && a.type === 'volume') : null}
                 onSlice={(rawSplitPoint) => {
@@ -583,7 +584,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
                 onOpenMenu={(menuData) => onOpenMenu({ ...menuData, trackId: track.id, clipIndex: idx })}
                 onUpdatePoints={updateAutomationPoints}
-                isSelected={selected?.trackId === track.id && selected?.clipIndex === idx}
+                isSelected={(selected?.trackId === track.id && selected?.clipIndex === idx) || selectedClips.some(sc => sc.trackId === track.id && sc.clipIndex === idx)}
                 activeTool={activeTool}
               />
             );
@@ -591,9 +592,9 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 
           // Handle pattern clips (existing code)
           const pattern = patterns.find(p => p.id === clip.patternId);
-          const clipName = pattern ? pattern.name : `Pattern ${clip.patternId}`;
-          const clipColor = pattern ? pattern.color : '#ccc';
-          const isClipSelected = selected?.trackId === track.id && selected?.clipIndex === idx;
+          const clipName = clip.name || (pattern ? pattern.name : `Pattern ${clip.patternId}`);
+          const clipColor = clip.color || (pattern ? pattern.color : '#ccc');
+          const isClipSelected = (selected?.trackId === track.id && selected?.clipIndex === idx) || selectedClips.some(sc => sc.trackId === track.id && sc.clipIndex === idx);
           const isClipHovered = hoveredClipIndex === idx;
 
           return (
@@ -674,18 +675,21 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                     className="clip-menu-btn"
                     onPointerDown={(e) => {
                       e.stopPropagation();
-                      const rect = e.currentTarget.getBoundingClientRect();
                       onSelect({ ...clip, trackId: track.id, clipIndex: idx }); // Select clip too
-                      // setMenu
-                      // We need to pass setMenu from TrackList? Or pass handler?
-                      // Track component doesn't have setMenu.
-                      // Better: Pass `onOpenMenu` prop to Track.
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      // The logic needs to be lifted or passed down. 
-                      // I'll emit an event "onOpenMenu"
-                      // See update below for Track Props.
+                      if (onOpenMenu) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        onOpenMenu({
+                          clip: { ...clip, type: 'pattern' },
+                          trackId: track.id,
+                          clipIndex: idx,
+                          x: rect.left,
+                          y: rect.bottom,
+                          type: 'pattern'
+                        });
+                      }
                     }}
                     style={{
                       background: 'rgba(255, 255, 255, 0.1)',
@@ -736,9 +740,10 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
   );
 });
 
-const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, createPattern, audioClips, setAudioClips, activeClipType, activeAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm } = useProject();
+const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor, onOpenPianoRoll }) => {
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab } = useProject();
   const [selected, setSelected] = useState(null);
+  const [selectedClips, setSelectedClips] = useState([]); // Array of {trackId, clipIndex} for multi-selection
 
   // Menu State
   const [menu, setMenu] = useState(null); // { trackId, clipIndex, x, y, patternId }
@@ -799,12 +804,24 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         return { ...t, clips: newClips };
       }));
     } else if (action === 'preview') {
-      console.log('Preview audio clip:', clip?.name);
-      // TODO: Integrate with AudioEngine to play preview
-      if (clip && clip.audioClipId) {
-        const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
-        if (audioClip) {
-          console.log('Playing preview for:', audioClip.name);
+      if (type === 'audio') {
+        console.log('Preview audio clip:', clip?.name);
+        // TODO: Integrate with AudioEngine to play preview
+        if (clip && clip.audioClipId) {
+          const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+          if (audioClip) {
+            console.log('Playing preview for:', audioClip.name);
+          }
+        }
+      } else if (type === 'pattern' || patternId) {
+        const patId = patternId || clip?.patternId;
+        const pattern = patterns.find(p => p.id === patId);
+        if (pattern) {
+          console.log('Previewing pattern:', pattern.name);
+          // AudioEngine might need a preview function for patterns
+          audioEngine.schedulePattern(pattern);
+          audioEngine.start();
+          // Auto-stop after pattern length? Or just start.
         }
       }
     } else if (action === 'edit_sample') {
@@ -816,7 +833,12 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         }
       }
     } else if (action === 'rename') {
-      const currentName = clip ? (clip.name || 'Clip') : 'Pattern';
+      let currentName = clip?.name;
+      if (!currentName && type === 'pattern') {
+        const pattern = patterns.find(p => p.id === (patternId || clip?.patternId));
+        currentName = pattern?.name || 'Pattern';
+      }
+      currentName = currentName || 'Clip';
       setRenameInput(currentName);
       setRenameModal({ open: true, trackId, clipIndex, currentName });
       return; // Don't close menu yet
@@ -831,8 +853,14 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         return { ...t, clips: newClips };
       }));
     } else if (action === 'change_color') {
-      setColorInput(clip?.color || '#3b82f6');
-      setColorModal({ open: true, trackId, clipIndex, currentColor: clip?.color || '#3b82f6' });
+      let currentColor = clip?.color;
+      if (!currentColor && type === 'pattern') {
+        const pattern = patterns.find(p => p.id === (patternId || clip?.patternId));
+        currentColor = pattern?.color || '#3b82f6';
+      }
+      currentColor = currentColor || '#3b82f6';
+      setColorInput(currentColor);
+      setColorModal({ open: true, trackId, clipIndex, currentColor });
       return; // Don't close menu yet
     } else if (action === 'change_icon') {
       setIconModal({ open: true, trackId, clipIndex });
@@ -841,18 +869,61 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       // Show available channels for routing
       console.log('Select source channel - would show channel picker');
     } else if (action === 'select_all_similar') {
-      // Select all clips with the same audioClipId
-      if (clip && clip.audioClipId) {
-        const similarClips = [];
+      // Select all clips with the same audioClipId or patternId
+      const similarClips = [];
+      if (clip) {
         playlistTracks.forEach(t => {
           t.clips.forEach((c, idx) => {
-            if (c.audioClipId === clip.audioClipId) {
+            if (clip.type === 'audio' && c.audioClipId === clip.audioClipId) {
+              similarClips.push({ trackId: t.id, clipIndex: idx });
+            } else if (clip.type === 'pattern' && c.patternId === clip.patternId) {
               similarClips.push({ trackId: t.id, clipIndex: idx });
             }
           });
         });
         console.log('Found similar clips:', similarClips);
-        // TODO: Implement multi-selection state
+        setSelectedClips(similarClips);
+        if (similarClips.length > 0) {
+          setSelected(similarClips[0]);
+        }
+      }
+    } else if (action === 'make_unique') {
+      if (clip && clip.type === 'pattern') {
+        const originalPattern = patterns.find(p => p.id === clip.patternId);
+        if (originalPattern) {
+          const nextId = Math.max(...patterns.map(p => p.id), 0) + 1;
+          const newPattern = {
+            ...originalPattern,
+            id: nextId,
+            name: `${originalPattern.name} (unique)`,
+            data: JSON.parse(JSON.stringify(originalPattern.data))
+          };
+
+          setPatterns(prev => [...prev, newPattern]);
+
+          // Update the specific clip in playlistTracks
+          setPlaylistTracks(prev => prev.map(t => {
+            if (t.id !== trackId) return t;
+            const newClips = [...t.clips];
+            if (newClips[clipIndex]) {
+              newClips[clipIndex] = { ...newClips[clipIndex], patternId: nextId };
+            }
+            return { ...t, clips: newClips };
+          }));
+        }
+      }
+    } else if (action === 'select_source_pattern') {
+      // Show submenu handled in UI
+    } else if (action === 'change_source_pattern') {
+      if (clip && clip.type === 'pattern') {
+        setPlaylistTracks(prev => prev.map(t => {
+          if (t.id !== trackId) return t;
+          const newClips = [...t.clips];
+          if (newClips[clipIndex]) {
+            newClips[clipIndex] = { ...newClips[clipIndex], patternId: patternId };
+          }
+          return { ...t, clips: newClips };
+        }));
       }
     } else if (action === 'extract_stems') {
       // Extract stems using backend AI
@@ -893,18 +964,40 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       }
     } else if (action === 'automate_volume') {
       if (type === 'audio' && clip) {
-        createAutomation(clip.audioClipId, 'volume');
+        createAutomation(clip.id, 'volume'); // target the clip instance ID
       }
     } else if (action === 'automate_panning') {
       if (type === 'audio' && clip) {
-        createAutomation(clip.audioClipId, 'panning');
+        createAutomation(clip.id, 'panning');
       }
-    } else if (action === 'edit') {
+    } else if (action === 'edit' || action === 'edit_pattern') {
       if (type === 'audio') {
-        console.log('Edit sample - would open sample editor');
+        const audioClip = audioClips.find(ac => ac.id === clip.audioClipId);
+        if (audioClip && onOpenSampleEditor) {
+          onOpenSampleEditor(audioClip);
+        }
       } else {
-        setActivePatternId(patternId);
+        const patId = patternId || clip?.patternId;
+        if (patId) {
+          setActivePatternId(patId);
+          setPickerTab('PAT'); // Ensure we switch to patterns tab
+          if (onOpenPianoRoll) onOpenPianoRoll();
+        }
       }
+    } else if (action === 'rename_and_color') {
+      let currentName = clip?.name;
+      let currentColor = clip?.color;
+      if (type === 'pattern') {
+        const pattern = patterns.find(p => p.id === (patternId || clip?.patternId));
+        if (!currentName) currentName = pattern?.name;
+        if (!currentColor) currentColor = pattern?.color;
+      }
+      currentName = currentName || 'Clip';
+      currentColor = currentColor || '#3b82f6';
+      setRenameInput(currentName);
+      setColorInput(currentColor);
+      setRenameModal({ open: true, trackId, clipIndex, currentName, combined: true });
+      return; // Will open color picker after rename in modal components or just keep both
     } else {
       console.log('Menu action:', action);
     }
@@ -1357,7 +1450,11 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onRemoveClip={removeClip}
           onStartDrag={onStartDrag}
           onResizeStart={onResizeStart}
-          onSelect={setSelected}
+          onSelect={(clip) => {
+            setSelected(clip);
+            setSelectedClips([]); // Clear multi-selection
+            if (onSelectClip) onSelectClip(clip);
+          }}
           pixelsPerBeat={pixelsPerBeat}
           measures={measures}
           beatsPerBar={beatsPerBar}
@@ -1365,6 +1462,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           audioClips={audioClips}
           automations={automations}
           selected={selected}
+          selectedClips={selectedClips}
           onOpenMenu={setMenu}
           onRenameTrack={renameTrack}
           onDeleteTrack={deleteTrack}
@@ -1459,7 +1557,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
 
               <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
 
-              <div className="clip-menu-item" onClick={() => handleMenuAction('rename')}
+              <div className="clip-menu-item" onClick={() => handleMenuAction('rename_and_color')}
                 style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
                 Rename and color...
               </div>
@@ -1553,22 +1651,92 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
             </>
           ) : (
             <>
-              {/* Pattern Menu - keeping dark or matching? Let's match for consistency but use existing logic if simpler. */}
-              {/* Pattern menu was relying on global CSS .clip-menu probably. Let's start with matching Audio clip style roughly */}
-              <div className="clip-menu-header" style={{ color: '#a855f7', padding: '4px 12px', fontWeight: 600 }}>Pattern Clip</div>
-              <div className="clip-menu-item" onClick={() => handleMenuAction('edit')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
-                <Edit size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Edit pattern
+              {/* Pattern Menu - Expanded to match Audio Clip style and user request */}
+              <div className="clip-menu-header" style={{ color: '#a855f7', padding: '4px 12px', fontWeight: 600, opacity: 0.8 }}>Pattern clip</div>
+
+              <div className="clip-menu-item" onClick={() => handleMenuAction('preview')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Preview
               </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('toggle_mute')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                <div style={{ width: '16px', display: 'flex', justifyContent: 'center', marginRight: '4px' }}>
+                  {menu.clip?.muted && '✓'}
+                </div>
+                Muted
+              </div>
+
               <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
-              <div className="clip-menu-item" onClick={() => handleMenuAction('rename')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
-                <Palette size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Rename and color...
+
+              <div className="clip-menu-item" onClick={() => handleMenuAction('rename_and_color')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Rename and color...
               </div>
-              <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
-                <Copy size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Make unique
+              <div className="clip-menu-item" onClick={() => handleMenuAction('random_color')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Random color
               </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('change_color')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Change color...
+              </div>
+
               <div className="clip-menu-separator" style={{ height: '1px', background: 'rgba(255,255,255,0.1)', margin: '4px 0', opacity: 0.5 }}></div>
-              <div className="clip-menu-item" onClick={() => handleMenuAction('delete')} style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}>
-                <Trash size={12} color="#000" className="blender-icon" style={{ marginRight: '6px' }} /> Delete
+
+              <div className="clip-menu-item"
+                onClick={(e) => { e.stopPropagation(); setActiveSubmenu(activeSubmenu === 'source_pattern' ? null : 'source_pattern'); }}
+                style={{ justifyContent: 'space-between', padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Select source pattern <ChevronDown size={10} style={{ transform: activeSubmenu === 'source_pattern' ? 'rotate(0deg)' : 'rotate(-90deg)', color: '#d1d5db', transition: 'transform 0.2s' }} />
+              </div>
+              {activeSubmenu === 'source_pattern' && (
+                <div style={{ background: 'rgba(0,0,0,0.2)', paddingBottom: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                  {patterns.map(p => (
+                    <div key={p.id} className="clip-menu-item" onClick={() => { handleMenuAction('change_source_pattern', { patternId: p.id }); setMenu({ ...menu, patternId: p.id }); }}
+                      style={{ padding: '4px 12px 4px 24px', cursor: 'pointer', display: 'flex', alignItems: 'center', fontSize: '11px', color: p.id === menu.clip?.patternId ? '#fff' : '#9ca3af' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; e.currentTarget.style.color = '#fff' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = p.id === menu.clip?.patternId ? '#fff' : '#9ca3af' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: p.color, marginRight: '8px' }} />
+                      {p.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="clip-menu-item" onClick={() => handleMenuAction('edit')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Edit pattern
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('make_unique')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s', color: !menu.clip?.patternId ? '#6b7280' : '#d1d5db' }}
+                onMouseEnter={(e) => menu.clip?.patternId && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)')}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Make unique
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('select_all_similar')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                Select all similar clips
+              </div>
+              <div className="clip-menu-item" onClick={() => handleMenuAction('delete')}
+                style={{ padding: '4px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'background 0.1s' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.12)'; e.currentTarget.style.color = '#ef4444' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#d1d5db' }}>
+                Delete
               </div>
             </>
           )}
@@ -1646,235 +1814,247 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       </div>
 
       {/* Rename Modal */}
-      {renameModal.open && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' })}>
+      {
+        renameModal.open && (
           <div style={{
-            background: '#1f2937',
-            padding: '20px',
-            borderRadius: '8px',
-            minWidth: '300px',
-            border: '1px solid #374151'
-          }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Rename Clip</h3>
-            <input
-              type="text"
-              value={renameInput}
-              onChange={(e) => setRenameInput(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: '#374151',
-                border: '1px solid #4b5563',
-                borderRadius: '4px',
-                color: '#fff',
-                fontSize: '13px',
-                boxSizing: 'border-box'
-              }}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setPlaylistTracks(prev => prev.map(t => {
-                    if (t.id !== renameModal.trackId) return t;
-                    const newClips = [...t.clips];
-                    if (newClips[renameModal.clipIndex]) {
-                      newClips[renameModal.clipIndex] = { ...newClips[renameModal.clipIndex], name: renameInput };
-                    }
-                    return { ...t, clips: newClips };
-                  }));
-                  setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' });
-                  setMenu(null);
-                } else if (e.key === 'Escape') {
-                  setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' });
-                }
-              }}
-            />
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' })}
-                style={{ padding: '6px 16px', background: '#374151', border: 'none', borderRadius: '4px', color: '#9ca3af', cursor: 'pointer' }}
-              >Cancel</button>
-              <button
-                onClick={() => {
-                  setPlaylistTracks(prev => prev.map(t => {
-                    if (t.id !== renameModal.trackId) return t;
-                    const newClips = [...t.clips];
-                    if (newClips[renameModal.clipIndex]) {
-                      newClips[renameModal.clipIndex] = { ...newClips[renameModal.clipIndex], name: renameInput };
-                    }
-                    return { ...t, clips: newClips };
-                  }));
-                  setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' });
-                  setMenu(null);
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }} onClick={() => setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '' })}>
+            <div style={{
+              background: '#1f2937',
+              padding: '20px',
+              borderRadius: '8px',
+              minWidth: '300px',
+              border: '1px solid #374151'
+            }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Rename Clip</h3>
+              <input
+                type="text"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: '#374151',
+                  border: '1px solid #4b5563',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  fontSize: '13px',
+                  boxSizing: 'border-box'
                 }}
-                style={{ padding: '6px 16px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
-              >Save</button>
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setPlaylistTracks(prev => prev.map(t => {
+                      if (t.id !== renameModal.trackId) return t;
+                      const newClips = [...t.clips];
+                      if (newClips[renameModal.clipIndex]) {
+                        newClips[renameModal.clipIndex] = { ...newClips[renameModal.clipIndex], name: renameInput };
+                      }
+                      return { ...t, clips: newClips };
+                    }));
+                    if (renameModal.combined) {
+                      setColorModal({ open: true, trackId: renameModal.trackId, clipIndex: renameModal.clipIndex, currentColor: '#3b82f6' });
+                    }
+                    setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '', combined: false });
+                    setMenu(null);
+                  } else if (e.key === 'Escape') {
+                    setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '', combined: false });
+                  }
+                }}
+              />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '', combined: false })}
+                  style={{ padding: '6px 16px', background: '#374151', border: 'none', borderRadius: '4px', color: '#9ca3af', cursor: 'pointer' }}
+                >Cancel</button>
+                <button
+                  onClick={() => {
+                    setPlaylistTracks(prev => prev.map(t => {
+                      if (t.id !== renameModal.trackId) return t;
+                      const newClips = [...t.clips];
+                      if (newClips[renameModal.clipIndex]) {
+                        newClips[renameModal.clipIndex] = { ...newClips[renameModal.clipIndex], name: renameInput };
+                      }
+                      return { ...t, clips: newClips };
+                    }));
+                    if (renameModal.combined) {
+                      setColorModal({ open: true, trackId: renameModal.trackId, clipIndex: renameModal.clipIndex, currentColor: '#3b82f6' });
+                    }
+                    setRenameModal({ open: false, trackId: null, clipIndex: null, currentName: '', combined: false });
+                    setMenu(null);
+                  }}
+                  style={{ padding: '6px 16px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
+                >Save</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Color Modal */}
-      {colorModal.open && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setColorModal({ open: false, trackId: null, clipIndex: null, currentColor: '#3b82f6' })}>
+      {
+        colorModal.open && (
           <div style={{
-            background: '#1f2937',
-            padding: '20px',
-            borderRadius: '8px',
-            minWidth: '300px',
-            border: '1px solid #374151'
-          }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Choose Color</h3>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-              {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#a855f7', '#a855f7', '#d946ef', '#ec4899'].map(color => (
-                <div
-                  key={color}
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }} onClick={() => setColorModal({ open: false, trackId: null, clipIndex: null, currentColor: '#3b82f6' })}>
+            <div style={{
+              background: '#1f2937',
+              padding: '20px',
+              borderRadius: '8px',
+              minWidth: '300px',
+              border: '1px solid #374151'
+            }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Choose Color</h3>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                {['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#a855f7', '#9333ea', '#d946ef', '#ec4899'].map(color => (
+                  <div
+                    key={color}
+                    onClick={() => {
+                      setPlaylistTracks(prev => prev.map(t => {
+                        if (t.id !== colorModal.trackId) return t;
+                        const newClips = [...t.clips];
+                        if (newClips[colorModal.clipIndex]) {
+                          newClips[colorModal.clipIndex] = { ...newClips[colorModal.clipIndex], color };
+                        }
+                        return { ...t, clips: newClips };
+                      }));
+                      setColorModal({ open: false, trackId: null, clipIndex: null, currentColor: '#3b82f6' });
+                      setMenu(null);
+                    }}
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      background: color,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      border: colorInput === color ? '2px solid #fff' : '2px solid transparent'
+                    }}
+                  />
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  type="color"
+                  value={colorInput}
+                  onChange={(e) => setColorInput(e.target.value)}
+                  style={{ width: '40px', height: '32px', border: 'none', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  value={colorInput}
+                  onChange={(e) => setColorInput(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    background: '#374151',
+                    border: '1px solid #4b5563',
+                    borderRadius: '4px',
+                    color: '#fff',
+                    fontSize: '13px'
+                  }}
+                  placeholder="#hex or color name"
+                />
+                <button
                   onClick={() => {
                     setPlaylistTracks(prev => prev.map(t => {
                       if (t.id !== colorModal.trackId) return t;
                       const newClips = [...t.clips];
                       if (newClips[colorModal.clipIndex]) {
-                        newClips[colorModal.clipIndex] = { ...newClips[colorModal.clipIndex], color };
+                        newClips[colorModal.clipIndex] = { ...newClips[colorModal.clipIndex], color: colorInput };
                       }
                       return { ...t, clips: newClips };
                     }));
                     setColorModal({ open: false, trackId: null, clipIndex: null, currentColor: '#3b82f6' });
                     setMenu(null);
                   }}
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    background: color,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    border: colorInput === color ? '2px solid #fff' : '2px solid transparent'
-                  }}
-                />
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="color"
-                value={colorInput}
-                onChange={(e) => setColorInput(e.target.value)}
-                style={{ width: '40px', height: '32px', border: 'none', cursor: 'pointer' }}
-              />
-              <input
-                type="text"
-                value={colorInput}
-                onChange={(e) => setColorInput(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  background: '#374151',
-                  border: '1px solid #4b5563',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '13px'
-                }}
-                placeholder="#hex or color name"
-              />
-              <button
-                onClick={() => {
-                  setPlaylistTracks(prev => prev.map(t => {
-                    if (t.id !== colorModal.trackId) return t;
-                    const newClips = [...t.clips];
-                    if (newClips[colorModal.clipIndex]) {
-                      newClips[colorModal.clipIndex] = { ...newClips[colorModal.clipIndex], color: colorInput };
-                    }
-                    return { ...t, clips: newClips };
-                  }));
-                  setColorModal({ open: false, trackId: null, clipIndex: null, currentColor: '#3b82f6' });
-                  setMenu(null);
-                }}
-                style={{ padding: '8px 16px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
-              >Apply</button>
+                  style={{ padding: '8px 16px', background: '#3b82f6', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}
+                >Apply</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Icon Modal */}
-      {iconModal.open && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 2000
-        }} onClick={() => setIconModal({ open: false, trackId: null, clipIndex: null })}>
+      {
+        iconModal.open && (
           <div style={{
-            background: '#1f2937',
-            padding: '20px',
-            borderRadius: '8px',
-            minWidth: '280px',
-            border: '1px solid #374151'
-          }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Choose Icon</h3>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['🎵', '🎹', '🥁', '🎸', '🎺', '🎻', '🎤', '🔊', '💿', '🎧', '🎼', '🎶', '🔉', '📻', '🎚️', '🎛️'].map(icon => (
-                <div
-                  key={icon}
-                  onClick={() => {
-                    setPlaylistTracks(prev => prev.map(t => {
-                      if (t.id !== iconModal.trackId) return t;
-                      const newClips = [...t.clips];
-                      if (newClips[iconModal.clipIndex]) {
-                        newClips[iconModal.clipIndex] = { ...newClips[iconModal.clipIndex], icon };
-                      }
-                      return { ...t, clips: newClips };
-                    }));
-                    setIconModal({ open: false, trackId: null, clipIndex: null });
-                    setMenu(null);
-                  }}
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '24px',
-                    background: '#374151',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = '#4b5563'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = '#374151'}
-                >
-                  {icon}
-                </div>
-              ))}
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }} onClick={() => setIconModal({ open: false, trackId: null, clipIndex: null })}>
+            <div style={{
+              background: '#1f2937',
+              padding: '20px',
+              borderRadius: '8px',
+              minWidth: '280px',
+              border: '1px solid #374151'
+            }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '14px' }}>Choose Icon</h3>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['🎵', '🎹', '🥁', '🎸', '🎺', '🎻', '🎤', '🔊', '💿', '🎧', '🎼', '🎶', '🔉', '📻', '🎚️', '🎛️'].map(icon => (
+                  <div
+                    key={icon}
+                    onClick={() => {
+                      setPlaylistTracks(prev => prev.map(t => {
+                        if (t.id !== iconModal.trackId) return t;
+                        const newClips = [...t.clips];
+                        if (newClips[iconModal.clipIndex]) {
+                          newClips[iconModal.clipIndex] = { ...newClips[iconModal.clipIndex], icon };
+                        }
+                        return { ...t, clips: newClips };
+                      }));
+                      setIconModal({ open: false, trackId: null, clipIndex: null });
+                      setMenu(null);
+                    }}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '24px',
+                      background: '#374151',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#4b5563'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#374151'}
+                  >
+                    {icon}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </div>
   );
 });
