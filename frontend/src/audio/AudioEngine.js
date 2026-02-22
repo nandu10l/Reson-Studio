@@ -4,6 +4,7 @@ class AudioEngine {
     constructor() {
         this.channels = new Map(); // id -> Tone.Channel
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
+        this.channelNames = new Map(); // id -> channel name string (for instrument-aware behaviour)
         this.audioPlayers = new Map(); // audioClipId -> Tone.Player
         this.channelEffects = new Map(); // channelId -> [effectNode, ...] (10 slots)
         this.channelMeters = new Map(); // id -> Tone.Meter for level monitoring
@@ -599,56 +600,84 @@ class AudioEngine {
                 envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
                 volume: -10
             }).connect(channel);
-        } else if (n.includes('piano')) {
-            // Grand Piano - Real Samples (Salamander)
-            source = new Tone.Sampler({
-                urls: {
-                    "A0": "A0.mp3",
-                    "C1": "C1.mp3",
-                    "D#1": "Ds1.mp3",
-                    "F#1": "Fs1.mp3",
-                    "A1": "A1.mp3",
-                    "C2": "C2.mp3",
-                    "D#2": "Ds2.mp3",
-                    "F#2": "Fs2.mp3",
-                    "A2": "A2.mp3",
-                    "C3": "C3.mp3",
-                    "D#3": "Ds3.mp3",
-                    "F#3": "Fs3.mp3",
-                    "A3": "A3.mp3",
-                    "C4": "C4.mp3",
-                    "D#4": "Ds4.mp3",
-                    "F#4": "Fs4.mp3",
-                    "A4": "A4.mp3",
-                    "C5": "C5.mp3",
-                    "D#5": "Ds5.mp3",
-                    "F#5": "Fs5.mp3",
-                    "A5": "A5.mp3",
-                    "C6": "C6.mp3",
-                    "D#6": "Ds6.mp3",
-                    "F#6": "Fs6.mp3",
-                    "A6": "A6.mp3",
-                    "C7": "C7.mp3",
-                    "D#7": "Ds7.mp3",
-                    "F#7": "Fs7.mp3",
-                    "A7": "A7.mp3",
-                    "C8": "C8.mp3"
-                },
-                release: 1,
-                baseUrl: "https://tonejs.github.io/audio/salamander/",
-            }).connect(channel);
         } else if (n.includes('bass')) {
             source = new Tone.PolySynth(Tone.MonoSynth, {
                 maxPolyphony: 128,
                 oscillator: { type: "square" },
-                envelope: { attack: 0.1 }
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.3 }
             }).connect(channel);
+        } else if (n.includes('piano')) {
+            // Grand Piano — tries Salamander CDN, falls back to a synthesized piano after 4s
+            let pianoLoaded = false;
+            const pianoFallback = new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 32,
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.5 },
+                volume: -4
+            });
+            pianoFallback.connect(channel);
+            source = pianoFallback;
+
+            const sampler = new Tone.Sampler({
+                urls: {
+                    "A0": "A0.mp3", "C1": "C1.mp3", "D#1": "Ds1.mp3", "F#1": "Fs1.mp3",
+                    "A1": "A1.mp3", "C2": "C2.mp3", "D#2": "Ds2.mp3", "F#2": "Fs2.mp3",
+                    "A2": "A2.mp3", "C3": "C3.mp3", "D#3": "Ds3.mp3", "F#3": "Fs3.mp3",
+                    "A3": "A3.mp3", "C4": "C4.mp3", "D#4": "Ds4.mp3", "F#4": "Fs4.mp3",
+                    "A4": "A4.mp3", "C5": "C5.mp3", "D#5": "Ds5.mp3", "F#5": "Fs5.mp3",
+                    "A5": "A5.mp3", "C6": "C6.mp3", "D#6": "Ds6.mp3", "F#6": "Fs6.mp3",
+                    "A6": "A6.mp3", "C7": "C7.mp3", "D#7": "Ds7.mp3", "F#7": "Fs7.mp3",
+                    "A7": "A7.mp3", "C8": "C8.mp3"
+                },
+                release: 1,
+                baseUrl: "https://tonejs.github.io/audio/salamander/",
+                onload: () => {
+                    pianoLoaded = true;
+                    console.log(`Grand Piano (ch ${id}): Salamander samples loaded!`);
+                    sampler.connect(channel);
+                    this.sources.set(id, sampler);
+                },
+                onerror: (err) => {
+                    console.warn(`Piano sampler CDN failed, using synth fallback:`, err);
+                }
+            });
+            setTimeout(() => {
+                if (!pianoLoaded) {
+                    console.warn(`Piano CDN timeout — using synthesized piano for ch ${id}`);
+                }
+            }, 4000);
+        } else if (n.includes('guitar')) {
+            // Electric Guitar
+            // Use PolySynth(Synth) — the most reliable base; sawtooth oscillator
+            // gives natural harmonic content that sounds string-like.
+            // Chebyshev distortion adds warm even-order harmonics (guitar saturation).
+            source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 8 }).connect(channel);
+            source.set({
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 }
+            });
+            source.volume.value = 4;
+
+            // Guitar signal processing chain (in parallel — source also goes direct)
+            try {
+                const gSat = new Tone.Chebyshev(3);     // 3rd-order adds warm harmonics
+                const gFilter = new Tone.Filter(4500, 'lowpass');
+                source.connect(gSat);
+                gSat.connect(gFilter);
+                gFilter.connect(channel);
+                gSat.wet.value = 0.5;                   // 50% dry/wet blend
+            } catch (e) {
+                // If Chebyshev is unavailable, direct connection already handles output
+                console.warn('Guitar effect chain skipped:', e.message);
+            }
+
         } else {
             // Default Synth
             source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 128 }).connect(channel);
         }
 
         this.sources.set(id, source);
+        this.channelNames.set(id, name); // track channel name for instrument-aware preview
         return channel;
     }
 
@@ -1755,33 +1784,44 @@ class AudioEngine {
     previewSound(id, time) {
         const source = this.sources.get(id);
         if (source) {
-            // PolySynth handles monophonic voices (like NoiseSynth) by ignoring the pitch
-            // but we provide a dummy pitch to satisfy the PolySynth signature.
+            // Guard: if it's a Sampler and hasn't loaded its buffers yet, skip
+            if (source instanceof Tone.Sampler && !source.loaded) {
+                console.warn(`Channel ${id} sampler is still loading. Try again in a moment.`);
+                return;
+            }
             if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
-                // Protect against "Start time must be strictly greater than previous start time"
-                // by ensuring we don't trigger at the exact same time as the last one.
                 const lastTime = source._lastTriggerTime || 0;
                 const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
 
-                // If attempting to play at the same time (or in the past relative to last trigger), 
-                // add a tiny offset.
                 let safeTime = scheduleTime;
                 if (safeTime <= lastTime) {
-                    safeTime = lastTime + 0.001; // 1ms offset
+                    safeTime = lastTime + 0.001;
                 }
                 source._lastTriggerTime = safeTime;
 
-                // Try-catch for extra safety
                 try {
                     source.triggerAttackRelease("8n", safeTime);
                 } catch (e) {
                     console.warn("NoiseSynth trigger prevented:", e);
                 }
             } else {
-                source.triggerAttackRelease("C2", "8n", time);
+                // Pick a suitable preview note for the instrument type
+                const channelName = (this.channelNames?.get(id) || '').toLowerCase();
+                let previewNote = "C4"; // Default for melodic instruments
+                if (channelName.includes('guitar') || channelName.includes('bass')) {
+                    previewNote = "E2"; // Open low-E string
+                } else if (channelName.includes('kick') || channelName.includes('drum')) {
+                    previewNote = "C2";
+                }
+                try {
+                    source.triggerAttackRelease(previewNote, "8n", time || Tone.now(), 0.78);
+                } catch (e) {
+                    console.warn("previewSound trigger prevented:", e);
+                }
             }
         }
     }
+
 
     previewNote(noteName, duration = "8n", time) {
         if (this.previewSynth && noteName) {
@@ -1792,10 +1832,14 @@ class AudioEngine {
     previewChannelNote(channelId, noteName, duration = "8n", time, velocity = 0.78) {
         const source = this.sources.get(channelId);
         if (source) {
-            // Velocity affects volume (0-1 range)
+            // Guard: if it's a Sampler and hasn't loaded its buffers yet, skip gracefully
+            if (source instanceof Tone.Sampler && !source.loaded) {
+                console.warn(`Channel ${channelId} sampler is still loading buffers. Try again in a moment.`);
+                return;
+            }
+
             const vel = Math.max(0, Math.min(1, velocity));
 
-            // Harmonized trigger for PolySynth instruments
             if (source instanceof Tone.NoiseSynth || source.name === 'NoiseSynth') {
                 const lastTime = source._lastTriggerTime || 0;
                 const scheduleTime = time !== undefined ? Tone.Time(time).toSeconds() : Tone.now();
@@ -1812,7 +1856,11 @@ class AudioEngine {
                     console.warn("NoiseSynth channel trigger prevented:", e);
                 }
             } else {
-                source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now(), vel);
+                try {
+                    source.triggerAttackRelease(noteName || "C2", duration, time || Tone.now(), vel);
+                } catch (e) {
+                    console.warn("previewChannelNote trigger prevented:", e);
+                }
             }
         }
     }
@@ -1858,16 +1906,34 @@ class AudioEngine {
                     volume: -10
                 }).connect(offlineChannel);
             } else if (n.includes('piano')) {
-                // For offline, use a simple synth instead of sampler (samples may not load in time)
+                // For offline, use a synthesized piano (sampler CDN won't be reliable)
                 source = new Tone.PolySynth(Tone.Synth, {
                     oscillator: { type: "triangle" },
-                    envelope: { attack: 0.005, decay: 0.3, sustain: 0.4, release: 1 }
+                    envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.5 },
+                    volume: -4
                 }).connect(offlineChannel);
             } else if (n.includes('bass')) {
                 source = new Tone.PolySynth(Tone.MonoSynth, {
                     oscillator: { type: "square" },
-                    envelope: { attack: 0.1 }
+                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.3 }
                 }).connect(offlineChannel);
+            } else if (n.includes('guitar')) {
+                // Match real-time guitar: PolySynth(Synth) sawtooth — guaranteed output
+                source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 8 }).connect(offlineChannel);
+                source.set({
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 }
+                });
+                source.volume.value = 4;
+                try {
+                    const ogSat = new Tone.Chebyshev(3);
+                    const ogFilter = new Tone.Filter(4500, 'lowpass');
+                    source.connect(ogSat);
+                    ogSat.connect(ogFilter);
+                    ogFilter.connect(offlineChannel);
+                    ogSat.wet.value = 0.5;
+                } catch (e) { /* direct already connected */ }
+
             } else {
                 source = new Tone.PolySynth(Tone.Synth).connect(offlineChannel);
             }

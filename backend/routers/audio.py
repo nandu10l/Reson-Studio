@@ -608,3 +608,222 @@ async def audio_health():
     """Health check for audio service"""
     return {"status": "ok", "service": "audio-conversion"}
 
+
+# ─── Instrument Synthesis ──────────────────────────────────────────────────────
+
+NOTE_FREQS = {
+    "C0": 16.35, "C#0": 17.32, "D0": 18.35, "D#0": 19.45, "E0": 20.60, "F0": 21.83,
+    "F#0": 23.12, "G0": 24.50, "G#0": 25.96, "A0": 27.50, "A#0": 29.14, "B0": 30.87,
+    "C1": 32.70, "C#1": 34.65, "D1": 36.71, "D#1": 38.89, "E1": 41.20, "F1": 43.65,
+    "F#1": 46.25, "G1": 49.00, "G#1": 51.91, "A1": 55.00, "A#1": 58.27, "B1": 61.74,
+    "C2": 65.41, "C#2": 69.30, "D2": 73.42, "D#2": 77.78, "E2": 82.41, "F2": 87.31,
+    "F#2": 92.50, "G2": 98.00, "G#2": 103.83, "A2": 110.00, "A#2": 116.54, "B2": 123.47,
+    "C3": 130.81, "C#3": 138.59, "D3": 146.83, "D#3": 155.56, "E3": 164.81, "F3": 174.61,
+    "F#3": 185.00, "G3": 196.00, "G#3": 207.65, "A3": 220.00, "A#3": 233.08, "B3": 246.94,
+    "C4": 261.63, "C#4": 277.18, "D4": 293.66, "D#4": 311.13, "E4": 329.63, "F4": 349.23,
+    "F#4": 369.99, "G4": 392.00, "G#4": 415.30, "A4": 440.00, "A#4": 466.16, "B4": 493.88,
+    "C5": 523.25, "C#5": 554.37, "D5": 587.33, "D#5": 622.25, "E5": 659.25, "F5": 698.46,
+    "F#5": 739.99, "G5": 783.99, "G#5": 830.61, "A5": 880.00, "A#5": 932.33, "B5": 987.77,
+    "C6": 1046.50, "C#6": 1108.73, "D6": 1174.66, "D#6": 1244.51, "E6": 1318.51,
+    "F6": 1396.91, "F#6": 1479.98, "G6": 1567.98, "A6": 1760.00, "B6": 1975.53,
+    "C7": 2093.00, "A7": 3520.00, "C8": 4186.01,
+}
+
+
+def _adsr_envelope(samples, sr, attack, decay, sustain, release, total_dur):
+    """Generate an ADSR envelope array matching len(samples)."""
+    import numpy as np
+    n = len(samples)
+    env = np.ones(n, dtype=np.float32)
+    a_end = int(attack * sr)
+    d_end = int((attack + decay) * sr)
+    r_start = int((total_dur - release) * sr)
+
+    for i in range(min(a_end, n)):
+        env[i] = i / max(a_end, 1)
+    for i in range(a_end, min(d_end, n)):
+        env[i] = 1.0 - (1.0 - sustain) * (i - a_end) / max(d_end - a_end, 1)
+    for i in range(d_end, min(r_start, n)):
+        env[i] = sustain
+    for i in range(max(r_start, 0), n):
+        env[i] = sustain * max(0.0, 1.0 - (i - r_start) / max(n - r_start, 1))
+    return env
+
+
+def _synth_piano(freq, duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    # Rich harmonic series (piano-like)
+    harmonics = [1, 2, 3, 4, 5, 6, 7, 8]
+    weights   = [1.0, 0.5, 0.25, 0.15, 0.08, 0.05, 0.03, 0.02]
+    wave = sum(w * np.sin(2 * np.pi * h * freq * t) for h, w in zip(harmonics, weights))
+    wave /= sum(weights)
+    env = _adsr_envelope(wave, sr, 0.005, 0.6, 0.3, 1.2, duration)
+    return wave * env * velocity
+
+
+def _synth_guitar(freq, duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    # AM synthesis: carrier + modulation (sawtooth-like via harmonics)
+    carrier = np.sin(2 * np.pi * freq * t)
+    mod = np.sin(2 * np.pi * 2 * freq * t)  # harmonicity=2
+    wave = carrier * (1 + 0.5 * mod)
+    # Add slight odd harmonics for electric edge
+    wave += 0.3 * np.sign(np.sin(2 * np.pi * freq * t))  # light clipping
+    wave = np.clip(wave, -1, 1)
+    env = _adsr_envelope(wave, sr, 0.002, 0.25, 0.25, 1.0, duration)
+    return wave * env * velocity * 0.7
+
+
+def _synth_bass(freq, duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    wave = 0.6 * np.sin(2 * np.pi * freq * t)
+    wave += 0.3 * np.sign(np.sin(2 * np.pi * freq * t))   # square sub
+    wave += 0.1 * np.sin(2 * np.pi * 2 * freq * t)
+    env = _adsr_envelope(wave, sr, 0.05, 0.2, 0.6, 0.3, duration)
+    return wave * env * velocity * 0.8
+
+
+def _synth_strings(freq, duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    wave = sum((1 / h) * np.sin(2 * np.pi * h * freq * t + (h * 0.1)) for h in range(1, 6))
+    # Vibrato
+    vibrato = 1.0 + 0.003 * np.sin(2 * np.pi * 5 * t)
+    wave *= vibrato
+    env = _adsr_envelope(wave, sr, 0.3, 0.1, 0.8, 0.5, duration)
+    return wave * env * velocity * 0.45
+
+
+def _synth_flute(freq, duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    wave = np.sin(2 * np.pi * freq * t) + 0.3 * np.sin(2 * np.pi * 2 * freq * t)
+    noise = np.random.randn(len(t)) * 0.04
+    env = _adsr_envelope(wave, sr, 0.08, 0.05, 0.9, 0.2, duration)
+    return (wave + noise) * env * velocity * 0.6
+
+
+def _synth_kick(duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    freq_sweep = 150 * np.exp(-30 * t)
+    wave = np.sin(2 * np.pi * freq_sweep * t)
+    env = np.exp(-12 * t)
+    return wave * env * velocity
+
+
+def _synth_snare(duration, sr, velocity):
+    import numpy as np
+    t = np.linspace(0, duration, int(sr * duration), endpoint=False)
+    noise = np.random.randn(len(t))
+    tone = np.sin(2 * np.pi * 200 * t)
+    wave = 0.6 * noise + 0.4 * tone
+    env = np.exp(-15 * t)
+    return wave * env * velocity * 0.8
+
+
+SYNTH_FUNCTIONS = {
+    "piano": _synth_piano,
+    "guitar": _synth_guitar,
+    "bass": _synth_bass,
+    "strings": _synth_strings,
+    "flute": _synth_flute,
+}
+
+DRUM_FUNCTIONS = {
+    "kick": _synth_kick,
+    "snare": _synth_snare,
+}
+
+
+@router.post("/synthesize")
+async def synthesize_instrument(
+    instrument: str = "piano",
+    note: str = "C4",
+    duration: float = 1.0,
+    velocity: float = 0.8,
+    bpm: float = 120.0,
+    sample_rate: int = 44100,
+):
+    """
+    Synthesize a single instrument note server-side using numpy.
+
+    Args:
+        instrument: Instrument name — piano | guitar | bass | strings | flute | kick | snare
+        note: Note name (e.g. C4, A3, F#2). Ignored for drums.
+        duration: Duration in seconds (default 1.0)
+        velocity: Amplitude 0.0\u20131.0 (default 0.8)
+        bpm: BPM for duration calculation (optional context)
+        sample_rate: Sample rate in Hz (default 44100)
+
+    Returns:
+        WAV audio file (mono, 44100 Hz, 16-bit)
+    """
+    try:
+        import numpy as np
+
+        instrument = instrument.lower().strip()
+        duration = max(0.05, min(duration, 30.0))
+        velocity = max(0.0, min(velocity, 1.0))
+
+        # Resolve note frequency
+        note_upper = note.upper().replace("B", "A#").replace("\u266f", "#").replace("\u266d", "b")
+        # Handle flats: Bb -> A#, Eb -> D#, etc.
+        flat_map = {"BB": "A#", "EB": "D#", "AB": "G#", "DB": "C#", "GB": "F#"}
+        for flat, sharp in flat_map.items():
+            if note_upper.replace("#", "").startswith(flat):
+                note_upper = sharp + note_upper[-1]
+
+        if instrument in DRUM_FUNCTIONS:
+            fn = DRUM_FUNCTIONS[instrument]
+            samples = fn(duration, sample_rate, velocity)
+        else:
+            freq = NOTE_FREQS.get(note.upper(), NOTE_FREQS.get("C4", 261.63))
+            fn = SYNTH_FUNCTIONS.get(instrument, SYNTH_FUNCTIONS["piano"])
+            samples = fn(freq, duration, sample_rate, velocity)
+
+        # Normalize and convert to 16-bit PCM
+        max_val = np.max(np.abs(samples))
+        if max_val > 0:
+            samples = samples / max_val * 0.92
+        samples_int = (samples * 32767).astype(np.int16)
+
+        # Write to WAV buffer
+        wav_buffer = io.BytesIO()
+        import wave as wave_module
+        with wave_module.open(wav_buffer, 'w') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(sample_rate)
+            wf.writeframes(samples_int.tobytes())
+        wav_buffer.seek(0)
+
+        return Response(
+            content=wav_buffer.read(),
+            media_type="audio/wav",
+            headers={
+                "Content-Disposition": f"attachment; filename={instrument}_{note}_{duration:.2f}s.wav",
+                "X-Instrument": instrument,
+                "X-Note": note,
+                "X-Duration": str(duration),
+            }
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Synthesis failed: {str(e)}")
+
+
+@router.get("/synthesize/instruments")
+async def list_synth_instruments():
+    """List all available instruments for synthesis"""
+    return {
+        "melodic": list(SYNTH_FUNCTIONS.keys()),
+        "drums": list(DRUM_FUNCTIONS.keys()),
+        "notes": list(NOTE_FREQS.keys()),
+        "example": "/audio/synthesize?instrument=guitar&note=E2&duration=0.5&velocity=0.8"
+    }
+

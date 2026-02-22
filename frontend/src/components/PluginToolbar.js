@@ -256,6 +256,7 @@ export default function PluginToolbar() {
                                             <div
                                                 key={plugin.id}
                                                 className="plugin-item"
+                                                data-category={categoryId}
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, plugin)}
                                                 title={`${plugin.name} (${plugin.type})`}
@@ -265,7 +266,7 @@ export default function PluginToolbar() {
                                                 </div>
                                                 <div className="plugin-info">
                                                     <div className="plugin-name">{plugin.name}</div>
-                                                    <div className="plugin-type">{plugin.type}</div>
+                                                    <span className="plugin-type-badge">{plugin.type}</span>
                                                 </div>
                                             </div>
                                         ))}

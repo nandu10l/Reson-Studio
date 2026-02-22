@@ -14,7 +14,7 @@ const PianoRoll = () => {
         activePattern, activePatternId, updatePattern, addNoteToActivePattern, removeNoteFromActivePattern,
         isPlaying, playheadPosition, setPlayheadPosition, updateNote, setActiveTool, activeTool, bpm,
         previewPianoNote, deleteNotes, togglePlayback, channels, addNotesToActivePattern,
-        pushNotesHistory, undoNotes, redoNotes // Added for undo/redo and batch paste
+        pushNotesHistory, undoNotes, redoNotes, selectedChannelIds, selectChannel // Added selectedChannelIds/selectChannel
     } = useProject();
 
     // Local State
@@ -77,6 +77,17 @@ const PianoRoll = () => {
         }
         return keys;
     }, []);
+
+    // Auto-sync local selectedChannelId with project state
+    useEffect(() => {
+        if (selectedChannelIds?.length > 0) {
+            const currentSelected = selectedChannelIds[0];
+            // Only update if it's a numeric ID (ignoring audio clips IDs like "audio-0")
+            if (typeof currentSelected === 'number') {
+                setSelectedChannelId(currentSelected);
+            }
+        }
+    }, [selectedChannelIds]);
 
     // Scroll to C5 on mount
     useEffect(() => {
@@ -1043,11 +1054,15 @@ const PianoRoll = () => {
                     </div>
 
                     {/* Channel Selector */}
-                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', marginLeft: '12px', gap: '6px' }}>
+                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', marginLeft: '24px', gap: '12px' }}>
                         <span style={{ fontSize: '11px', color: '#888' }}>Channel:</span>
                         <select
                             value={selectedChannelId}
-                            onChange={(e) => setSelectedChannelId(parseInt(e.target.value))}
+                            onChange={(e) => {
+                                const id = parseInt(e.target.value);
+                                setSelectedChannelId(id);
+                                if (selectChannel) selectChannel(id);
+                            }}
                             style={{
                                 background: '#333',
                                 color: '#eee',

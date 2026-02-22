@@ -677,8 +677,6 @@
   border-bottom: 1px solid #1a1a1a;
   cursor: pointer;
   transition: background 0.1s ease-out;
-  will-change: background;
-  transform: translateZ(0);
 }
 
 .fl-slot-item:hover {
@@ -913,25 +911,28 @@
    ========================================== */
 
 .effect-selector-modal {
-  background: #2d2d2d;
-  border: 1px solid #444;
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  min-width: 250px;
+  background: #1e2128;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.7),
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(168, 85, 247, 0.1);
+  min-width: 220px;
   max-height: 350px;
   overflow: hidden;
-  animation: fadeIn 0.1s ease;
+  animation: effectSelectorFadeIn 0.12s ease;
 }
 
-@keyframes fadeIn {
+@keyframes effectSelectorFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-6px) scale(0.97);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -939,12 +940,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background: linear-gradient(to bottom, #3a3a3a, #2d2d2d);
-  border-bottom: 1px solid #444;
-  color: #ccc;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #262c36 0%, #1e2128 100%);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .effect-selector-close {
@@ -973,22 +976,27 @@
   padding: 10px 14px;
   cursor: pointer;
   transition: background 0.1s;
+  border-radius: 4px;
+  margin: 2px 4px;
 }
 
 .effect-selector-item:hover {
-  background: #3a4a5a;
+  background: rgba(168, 85, 247, 0.15);
 }
 
 .effect-selector-name {
-  color: #ddd;
-  font-size: 14px;
+  color: #e2e8f0;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .effect-selector-type {
-  color: #888;
-  font-size: 11px;
+  color: #c084fc;
+  font-size: 10px;
   text-transform: capitalize;
+  background: rgba(168, 85, 247, 0.1);
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
 /* ==========================================

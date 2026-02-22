@@ -257,7 +257,7 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           <span className="transport-midify-label">Midify</span>
         </button>
 
-        {/* View Controls - Secondary */}
+        {/* View Controls — labeled icon buttons */}
         <div className="transport-views-cluster">
           <button
             className={`transport-view-btn ${activeWindows?.playlist ? 'active' : ''}`}
@@ -265,7 +265,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Playlist"
             {...useGuideHandlers('View Playlist')}
           >
-            <ListMusic size={20} className="blender-icon" />
+            <ListMusic size={17} className="blender-icon" />
+            <span className="transport-view-label">Playlist</span>
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.pianoRoll ? 'active' : ''}`}
@@ -273,7 +274,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Piano Roll"
             {...useGuideHandlers('View Piano Roll')}
           >
-            <Piano size={20} className="blender-icon" />
+            <Piano size={17} className="blender-icon" />
+            <span className="transport-view-label">Piano</span>
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.channelRack ? 'active' : ''}`}
@@ -281,7 +283,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Channel Rack"
             {...useGuideHandlers('View Channel Rack')}
           >
-            <LayoutGrid size={20} className="blender-icon" />
+            <LayoutGrid size={17} className="blender-icon" />
+            <span className="transport-view-label">Channels</span>
           </button>
           <button
             className={`transport-view-btn ${activeWindows?.mixer ? 'active' : ''}`}
@@ -289,7 +292,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             title="Mixer"
             {...useGuideHandlers('View Mixer')}
           >
-            <Sliders size={20} className="blender-icon" />
+            <Sliders size={17} className="blender-icon" />
+            <span className="transport-view-label">Mixer</span>
           </button>
         </div>
       </div>

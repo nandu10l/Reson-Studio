@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import '../styles/butter/Mixer.css';
 import { useGuide } from '../contexts/GuideContext';
 import { useProject } from '../contexts/ProjectContext';
@@ -17,18 +18,18 @@ const AVAILABLE_EFFECTS = [
   { id: 'eq-1', name: 'Parametric EQ', type: 'eq' }
 ];
 
-// Effect Selector Modal
+// Effect Selector Portal — renders outside DraggableWindow to avoid stacking context issues
 const EffectSelector = React.memo(({ isOpen, onClose, onSelect, position }) => {
   if (!isOpen) return null;
 
-  return (
+  const modal = (
     <div
       className="effect-selector-modal"
       style={{
         position: 'fixed',
         left: position?.x || 200,
         top: position?.y || 200,
-        zIndex: 10000
+        zIndex: 99999
       }}
     >
       <div className="effect-selector-header">
@@ -49,6 +50,8 @@ const EffectSelector = React.memo(({ isOpen, onClose, onSelect, position }) => {
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(modal, document.body);
 });
 
 // FL Studio-style Mixer Channel
@@ -398,8 +401,28 @@ const MixerDetailPanel = React.memo(({
       return;
     }
     // Open effect selector for empty slot
+    // Smart positioning: prefer left of the panel since detail panel is at the right edge
     const rect = e.currentTarget.getBoundingClientRect();
-    setSelectorPosition({ x: rect.right + 10, y: rect.top });
+    const popupWidth = 260;
+    const popupHeight = 300;
+    const margin = 6;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Try left of the slot first (since detail panel is at the right edge)
+    let x = rect.left - popupWidth - margin;
+    // If that goes off-screen to the left, try right of the slot
+    if (x < margin) {
+      x = rect.right + margin;
+    }
+    // Clamp to viewport
+    x = Math.max(margin, Math.min(x, vw - popupWidth - margin));
+
+    let y = rect.top;
+    // Clamp vertically
+    y = Math.max(margin, Math.min(y, vh - popupHeight - margin));
+
+    setSelectorPosition({ x, y });
     setActiveSlot(slotIndex);
     setSelectorOpen(true);
   };
