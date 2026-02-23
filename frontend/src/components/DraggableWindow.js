@@ -139,12 +139,12 @@ const DraggableWindow = ({ title, onClose, content, initialPosition = { x: 100, 
 
     const windowStyle = isMaximized ? {
         position: 'fixed',
-        top: 96, // Below Navbar (64px) + TransportBar (32px) = 96px
+        top: 124, // TitleBar(32) + Navbar(40) + TransportBar(52)
         left: 0,
         width: '100vw',
-        height: 'calc(100vh - 96px)',
-        zIndex: 1001, // Higher than regular windows
-        overflow: 'visible' // Ensure header is visible
+        height: 'calc(100vh - 124px)',
+        zIndex: 1001,
+        overflow: 'visible'
     } : {
         position: 'absolute',
         left: position.x,

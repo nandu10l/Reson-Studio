@@ -33,7 +33,20 @@
   --border: rgba(255, 255, 255, 0.06);
   --border-light: rgba(255, 255, 255, 0.1);
   --border-purple: rgba(168, 85, 247, 0.2);
+
+  /* ── Layout heights (single source of truth) ──────────────────
+     Change these if you resize the chrome bars; DraggableWindow
+     and any calc() that references chrome offsets will auto-follow. */
+  --titlebar-h: 32px;
+  /* custom-titlebar (Electron only)  */
+  --navbar-h: 40px;
+  /* .command-strip (menu bar)        */
+  --transport-h: 52px;
+  /* .transport-bar                   */
+  --chrome-h: calc(var(--titlebar-h) + var(--navbar-h) + var(--transport-h));
+  /* = 124px */
 }
+
 
 /* Modal Styles */
 .modal-overlay {

@@ -295,6 +295,15 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             <Sliders size={17} className="blender-icon" />
             <span className="transport-view-label">Mixer</span>
           </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.aiComposer ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('aiComposer')}
+            title="AI Composer — Generate MIDI with the trained model"
+            style={activeWindows?.aiComposer ? { borderColor: '#7c3aed', color: '#c4b5fd' } : {}}
+          >
+            <span style={{ fontSize: 14 }}>✨</span>
+            <span className="transport-view-label">AI</span>
+          </button>
         </div>
       </div>
 

@@ -1,72 +1,150 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/welcome.css';
-import { X, FilePlus, Music, Mic, Zap, Compass } from 'lucide-react';
+import {
+  X, FilePlus, Music, Mic, Compass, Sparkles,
+  Clock, ChevronRight, Zap, Layers, Cpu
+} from 'lucide-react';
+
+const RECENT_PROJECTS = [
+  { name: 'Untitled Project', time: 'Just now', color: '#a855f7' },
+  { name: 'Beat Session 01', time: '2 hours ago', color: '#3b82f6' },
+  { name: 'Chord Exploration', time: 'Yesterday', color: '#10b981' },
+];
+
+const TEMPLATES = [
+  {
+    id: 'empty',
+    name: 'Blank Canvas',
+    icon: <FilePlus size={20} />,
+    desc: 'Start from scratch — your rules',
+    color: '#6366f1',
+  },
+  {
+    id: 'chord',
+    name: 'Beat & Bass',
+    icon: <Music size={20} />,
+    desc: 'Piano · Bass · Drums pre-loaded',
+    color: '#8b5cf6',
+  },
+  {
+    id: 'recording',
+    name: 'Vocal Studio',
+    icon: <Mic size={20} />,
+    desc: 'Optimised for recording vocals',
+    color: '#ec4899',
+  },
+];
+
+const FEATURES = [
+  { icon: <Cpu size={14} />, label: 'AI Composer — generate melodies' },
+  { icon: <Layers size={14} />, label: 'Multi-track Mixer & FX chain' },
+  { icon: <Zap size={14} />, label: 'Real-time MIDI + audio engine' },
+];
 
 const WelcomeModal = ({ onClose, onNewProject, onStartTour }) => {
-
-  const templates = [
-    { id: 'empty', name: 'Empty Project', icon: <FilePlus size={18} />, desc: 'Start from scratch' },
-    { id: 'chord', name: 'Create chord progression', icon: <Music size={18} />, desc: 'Piano, Bass, Drums' },
-    { id: 'recording', name: 'Audio Recording', icon: <Mic size={18} />, desc: 'Ready for vocals' },
-  ];
+  const [hoveredTemplate, setHoveredTemplate] = useState(null);
 
   return (
     <div className="welcome-overlay" onClick={onClose}>
       <div className="welcome-modal" onClick={e => e.stopPropagation()}>
 
-        <div className="welcome-header">
-          <div className="welcome-title">Welcome to Reson Studio</div>
-          <button className="close-btn" onClick={onClose} aria-label="Close">
-            <X size={18} />
+        {/* ── Ambient glows ── */}
+        <div className="welcome-glow welcome-glow-1" />
+        <div className="welcome-glow welcome-glow-2" />
+
+        {/* ═══════════ LEFT PANEL ══════════ */}
+        <div className="welcome-left">
+          <div className="welcome-brand">
+            <div className="welcome-logo">
+              <Sparkles size={22} />
+            </div>
+            <div>
+              <div className="welcome-brand-name">Reson Studio</div>
+              <div className="welcome-brand-version">v2026.1</div>
+            </div>
+          </div>
+
+          <div className="welcome-tagline">
+            Your sound,<br />
+            <span className="welcome-tagline-accent">your vision.</span>
+          </div>
+
+          <div className="welcome-features">
+            {FEATURES.map((f, i) => (
+              <div className="welcome-feature-pill" key={i}>
+                {f.icon}
+                <span>{f.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Tour button */}
+          <button className="welcome-tour-btn" onClick={onStartTour}>
+            <Compass size={15} />
+            Take the tour
+            <ChevronRight size={14} className="tour-arrow" />
           </button>
         </div>
 
-        <div className="welcome-body">
-          <div className="welcome-column">
+        {/* ═══════════ RIGHT PANEL ══════════ */}
+        <div className="welcome-right">
 
-            {/* What's New Section */}
-            <div className="whats-new-section">
-              <div className="column-header">What's New</div>
-              <div className="whats-new-card">
-                <div className="featured-icon-container">
-                  <Zap size={20} />
-                </div>
-                <div className="featured-text-content">
-                  <h4>Reson Update 2026.1</h4>
-                  <p>
-                    Experience the new high-performance audio engine, improved mixer workflow, and enhanced plugin support.
-                  </p>
-                </div>
-              </div>
-            </div>
+          {/* Header row */}
+          <div className="welcome-right-header">
+            <span className="welcome-right-title">Get started</span>
+            <button className="welcome-close" onClick={onClose} aria-label="Close">
+              <X size={16} />
+            </button>
+          </div>
 
-            {/* New Project Section */}
-            <div className="column-header">New Project</div>
-            <div className="list-container">
-              {templates.map(t => (
-                <div key={t.id} className="list-item" onClick={() => onNewProject(t.id)}>
-                  <div className="item-icon">{t.icon}</div>
-                  <div className="item-text">
-                    <h4>{t.name}</h4>
-                    <p>{t.desc}</p>
-                  </div>
+          {/* Templates */}
+          <div className="welcome-section-label">New project</div>
+          <div className="welcome-templates">
+            {TEMPLATES.map(t => (
+              <button
+                key={t.id}
+                className={`welcome-template-card ${hoveredTemplate === t.id ? 'hovered' : ''}`}
+                style={{ '--card-color': t.color }}
+                onMouseEnter={() => setHoveredTemplate(t.id)}
+                onMouseLeave={() => setHoveredTemplate(null)}
+                onClick={() => onNewProject(t.id)}
+              >
+                <div className="welcome-card-icon">{t.icon}</div>
+                <div className="welcome-card-text">
+                  <div className="welcome-card-name">{t.name}</div>
+                  <div className="welcome-card-desc">{t.desc}</div>
                 </div>
-              ))}
-            </div>
+                <ChevronRight size={15} className="welcome-card-arrow" />
+              </button>
+            ))}
+          </div>
 
-            {/* Learn Section */}
-            <div className="column-header" style={{ marginTop: '20px' }}>Learn</div>
-            <div className="list-container">
-              <div className="list-item" onClick={onStartTour}>
-                <div className="item-icon"><Compass size={18} /></div>
-                <div className="item-text">
-                  <h4>Take a Quick Tour</h4>
-                  <p>Learn the basics of Reson Studio</p>
-                </div>
-              </div>
-            </div>
+          {/* Recent projects */}
+          <div className="welcome-section-label" style={{ marginTop: 24 }}>
+            <Clock size={11} style={{ display: 'inline', marginRight: 5 }} />
+            Recent
+          </div>
+          <div className="welcome-recents">
+            {RECENT_PROJECTS.map((p, i) => (
+              <button
+                key={i}
+                className="welcome-recent-row"
+                onClick={() => onClose()}
+              >
+                <div className="welcome-recent-dot" style={{ background: p.color }} />
+                <span className="welcome-recent-name">{p.name}</span>
+                <span className="welcome-recent-time">{p.time}</span>
+                <ChevronRight size={13} className="welcome-recent-arrow" />
+              </button>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="welcome-footer">
+            Press <kbd>Esc</kbd> or click outside to dismiss
           </div>
         </div>
+
       </div>
     </div>
   );

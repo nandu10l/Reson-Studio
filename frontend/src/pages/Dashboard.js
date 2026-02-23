@@ -25,6 +25,7 @@ import SampleEditor from '../components/SampleEditor';
 import WelcomeModal from '../components/WelcomeModal';
 import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
+import AIComposer from '../components/AIComposer/AIComposer';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
@@ -37,6 +38,7 @@ function Dashboard() {
     pianoRoll: false,
     channelRack: false,
     sampleEditor: false,
+    aiComposer: false,
     playlist: true, // Default view
     browser: true
   });
@@ -462,6 +464,19 @@ function Dashboard() {
           height={600}
         >
           <PluginToolbar />
+        </DraggableWindow>
+      )}
+
+      {/* AI Composer Panel */}
+      {activeWindows.aiComposer && (
+        <DraggableWindow
+          title="✨ AI Composer"
+          onClose={() => toggleWindow('aiComposer')}
+          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 420), y: 130 }}
+          width={860}
+          height={480}
+        >
+          <AIComposer />
         </DraggableWindow>
       )}
 
