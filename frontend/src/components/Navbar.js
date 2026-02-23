@@ -11,7 +11,9 @@ function Navbar({
   onChangeView,
   currentView = 'arrange',
   onCreateProject,
-  onSaveProject
+  onSaveProject,
+  onToggleWindow,
+  onSetPluginToolbarCollapsed
 }) {
   const {
     patterns,
@@ -24,7 +26,14 @@ function Navbar({
     setCurrentProjectPath,
     importAudioFile,
     importMidiFile,
-    loadProject
+    loadProject,
+    createPattern,
+    clonePattern,
+    findFirstEmptyPattern,
+    activePatternId,
+    revertToLastBackup,
+    undoNotes,
+    redoNotes
   } = useProject();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -175,6 +184,26 @@ function Navbar({
     if (action === 'export_midi') {
       alert('MIDI export is coming soon!');
     }
+
+    // Window management
+    if (action === 'view_playlist') onToggleWindow?.('playlist');
+    if (action === 'view_pianoroll') onToggleWindow?.('pianoRoll');
+    if (action === 'view_channelrack') onToggleWindow?.('channelRack');
+    if (action === 'view_mixer') onToggleWindow?.('mixer');
+    if (action === 'view_browser') onToggleWindow?.('browser');
+
+    // Pattern/Channel Actions
+    if (action === 'add_channel') onSetPluginToolbarCollapsed?.(false);
+    if (action === 'add_pattern') createPattern?.();
+    if (action === 'find_empty') findFirstEmptyPattern?.();
+    if (action === 'clone_pattern') clonePattern?.(activePatternId);
+
+    // Edit Actions
+    if (action === 'undo') undoNotes?.();
+    if (action === 'redo') redoNotes?.();
+
+    // Misc
+    if (action === 'revert_backup') revertToLastBackup?.();
   };
 
   const handleExport = async (format) => {

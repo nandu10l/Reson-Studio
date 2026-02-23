@@ -21,7 +21,6 @@ const PianoRoll = () => {
     // Local State
     const [zoom, setZoom] = useState(40); // pixels per step (bigger UI)
     const pixelsPerStep = zoom;
-    const [selectedTool, setSelectedTool] = useState('pencil'); // pencil, eraser, select
     const [selection, setSelection] = useState([]); // Array of note IDs
     const [selectedChannelId, setSelectedChannelId] = useState(channels.length > 0 ? channels[0].id : 1);
 
@@ -55,14 +54,14 @@ const PianoRoll = () => {
     const startOctave = 8;
     const totalBars = 256;
     const stepsPerBar = 16;
-    const keyHeight = 32; // increased row height for bigger UI
+    const keyHeight = 16; // compact row — shows 3x more notes at once
 
     const scrollContainerRef = useRef(null);
     const pianoKeysRef = useRef(null);
     const gridAreaRef = useRef(null);
     const playheadRef = useRef(null); // Added
 
-    const KEYS_WIDTH = 140; // Must match CSS .piano-keys-column width (bigger UI)
+    const KEYS_WIDTH = 90; // narrower piano key column
 
     // Generate keys
     const allKeys = useMemo(() => {
@@ -321,13 +320,13 @@ const PianoRoll = () => {
             const noteId = parseInt(e.target.closest('.piano-note').dataset.id);
 
             // Eraser Tool
-            if (selectedTool === 'eraser') {
+            if (activeTool === 'eraser') {
                 removeNoteFromActivePattern(noteId);
                 return;
             }
 
             // Slice Tool
-            if (selectedTool === 'slice') {
+            if (activeTool === 'slice') {
                 // Start Slice Drag
                 setDragState({
                     type: 'SLICE',
@@ -380,7 +379,7 @@ const PianoRoll = () => {
 
         if (!noteName) return;
 
-        if (selectedTool === 'pencil' || selectedTool === 'brush') {
+        if (activeTool === 'pencil' || activeTool === 'brush') {
             // Preview sound
             previewPianoNote(noteName, selectedChannelId);
 
@@ -1119,26 +1118,26 @@ const PianoRoll = () => {
                 {/* Draw / Select Group */}
                 <div className="tool-group">
                     <button
-                        className={`tool-btn ${selectedTool === 'pencil' ? 'active' : ''}`}
-                        onClick={() => setSelectedTool('pencil')}
+                        className={`tool-btn ${activeTool === 'pencil' ? 'active' : ''}`}
+                        onClick={() => setActiveTool('pencil')}
                         title="Pencil Tool">
                         <Pencil size={16} className="blender-icon" />
                     </button>
                     <button
-                        className={`tool-btn ${selectedTool === 'select' ? 'active' : ''}`}
-                        onClick={() => setSelectedTool('select')}
+                        className={`tool-btn ${activeTool === 'select' ? 'active' : ''}`}
+                        onClick={() => setActiveTool('select')}
                         title="Select Tool">
                         <MousePointer2 size={16} className="blender-icon" />
                     </button>
                     <button
-                        className={`tool-btn ${selectedTool === 'brush' ? 'active' : ''}`}
-                        onClick={() => setSelectedTool('brush')}
+                        className={`tool-btn ${activeTool === 'brush' ? 'active' : ''}`}
+                        onClick={() => setActiveTool('brush')}
                         title="Paint Tool">
                         <Brush size={16} className="blender-icon" />
                     </button>
                     <button
-                        className={`tool-btn ${selectedTool === 'slice' ? 'active' : ''}`}
-                        onClick={() => setSelectedTool('slice')}
+                        className={`tool-btn ${activeTool === 'slice' ? 'active' : ''}`}
+                        onClick={() => setActiveTool('slice')}
                         title="Slice Tool">
                         <Scissors size={16} className="blender-icon" />
                     </button>
@@ -1148,8 +1147,8 @@ const PianoRoll = () => {
                 <div className="toolbar-separator"></div>
                 <div className="tool-group">
                     <button
-                        className={`tool-btn ${selectedTool === 'eraser' ? 'active' : ''}`}
-                        onClick={() => setSelectedTool('eraser')}
+                        className={`tool-btn ${activeTool === 'eraser' ? 'active' : ''}`}
+                        onClick={() => setActiveTool('eraser')}
                         title="Eraser Tool">
                         <Eraser size={16} className="blender-icon" />
                     </button>

@@ -116,9 +116,9 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           </button>
 
           <button
-            className={`transport-tool-btn ${activeTool === 'delete' ? 'active' : ''}`}
-            onClick={() => setActiveTool('delete')}
-            title="Delete"
+            className={`transport-tool-btn ${activeTool === 'eraser' ? 'active' : ''}`}
+            onClick={() => setActiveTool('eraser')}
+            title="Eraser (Delete)"
           >
             <Ban size={20} className="blender-icon" />
           </button>

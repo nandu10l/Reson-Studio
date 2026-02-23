@@ -384,6 +384,8 @@ function Dashboard() {
         currentView={view}
         onCreateProject={(project) => setProjects(prev => [...prev, project])}
         onSaveProject={() => console.log('Project saved:', currentProject)}
+        onToggleWindow={toggleWindow}
+        onSetPluginToolbarCollapsed={setIsPluginToolbarCollapsed}
       />
       <TransportBar
         activeWindows={activeWindows}

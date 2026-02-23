@@ -97,6 +97,20 @@ const EFFECT_PARAMS = {
             { id: 'type', name: 'Type', type: 'mode', options: ['Hard', 'Medium', 'Soft', 'Vintage'], default: 'Vintage' }
         ]
     },
+    // Gain (Utility)
+    gain: {
+        name: 'Fruity Gain',
+        params: [
+            { id: 'gain', name: 'Gain', min: -60, max: 12, default: 0, unit: 'dB' },
+        ]
+    },
+    // Panner (Utility)
+    pan: {
+        name: 'Fruity Pan',
+        params: [
+            { id: 'pan', name: 'Pan', min: -1, max: 1, default: 0, unit: '' },
+        ]
+    },
     // EQ
     eq: {
         name: 'Parametric EQ',

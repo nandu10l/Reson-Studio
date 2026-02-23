@@ -582,11 +582,16 @@ class AudioEngine {
         // Basic Synthesis logic based on name
         // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
         if (n.includes('kick')) {
-            source = new Tone.PolySynth(Tone.MembraneSynth, { maxPolyphony: 128 }).connect(channel);
+            source = new Tone.PolySynth(Tone.MembraneSynth, {
+                maxPolyphony: 128,
+                pitchDecay: 0.05,
+                octaves: 6,
+                envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.1 }
+            }).connect(channel);
         } else if (n.includes('snare')) {
             source = new Tone.NoiseSynth({
-                noise: { type: 'pink' }, // Pink noise for more body
-                envelope: { attack: 0.005, decay: 0.25, sustain: 0 }
+                noise: { type: 'white' }, // white noise is punchier/snappier than pink
+                envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.05 }
             }).connect(channel);
         } else if (n.includes('clap')) {
             source = new Tone.NoiseSynth({
@@ -596,15 +601,19 @@ class AudioEngine {
         } else if (n.includes('hat') || n.includes('cymbal')) {
             source = new Tone.PolySynth(Tone.MetalSynth, {
                 maxPolyphony: 128,
-                frequency: 200, harmonicity: 5.1, modulationIndex: 32,
-                envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
-                volume: -10
+                frequency: 400, // brighter/more cymbal-like (was 200)
+                harmonicity: 5.1,
+                modulationIndex: 32,
+                envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
+                volume: -8
             }).connect(channel);
         } else if (n.includes('bass')) {
             source = new Tone.PolySynth(Tone.MonoSynth, {
-                maxPolyphony: 128,
-                oscillator: { type: "square" },
-                envelope: { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.3 }
+                maxPolyphony: 8,
+                oscillator: { type: 'square' },
+                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
+                envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.4 }
             }).connect(channel);
         } else if (n.includes('piano')) {
             // Grand Piano — tries Salamander CDN, falls back to a synthesized piano after 4s
@@ -634,6 +643,9 @@ class AudioEngine {
                 onload: () => {
                     pianoLoaded = true;
                     console.log(`Grand Piano (ch ${id}): Salamander samples loaded!`);
+                    // Disconnect fallback FIRST — prevents both sources playing simultaneously
+                    // (which causes muddy doubled audio on the piano channel).
+                    try { pianoFallback.disconnect(channel); } catch (_) { }
                     sampler.connect(channel);
                     this.sources.set(id, sampler);
                 },
@@ -735,6 +747,12 @@ class AudioEngine {
             case 'eq':
             case 'filter':
                 return this.createParametricEQEffect();
+            case 'gain':
+            case 'utility':
+                return this.createGainEffect();
+            case 'pan':
+            case 'panner':
+                return this.createPannerEffect();
             default:
                 console.warn(`Unknown effect type: ${type}`);
                 return null;
@@ -1506,6 +1524,32 @@ class AudioEngine {
         };
     }
 
+    createGainEffect() {
+        const gain = new Tone.Gain(1);
+        return {
+            input: gain,
+            output: gain,
+            wet: { value: 1, rampTo: () => { } },
+            setGain: (v) => gain.gain.rampTo(Tone.dbToGain(v), 0.1),
+            dispose: () => gain.dispose(),
+            connect: (d) => gain.connect(d),
+            disconnect: () => gain.disconnect()
+        };
+    }
+
+    createPannerEffect() {
+        const panner = new Tone.Panner(0);
+        return {
+            input: panner,
+            output: panner,
+            wet: { value: 1, rampTo: () => { } },
+            setPan: (v) => panner.pan.rampTo(v, 0.1),
+            dispose: () => panner.dispose(),
+            connect: (d) => panner.connect(d),
+            disconnect: () => panner.disconnect()
+        };
+    }
+
     /**
      * Update effect parameters (e.g., reverb decay, delay time, etc.)
      */
@@ -1683,8 +1727,7 @@ class AudioEngine {
 
                     // Or check for specific keys
                     if (effect.setBand) {
-                        // Check for flattened updates
-                        // We iterate 0-6
+                        // Custom Parametric EQ
                         for (let i = 0; i < 7; i++) {
                             const prefix = `b${i}`;
                             const update = {};
@@ -1706,6 +1749,16 @@ class AudioEngine {
                         if (params.mid !== undefined && effect.mid) effect.mid.rampTo(params.mid, 0.05);
                         if (params.high !== undefined && effect.high) effect.high.rampTo(params.high, 0.05);
                     }
+                    break;
+
+                case 'gain':
+                case 'utility':
+                    if (params.gain !== undefined && effect.setGain) effect.setGain(params.gain);
+                    break;
+
+                case 'pan':
+                case 'panner':
+                    if (params.pan !== undefined && effect.setPan) effect.setPan(params.pan);
                     break;
 
                 default:

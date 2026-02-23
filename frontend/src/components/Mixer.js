@@ -15,7 +15,9 @@ const AVAILABLE_EFFECTS = [
   { id: 'phaser-1', name: 'Phaser', type: 'phaser' },
   { id: 'dist-1', name: 'Distortion', type: 'distortion' },
   { id: 'comp-1', name: 'Compressor', type: 'compressor' },
-  { id: 'eq-1', name: 'Parametric EQ', type: 'eq' }
+  { id: 'eq-1', name: 'Parametric EQ', type: 'eq' },
+  { id: 'gain-1', name: 'Gain', type: 'gain' },
+  { id: 'pan-1', name: 'Panner', type: 'pan' }
 ];
 
 // Effect Selector Portal — renders outside DraggableWindow to avoid stacking context issues

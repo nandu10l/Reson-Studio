@@ -500,7 +500,7 @@ const ChannelRack = () => {
                                 name={item.name}
                                 vol={item.vol}
                                 pan={item.pan}
-                                color={activePattern.color}
+                                color={item.color || activePattern.color}
                                 steps={activePattern.data.steps[item.id] || Array(activePattern.length).fill(false)}
                                 isPlaying={isPlaying}
                                 isSelected={selectedChannelIds.includes(item.id)}

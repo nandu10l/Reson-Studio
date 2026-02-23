@@ -755,6 +755,38 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const addChannel = useCallback((plugin) => {
+        // Drum Machine: expand into 4 named drum rows so AudioEngine matchers work correctly
+        if (plugin.type === 'drums') {
+            const drumRows = [
+                { suffix: 'Kick', color: '#f97316' },
+                { suffix: 'Snare', color: '#a855f7' },
+                { suffix: 'Hi Hat', color: '#06b6d4' },
+                { suffix: 'Clap', color: '#ec4899' },
+            ];
+            setChannels(prev => {
+                const baseId = Math.max(...prev.map(c => c.id), -1) + 1;
+                const newChannels = drumRows.map((row, i) => ({
+                    id: baseId + i,
+                    name: row.suffix,
+                    vol: 80,
+                    pan: 50,
+                    color: row.color,
+                    effects: [],
+                    pluginId: 'drums'
+                }));
+
+                setPatterns(prevPats => prevPats.map(pat => {
+                    const newSteps = { ...pat.data.steps };
+                    newChannels.forEach(ch => { newSteps[ch.id] = Array(pat.length).fill(false); });
+                    return { ...pat, data: { ...pat.data, steps: newSteps } };
+                }));
+
+                newChannels.forEach(ch => audioEngine.createChannel(ch.id, ch.name));
+                return [...prev, ...newChannels];
+            });
+            return;
+        }
+
         setChannels(prev => {
             const nextId = Math.max(...prev.map(c => c.id), -1) + 1;
             const newChannel = {
@@ -785,6 +817,7 @@ export const ProjectProvider = ({ children }) => {
             return [...prev, newChannel];
         });
     }, []);
+
 
     const addEffect = useCallback((channelId, plugin, slotIndex = null) => {
         setChannels(prev => prev.map(ch => {
@@ -1527,6 +1560,43 @@ export const ProjectProvider = ({ children }) => {
         }
     }, []);
 
+    const clonePattern = useCallback((patternId) => {
+        setPatterns(prev => {
+            const patternToClone = prev.find(p => p.id === patternId);
+            if (!patternToClone) return prev;
+
+            const nextId = Math.max(...prev.map(p => p.id), 0) + 1;
+            const clonedPattern = {
+                ...JSON.parse(JSON.stringify(patternToClone)),
+                id: nextId,
+                name: `${patternToClone.name} (Copy)`
+            };
+
+            setActivePatternId(nextId);
+            return [...prev, clonedPattern];
+        });
+    }, []);
+
+    const findFirstEmptyPattern = useCallback(() => {
+        const emptyPattern = patterns.find(p => {
+            const hasNotes = p.data.notes.length > 0;
+            const hasSteps = Object.values(p.data.steps).some(s => s.some(step => step === true));
+            return !hasNotes && !hasSteps;
+        });
+
+        if (emptyPattern) {
+            setActivePatternId(emptyPattern.id);
+        } else {
+            createPattern();
+        }
+    }, [patterns, createPattern]);
+
+    const revertToLastBackup = useCallback(() => {
+        // Placeholder for backup logic
+        console.log("Reverting to last backup...");
+        alert("Revert to backup is not implemented yet, but your state is safe.");
+    }, []);
+
     const value = {
         patterns, setPatterns,
         activePatternId, setActivePatternId,
@@ -1537,6 +1607,11 @@ export const ProjectProvider = ({ children }) => {
         channels, setChannels,
         playlistTracks, setPlaylistTracks,
         automations, setAutomations,
+
+        activePattern,
+        clonePattern,
+        findFirstEmptyPattern,
+        revertToLastBackup,
 
         // Actions
         createPattern,
