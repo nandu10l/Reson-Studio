@@ -8,18 +8,12 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "@babel/core": "^7.28.4",
-    "@babel/preset-react": "^7.27.1",
-    "concurrently": "^9.2.1",
-    "cross-env": "^10.1.0",
     "electron-is-dev": "^3.0.1",
-    "lamejs": "^1.2.1",
     "lucide-react": "^0.546.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.4",
     "tone": "^15.1.22",
-    "wait-on": "^9.0.1",
     "wavesurfer.js": "^7.11.0"
   },
   "scripts": {
@@ -54,12 +48,17 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-react": "^7.27.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
     "electron": "^38.3.0",
     "electron-builder": "^26.0.12",
     "eslint": "^8.57.1",
     "eslint-plugin-react-hooks": "^4.6.2",
-    "react-scripts": "^5.0.1"
+    "react-scripts": "^5.0.1",
+    "wait-on": "^9.0.1"
   }
 }
