@@ -72,6 +72,9 @@ export const ProjectProvider = ({ children }) => {
     // 9. Mixer Inserts (audio clips routed to mixer)
     const [mixerInserts, setMixerInserts] = useState([]);
 
+    // 10. Clipboard for copy/paste operations (global to allow cross-instrument/pattern)
+    const [clipboard, setClipboard] = useState([]);
+
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
 
@@ -1666,6 +1669,9 @@ export const ProjectProvider = ({ children }) => {
 
         // Mixer Inserts
         mixerInserts, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
+
+        // Clipboard
+        clipboard, setClipboard,
 
         // Audio Clips
         audioClips,
