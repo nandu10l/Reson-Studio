@@ -1,247 +1,150 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles } from '../icons/BlenderIcons';
-import { generateAiMidi, getAiStatus, listAiFiles, getAiDownloadUrl } from '../../services/aiComposerService';
+import React, { useState, useCallback } from 'react';
+import SeedEditor from './SeedEditor';
+import GenerationControls from './GenerationControls';
+import ResultPreview from './ResultPreview';
+import { generateMusic, C_MAJOR_SEED } from '../../services/aiComposerService';
+import { audioEngine } from '../../audio/AudioEngine';
 import './AIComposer.css';
 
-const GENRES = [
-    { id: 'lofi', name: 'Lo-Fi', emoji: '🌙', sub: 'Chill · Warm · 70–90 BPM', bpm: 85 },
-    { id: 'trap', name: 'Trap', emoji: '🔥', sub: 'Hard · Dark · 130–150 BPM', bpm: 140 },
-];
+const DEFAULT_PARAMS = {
+    numNotes: 200,
+    tempo: 120,
+    velocity: 80,
+    noteDuration: 0.3,
+    instrument: 0,
+};
 
-const TRACKS = [
-    { id: 'melody', name: 'Melody', icon: '🎵' },
-    { id: 'bass', name: 'Bass', icon: '🎸' },
-    { id: 'chords', name: 'Chords', icon: '🎻' },
-    { id: 'piano', name: 'Piano', icon: '🎹' },
-    { id: 'kick', name: 'Kick', icon: '🥁' },
-    { id: 'claps', name: 'Claps', icon: '👏' },
-    { id: 'hihat', name: 'Hi-Hat', icon: '🎩' },
-    { id: 'snare', name: 'Snare', icon: '🪘' },
-];
-
-export default function AIComposer() {
-    const [status, setStatus] = useState({ ready: false, text: 'Connecting...' });
-    const [genre, setGenre] = useState('lofi');
-    const [activeTracks, setActiveTracks] = useState(['melody', 'bass', 'chords', 'piano', 'kick', 'claps', 'hihat', 'snare']);
-    const [bpm, setBpm] = useState(85);
-    const [notes, setNotes] = useState(200);
-    const [temp, setTemp] = useState(1.0);
-    const [duration, setDuration] = useState(0.30);
+export default function AIComposer({ onImport }) {
+    const [seedNotes, setSeedNotes] = useState([...C_MAJOR_SEED]);
+    const [params, setParams] = useState(DEFAULT_PARAMS);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [logs, setLogs] = useState([{ text: '// Waiting for input...', type: 'muted' }]);
-    const [files, setFiles] = useState([]);
+    const [result, setResult] = useState(null); // { notes, midiBase64, duration_seconds }
+    const [error, setError] = useState(null);
 
-    const terminalRef = useRef(null);
-
-    useEffect(() => {
-        checkStatus();
-        loadFiles();
-        const interval = setInterval(checkStatus, 5000);
-        return () => clearInterval(interval);
-    }, []);
-
-    useEffect(() => {
-        if (terminalRef.current) {
-            terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-        }
-    }, [logs]);
-
-    const checkStatus = async () => {
-        const data = await getAiStatus();
-        if (data.ready) {
-            setStatus({ ready: true, text: `Model v${data.version} ready` });
-        } else {
-            setStatus({ ready: false, text: data.error || 'Server offline' });
-        }
-    };
-
-    const loadFiles = async () => {
-        const data = await listAiFiles();
-        if (data.files) setFiles(data.files);
-    };
-
-    const addLog = (text, type = 'muted') => {
-        setLogs(prev => [...prev, { text, type }]);
-    };
-
-    const toggleTrack = (trackId) => {
-        setActiveTracks(prev =>
-            prev.includes(trackId)
-                ? prev.filter(t => t !== trackId)
-                : [...prev, trackId]
-        );
-    };
-
-    const handleGenerate = async () => {
-        if (!activeTracks.length) {
-            alert('Select at least one track!');
-            return;
-        }
-
+    const handleGenerate = useCallback(async () => {
         setIsGenerating(true);
-        setLogs([]);
-        addLog(`> Genre: ${genre.toUpperCase()} | BPM: ${bpm} | Notes: ${notes}`, 'cyan');
-        addLog(`> Creativity: ${temp.toFixed(1)} | Duration: ${duration.toFixed(2)}s`, 'cyan');
-        addLog(`> Tracks: ${activeTracks.join(', ')}`, 'cyan');
-        addLog(`> Sending to AI model...`, 'accent');
-
+        setError(null);
         try {
-            const data = await generateAiMidi({
-                genre,
-                bpm: parseInt(bpm),
-                notes: parseInt(notes),
-                temperature: temp,
-                duration,
-                tracks: activeTracks
+            const data = await generateMusic({
+                seedNotes,
+                numNotes: params.numNotes,
+                tempo: params.tempo,
+                velocity: params.velocity,
+                noteDuration: params.noteDuration,
             });
-
-            if (data.success) {
-                addLog(`> ✅ Generated: ${data.filename}`, 'green');
-                addLog(`> Tracks inside: ${data.tracks}`, 'green');
-                addLog(`> Import → File → Import MIDI`, 'yellow');
-                loadFiles();
-            } else {
-                addLog(`> ❌ Error: ${data.error}`, 'red');
-            }
-        } catch (e) {
-            addLog(`> ❌ Connection failed!`, 'red');
-            addLog(`> Make sure backend is running`, 'muted');
+            setResult(data);
+        } catch (err) {
+            setError(err.message || 'Generation failed — is the backend running?');
         } finally {
             setIsGenerating(false);
         }
-    };
+    }, [seedNotes, params]);
 
-    const selectGenre = (g) => {
-        setGenre(g.id);
-        setBpm(g.bpm);
-    };
+    // Play preview using Web Audio (simple tone scheduling)
+    const handlePlay = useCallback(async () => {
+        if (!result?.notes?.length) return;
+        try {
+            const ctx = audioEngine.context || new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === 'suspended') await ctx.resume();
+
+            let time = ctx.currentTime + 0.05;
+            const dur = params.noteDuration;
+
+            result.notes.forEach((midi) => {
+                const freq = 440 * Math.pow(2, (midi - 69) / 12);
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(params.velocity / 127 * 0.3, time);
+                gain.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.9);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(time);
+                osc.stop(time + dur);
+                time += dur;
+            });
+        } catch (e) {
+            console.error('Preview playback failed:', e);
+        }
+    }, [result, params]);
+
+    // Import notes into Piano Roll as MIDI notes
+    const handleImport = useCallback((notes) => {
+        if (onImport) {
+            const dur = params.noteDuration;
+            const midiNotes = notes.map((pitch, i) => ({
+                pitch,
+                startBeat: i * dur * (params.tempo / 60),
+                duration: dur * (params.tempo / 60) * 0.9,
+                velocity: params.velocity,
+            }));
+            onImport(midiNotes);
+        } else {
+            alert('Open the Piano Roll first, then import.');
+        }
+    }, [onImport, params]);
 
     return (
-        <div className="ai-composer-container">
-            <aside className="ai-sidebar">
-                <div className="ai-logo-section">
-                    <div className="ai-logo-badge">AI Music Engine v2</div>
-                    <h1 className="ai-title"><Sparkles size={24} style={{ marginRight: '8px', verticalAlign: 'middle' }} />MIDI<br />Generator</h1>
+        <div className="ai-composer-panel">
+            {/* Header */}
+            <div className="ai-composer-header">
+                <div className="ai-composer-title">
+                    <span className="ai-composer-title-icon">✨</span>
+                    AI Composer
+                </div>
+            </div>
+
+            {/* Body */}
+            <div className="ai-composer-body">
+                {/* Left column: Seed Editor */}
+                <div className="ai-composer-left">
+                    <div className="ai-section-label">Seed Notes (50)</div>
+                    <SeedEditor seedNotes={seedNotes} onChange={setSeedNotes} />
                 </div>
 
-                <div className="ai-status-bar">
-                    <div className={`ai-dot ${status.ready ? 'green' : 'red'}`}></div>
-                    <span className="ai-status-text">{status.text}</span>
-                </div>
+                {/* Right column: Controls + Generate */}
+                <div className="ai-composer-right">
+                    <div className="ai-section-label" style={{ padding: 0, border: 'none', background: 'transparent' }}>
+                        Generation Settings
+                    </div>
 
-                <div className="ai-section">
-                    <div className="ai-sec-label">Genre</div>
-                    <div className="ai-genre-grid">
-                        {GENRES.map(g => (
-                            <button
-                                key={g.id}
-                                className={`ai-genre-btn ${g.id} ${genre === g.id ? 'active' : ''}`}
-                                onClick={() => selectGenre(g)}
-                            >
-                                <div className="ai-genre-btn-inner">
-                                    <span className="ai-genre-emoji">{g.emoji}</span>
-                                    <div className="ai-genre-info">
-                                        <span className="ai-genre-name">{g.name}</span>
-                                        <span className="ai-genre-sub">{g.sub}</span>
-                                    </div>
-                                </div>
-                            </button>
-                        ))}
+                    <GenerationControls params={params} onChange={setParams} />
+
+                    {error && (
+                        <div className="ai-error-banner">⚠ {error}</div>
+                    )}
+
+                    <div className="generate-btn-wrapper">
+                        <button
+                            className="generate-btn"
+                            onClick={handleGenerate}
+                            disabled={isGenerating}
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <span className="ai-spinner" />
+                                    Generating…
+                                </>
+                            ) : (
+                                <>
+                                    <span className="generate-btn-icon">✨</span>
+                                    Generate
+                                </>
+                            )}
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                <div className="ai-section">
-                    <div className="ai-sec-label">Tracks</div>
-                    <div className="ai-tracks-wrap">
-                        {TRACKS.map(t => (
-                            <div
-                                key={t.id}
-                                className={`ai-track-pill ${activeTracks.includes(t.id) ? 'on' : ''}`}
-                                onClick={() => toggleTrack(t.id)}
-                            >
-                                {t.icon} {t.name}
-                                <span className="ai-tick">✓</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="ai-waveform">
-                    {[...Array(9)].map((_, i) => <span key={i}></span>)}
-                </div>
-            </aside>
-
-            <main className="ai-main-content">
-                <div className="ai-card">
-                    <div className="ai-sec-label" style={{ marginBottom: '18px' }}>Parameters</div>
-                    <div className="ai-sliders-grid">
-                        <div className="ai-sl-group">
-                            <div className="ai-sl-label"><span>BPM</span><span className="ai-sl-val">{bpm}</span></div>
-                            <input type="range" min="60" max="180" value={bpm} onChange={(e) => setBpm(e.target.value)} />
-                        </div>
-                        <div className="ai-sl-group">
-                            <div className="ai-sl-label"><span>Notes</span><span className="ai-sl-val">{notes}</span></div>
-                            <input type="range" min="50" max="500" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                        </div>
-                        <div className="ai-sl-group">
-                            <div className="ai-sl-label"><span>Creativity</span><span className="ai-sl-val">{temp.toFixed(1)}</span></div>
-                            <input type="range" min="1" max="20" value={temp * 10} onChange={(e) => setTemp(e.target.value / 10)} />
-                        </div>
-                        <div className="ai-sl-group">
-                            <div className="ai-sl-label"><span>Note Length</span><span className="ai-sl-val">{duration.toFixed(2)}s</span></div>
-                            <input type="range" min="1" max="10" value={duration * 10} onChange={(e) => setDuration(e.target.value / 10)} />
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    className="ai-gen-btn"
-                    onClick={handleGenerate}
-                    disabled={isGenerating || !status.ready}
-                >
-                    <span>{isGenerating ? '⏳ GENERATING...' : '⚡ GENERATE MIDI'}</span>
-                </button>
-
-                <div className="ai-terminal">
-                    <div className="ai-term-head">
-                        <div className="ai-term-dots"><span></span><span></span><span></span></div>
-                        <span className="ai-term-title">OUTPUT CONSOLE</span>
-                    </div>
-                    <div className="ai-term-body" ref={terminalRef}>
-                        {logs.map((log, i) => (
-                            <div key={i} className={`ai-t-${log.type}`}>{log.text}</div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="ai-card">
-                    <div className="ai-sec-label" style={{ marginBottom: '14px' }}>Generated Files</div>
-                    <div className="ai-files-list">
-                        {files.length === 0 ? (
-                            <div className="ai-t-muted" style={{ fontSize: '11px' }}>No files yet. Generate your first MIDI!</div>
-                        ) : (
-                            files.map((f, i) => (
-                                <div
-                                    key={i}
-                                    className="ai-file-row"
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.setData('ai-midi', f);
-                                        e.dataTransfer.effectAllowed = 'copy';
-                                    }}
-                                >
-                                    <span className="ai-file-icon">{f.includes('lofi') ? '🌙' : '🔥'}</span>
-                                    <div className="ai-file-info">
-                                        <div className="ai-file-name">{f}</div>
-                                        <div className="ai-file-meta">{f.match(/(\d+)bpm/)?.[1] || '?'} BPM · MIDI</div>
-                                    </div>
-                                    <a className="ai-file-dl" href={getAiDownloadUrl(f)} download>↓ GET</a>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            </main>
+            {/* Result Preview (bottom strip) */}
+            <ResultPreview
+                notes={result?.notes}
+                midiBase64={result?.midi_base64}
+                duration={result?.duration_seconds}
+                onPlay={result ? handlePlay : null}
+                onImport={result ? handleImport : null}
+            />
         </div>
     );
 }

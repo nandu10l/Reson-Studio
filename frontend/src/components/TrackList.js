@@ -12,7 +12,7 @@ import audioPackSynth from '../audio/AudioPackSynth';
 import { audioEngine } from '../audio/AudioEngine';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample, onImportAiMidi }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -70,14 +70,6 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 
   const handleDrop = (e) => {
     e.preventDefault();
-    const aiMidiData = e.dataTransfer.getData('ai-midi');
-    if (aiMidiData) {
-      if (onImportAiMidi) {
-        onImportAiMidi(aiMidiData);
-        return;
-      }
-    }
-
     const pluginData = e.dataTransfer.getData('plugin');
     if (pluginData) {
       try {
@@ -749,7 +741,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor, onOpenPianoRoll }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab, importAiMidi } = useProject();
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab } = useProject();
   const [selected, setSelected] = useState(null);
   const [selectedClips, setSelectedClips] = useState([]); // Array of {trackId, clipIndex} for multi-selection
 
@@ -1478,7 +1470,6 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onSlice={handleSlice}
           onAddChannel={addChannel}
           onAddEffect={addEffect}
-          onImportAiMidi={importAiMidi}
         />
       ))}
 

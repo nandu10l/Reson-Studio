@@ -147,36 +147,6 @@ const ChordProgressionGenerator = ({ onClose, onAccept, channelId, initialBpm = 
                             <button className="solo-btn">Solo</button>
                         </div>
                         <div className="generate-group">
-                            <div className="toolbar-item">
-                                <span className="toolbar-label">Count</span>
-                                <input
-                                    className="toolbar-input"
-                                    type="number"
-                                    value={count}
-                                    onChange={(e) => setCount(parseInt(e.target.value) || 1)}
-                                />
-                            </div>
-                            <div className="toolbar-item">
-                                <span className="toolbar-label">Octave</span>
-                                <input
-                                    className="toolbar-input"
-                                    type="number"
-                                    value={octave}
-                                    onChange={(e) => setOctave(parseInt(e.target.value) || 1)}
-                                />
-                            </div>
-                            <div className="toolbar-item">
-                                <span className="toolbar-label">Length</span>
-                                <select
-                                    className="toolbar-input"
-                                    style={{ width: '60px' }}
-                                    value={length}
-                                    onChange={(e) => setLength(e.target.value)}
-                                >
-                                    <option>Bar</option>
-                                    <option>Beat</option>
-                                </select>
-                            </div>
                             <button className="settings-btn"><Settings size={14} /></button>
                             <button className="generate-btn" onClick={generateNotes}>Generate</button>
                             <button className="random-btn" onClick={generateNotes} title="Randomize progression"><RotateCcw size={14} /></button>
@@ -198,10 +168,42 @@ const ChordProgressionGenerator = ({ onClose, onAccept, channelId, initialBpm = 
                     </div>
                 </div>
 
-
+                {/* Sidebar */}
+                <div className="right-sidebar">
+                    <div className="sidebar-item">
+                        <span className="sidebar-label">Count</span>
+                        <input
+                            className="sidebar-input"
+                            type="number"
+                            value={count}
+                            onChange={(e) => setCount(parseInt(e.target.value) || 1)}
+                        />
+                    </div>
+                    <div className="sidebar-item">
+                        <span className="sidebar-label">Octave</span>
+                        <input
+                            className="sidebar-input"
+                            type="number"
+                            value={octave}
+                            onChange={(e) => setOctave(parseInt(e.target.value) || 1)}
+                        />
+                    </div>
+                    <div className="sidebar-item">
+                        <span className="sidebar-label">Length</span>
+                        <select
+                            className="sidebar-input"
+                            style={{ width: '60px' }}
+                            value={length}
+                            onChange={(e) => setLength(e.target.value)}
+                        >
+                            <option>Bar</option>
+                            <option>Beat</option>
+                        </select>
+                    </div>
+                </div>
 
                 {/* Main View */}
-                <div>
+                <div style={{ padding: '0 100px 0 0', position: 'relative' }}>
                     <div className="chord-display-area">
                         {progression.map((chord, i) => (
                             <div key={i} className="chord-block">
@@ -228,6 +230,14 @@ const ChordProgressionGenerator = ({ onClose, onAccept, channelId, initialBpm = 
                         className={`tab-btn ${activeTab === 'Presets' ? 'active' : ''}`}
                         onClick={() => setActiveTab('Presets')}
                     >Presets</button>
+                    <button
+                        className={`tab-btn ${activeTab === 'Performance' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('Performance')}
+                    >Performance</button>
+                    <button
+                        className={`tab-btn ${activeTab === 'Advanced' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('Advanced')}
+                    >Advanced</button>
                 </div>
 
                 <div className="tab-content">

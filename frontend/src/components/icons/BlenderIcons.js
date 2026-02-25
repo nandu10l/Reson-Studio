@@ -57,7 +57,6 @@ export const MousePointer2 = (props) => <BlenderIcon icon={LucideIcons.MousePoin
 export const Link = (props) => <BlenderIcon icon={LucideIcons.Link} {...props} />;
 export const Link2 = (props) => <BlenderIcon icon={LucideIcons.Link2} {...props} />;
 export const Target = (props) => <BlenderIcon icon={LucideIcons.Target} {...props} />;
-export const Sparkles = (props) => <BlenderIcon icon={LucideIcons.Sparkles} {...props} />;
 export const AlignCenter = (props) => <BlenderIcon icon={LucideIcons.AlignCenter} {...props} />;
 export const Volume2 = (props) => <BlenderIcon icon={LucideIcons.Volume2} {...props} />;
 export const VolumeX = (props) => <BlenderIcon icon={LucideIcons.VolumeX} {...props} />;
@@ -158,6 +157,5 @@ export default {
   BoxSelect,
   Speaker,
   MousePointer,
-  Piano,
-  Sparkles
+  Piano
 };

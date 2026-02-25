@@ -1059,8 +1059,8 @@ const PianoRoll = () => {
                     </div>
 
                     {/* Channel Selector */}
-                    <div className="piano-channel-selector-container">
-                        <span className="piano-channel-selector-label">Channel:</span>
+                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', marginLeft: '24px', gap: '12px' }}>
+                        <span style={{ fontSize: '11px', color: '#888' }}>Channel:</span>
                         <select
                             value={selectedChannelId}
                             onChange={(e) => {
@@ -1068,7 +1068,16 @@ const PianoRoll = () => {
                                 setSelectedChannelId(id);
                                 if (selectChannel) selectChannel(id);
                             }}
-                            className="piano-channel-select"
+                            style={{
+                                background: '#333',
+                                color: '#eee',
+                                border: '1px solid #444',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                padding: '2px 4px',
+                                outline: 'none',
+                                cursor: 'pointer'
+                            }}
                         >
                             {channels.map(ch => (
                                 <option key={ch.id} value={ch.id}>{ch.id}. {ch.name}</option>
