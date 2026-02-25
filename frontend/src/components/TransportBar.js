@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as Tone from 'tone';
 import {
   ListMusic, Piano, LayoutGrid, Sliders, Play, Pause, Stop, Circle,
-  Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2
+  Magnet, Pencil, Brush, Ban, VolumeX, ArrowRightLeft, Scissors, BoxSelect, Search, Volume2, Sparkles
 } from './icons/BlenderIcons';
 import PatternSelector from './PatternSelector';
 import MidifyDialog from './MidifyDialog';
@@ -298,10 +298,10 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
           <button
             className={`transport-view-btn ${activeWindows?.aiComposer ? 'active' : ''}`}
             onClick={() => onToggleWindow && onToggleWindow('aiComposer')}
-            title="AI Composer — Generate MIDI with the trained model"
+            title="AI Composer - Generate MIDI with the trained model"
             style={activeWindows?.aiComposer ? { borderColor: '#7c3aed', color: '#c4b5fd' } : {}}
           >
-            <span style={{ fontSize: 14 }}>✨</span>
+            <Sparkles size={20} className="blender-icon" />
             <span className="transport-view-label">AI</span>
           </button>
         </div>

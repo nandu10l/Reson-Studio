@@ -1,26 +1,67 @@
 const API_BASE = 'http://localhost:8000';
 
 /**
- * Generate music via the backend ML model.
- * @param {{ seedNotes: number[], numNotes: number, tempo: number, velocity: number, noteDuration: number }} params
- * @returns {Promise<{ midi_base64: string, notes: number[], duration_seconds: number }>}
+ * Generate MIDI via the new AI MIDI API.
  */
-export async function generateMusic({ seedNotes, numNotes, tempo, velocity, noteDuration }) {
-    const res = await fetch(`${API_BASE}/api/generate-music`, {
+export async function generateAiMidi(params) {
+    const res = await fetch(`${API_BASE}/api/ai-midi/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            seed_notes: seedNotes,
-            num_notes: numNotes,
-            tempo,
-            velocity,
-            duration: noteDuration,
-        }),
+        body: JSON.stringify(params),
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Server error ${res.status}`);
     }
+    return res.json();
+}
+
+/**
+ * Check the status of the AI model.
+ */
+export async function getAiStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/api/ai-midi/status`);
+        return await res.json();
+    } catch (e) {
+        return { ready: false, error: 'Server offline' };
+    }
+}
+
+/**
+ * List recently generated AI MIDI files.
+ */
+export async function listAiFiles() {
+    try {
+        const res = await fetch(`${API_BASE}/api/ai-midi/files`);
+        return await res.json();
+    } catch (e) {
+        return { files: [] };
+    }
+}
+
+/**
+ * Get the download URL for a specific file.
+ */
+export function getAiDownloadUrl(filename) {
+    return `${API_BASE}/api/ai-midi/download/${filename}`;
+}
+
+/**
+ * Legacy support for the old generate music endpoint.
+ */
+export async function generateMusic({ seed_notes, num_notes, tempo, velocity, duration }) {
+    const res = await fetch(`${API_BASE}/api/generate-music`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            seed_notes,
+            num_notes,
+            tempo,
+            velocity,
+            duration,
+        }),
+    });
     return res.json();
 }
 
@@ -40,9 +81,6 @@ export function downloadMidi(base64, filename = 'ai-generated.mid') {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Default C-major seed pattern (50 notes cycling C3–B3).
- */
 export const C_MAJOR_SEED = [
     60, 62, 64, 65, 67, 69, 71, 72, 71, 69,
     67, 65, 64, 62, 60, 62, 64, 65, 67, 64,
@@ -65,21 +103,4 @@ export const G_PENTATONIC_SEED = [
     55, 62, 64, 67, 64, 62, 59, 57, 55, 57,
     55, 59, 62, 59, 55, 57, 62, 64, 62, 57,
     55, 64, 62, 59, 57, 55, 57, 59, 62, 55,
-];
-
-export const GM_INSTRUMENTS = [
-    { value: 0, label: 'Acoustic Grand Piano' },
-    { value: 24, label: 'Acoustic Guitar (nylon)' },
-    { value: 25, label: 'Acoustic Guitar (steel)' },
-    { value: 30, label: 'Distortion Guitar' },
-    { value: 32, label: 'Acoustic Bass' },
-    { value: 40, label: 'Violin' },
-    { value: 48, label: 'String Ensemble 1' },
-    { value: 56, label: 'Trumpet' },
-    { value: 60, label: 'French Horn' },
-    { value: 68, label: 'Oboe' },
-    { value: 73, label: 'Flute' },
-    { value: 80, label: 'Square Lead' },
-    { value: 88, label: 'New Age Pad' },
-    { value: 118, label: 'Synth Drum' },
 ];
