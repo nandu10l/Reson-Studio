@@ -15,7 +15,8 @@ const PianoRoll = () => {
         activePattern, activePatternId, updatePattern, addNoteToActivePattern, removeNoteFromActivePattern,
         isPlaying, playheadPosition, setPlayheadPosition, updateNote, setActiveTool, activeTool, bpm,
         previewPianoNote, deleteNotes, togglePlayback, channels, addNotesToActivePattern,
-        pushNotesHistory, undoNotes, redoNotes, selectedChannelIds, selectChannel // Added selectedChannelIds/selectChannel
+        pushNotesHistory, undoNotes, redoNotes, selectedChannelIds, selectChannel,
+        clipboard, setClipboard // Added clipboard/setClipboard
     } = useProject();
 
     // Local State
@@ -42,9 +43,6 @@ const PianoRoll = () => {
     // Drag State
     // type: 'MOVE' | 'RESIZE' | 'SELECT' | 'CREATE'
     const [dragState, setDragState] = useState(null);
-
-    // Clipboard for copy/paste operations
-    const [clipboard, setClipboard] = useState([]);
 
     // Track mouse position in grid for paste operations
     const mouseGridPositionRef = useRef({ step: 0, key: null });
@@ -747,11 +745,16 @@ const PianoRoll = () => {
             return;
         }
 
-        // Ctrl+A - Select All
+        // Ctrl+A - Select All (Limited to current instrument)
         if (isCtrl && e.key.toLowerCase() === 'a') {
             e.preventDefault();
             if (activePattern?.data?.notes) {
-                setSelection(activePattern.data.notes.map(n => n.id));
+                // Only select notes that match the currently selected channel
+                const channelNotes = activePattern.data.notes.filter(n => {
+                    const noteChannelId = n.channelId !== undefined ? n.channelId : 0;
+                    return noteChannelId === selectedChannelId;
+                });
+                setSelection(channelNotes.map(n => n.id));
             }
             return;
         }
@@ -820,10 +823,11 @@ const PianoRoll = () => {
             const pasteStep = mouseGridPositionRef.current.step || Math.floor(playheadPosition * 4);
 
             // Create new notes with new IDs and adjusted positions
+            // CRITICAL: Set channelId to the currently selected channel in the Piano Roll!
             const newNotes = clipboard.map(n => ({
                 id: Date.now() + Math.random(),
                 noteName: n.noteName,
-                channelId: n.channelId,
+                channelId: selectedChannelId, // Always use current selection for cross-instrument paste
                 startStep: pasteStep + n.relativeStep,
                 length: n.length,
                 velocity: n.velocity || 100
