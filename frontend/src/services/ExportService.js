@@ -126,17 +126,19 @@ export async function audioBufferToMp3(audioBuffer) {
  */
 export function calculateProjectDuration(playlistTracks, patterns, audioClips = []) {
     let maxEndTime = 0;
+    const bpm = Tone.Transport.bpm.value || 120;
+    const beatsToSeconds = (beats) => beats * (60 / bpm);
 
     // Check pattern clips
     playlistTracks.forEach(track => {
         track.clips.forEach(clip => {
             if (clip.type === 'pattern' || !clip.type) {
                 const clipEndBeats = (clip.offset || 0) + (clip.length || 16);
-                const clipEndTime = Tone.Time(`${clipEndBeats}q`).toSeconds();
+                const clipEndTime = beatsToSeconds(clipEndBeats);
                 maxEndTime = Math.max(maxEndTime, clipEndTime);
             } else if (clip.type === 'audio') {
                 const clipEndBeats = (clip.offset || 0) + (clip.length || 0);
-                const clipEndTime = Tone.Time(`${clipEndBeats}q`).toSeconds();
+                const clipEndTime = beatsToSeconds(clipEndBeats);
                 maxEndTime = Math.max(maxEndTime, clipEndTime);
             }
         });

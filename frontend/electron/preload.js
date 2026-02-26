@@ -52,5 +52,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     readFile: (path) => ipcRenderer.invoke('read-file', path),
     // Audio export APIs
     saveAudioFile: (format) => ipcRenderer.invoke('save-audio-file', format),
-    saveAudioBuffer: (path, buffer) => ipcRenderer.invoke('save-audio-buffer', path, buffer)
+    saveAudioBuffer: (filePath, base64Data) => ipcRenderer.invoke('save-audio-buffer', filePath, base64Data),
+    // Project audio file management
+    ensureDir: (dirPath) => ipcRenderer.invoke('ensure-dir', dirPath),
+    readFileBinary: (filePath) => ipcRenderer.invoke('read-file-binary', filePath),
+    fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
+    pathJoin: (...parts) => ipcRenderer.invoke('path-join', ...parts)
 });

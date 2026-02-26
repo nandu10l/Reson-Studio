@@ -121,6 +121,73 @@ function Dashboard() {
     }
   };
 
+  // Apply edited audio back to the original audio clip (overwrite in-place)
+  const handleApplyChanges = (editedAudioBuffer) => {
+    if (!editingSample || !editedAudioBuffer) return;
+
+    try {
+      const originalId = editingSample.id;
+
+      // Convert AudioBuffer to WAV Blob/File
+      const wavBlob = audioBufferToWav(editedAudioBuffer);
+      const fileName = (editingSample.name || 'Edited Sample').replace(/\.wav$/i, '') + '.wav';
+      const file = new File([wavBlob], fileName, { type: 'audio/wav' });
+
+      // Generate new waveform data and compute new duration in beats
+      const waveform = generateWaveform(editedAudioBuffer, 2000);
+      const newDurationBeats = audioDurationToBeats(editedAudioBuffer, bpm);
+      const newUrl = URL.createObjectURL(wavBlob);
+
+      // Revoke old URL to prevent memory leaks
+      if (editingSample.url && editingSample.url.startsWith('blob:')) {
+        try { URL.revokeObjectURL(editingSample.url); } catch (_) {}
+      }
+
+      // Overwrite the audio clip in audioClips state
+      setAudioClips(prev => prev.map(ac => {
+        if (ac.id !== originalId) return ac;
+        return {
+          ...ac,
+          audioBuffer: editedAudioBuffer,
+          waveform: waveform,
+          duration: editedAudioBuffer.duration,
+          durationBeats: newDurationBeats,
+          sampleRate: editedAudioBuffer.sampleRate,
+          file: file,
+          url: newUrl
+        };
+      }));
+
+      // Update all playlist track clips that reference this audio clip
+      // (adjust length if audio duration changed)
+      setPlaylistTracks(prev => prev.map(track => ({
+        ...track,
+        clips: track.clips.map(clip => {
+          if (clip.type === 'audio' && clip.audioClipId === originalId) {
+            return { ...clip, length: newDurationBeats };
+          }
+          return clip;
+        })
+      })));
+
+      // Update the editingSample ref so the editor reflects the saved state
+      setEditingSample(prev => prev ? {
+        ...prev,
+        audioBuffer: editedAudioBuffer,
+        waveform: waveform,
+        duration: editedAudioBuffer.duration,
+        durationBeats: newDurationBeats,
+        sampleRate: editedAudioBuffer.sampleRate,
+        file: file,
+        url: newUrl
+      } : null);
+
+      console.log('Audio clip overwritten with edited version:', editingSample.name);
+    } catch (error) {
+      console.error('Error applying sample changes:', error);
+    }
+  };
+
   const [playing, setPlaying] = useState(false);
   const [selectedClip, setSelectedClip] = useState(null);
   const [view, setView] = useState('arrange'); // arrange | projects | settings | home
@@ -454,6 +521,7 @@ function Dashboard() {
               setEditingSample(null);
             }}
             onSave={handleSaveSample}
+            onApplyChanges={handleApplyChanges}
           />
         </DraggableWindow>
       )}

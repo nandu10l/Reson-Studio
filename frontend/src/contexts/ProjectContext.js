@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
-import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile, deserializeAudioBuffer, audioBufferToWav } from '../utils/audioImport';
+import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile, audioBufferToWav } from '../utils/audioImport';
 import * as Tone from 'tone';
 
 const ProjectContext = createContext();
@@ -72,9 +72,6 @@ export const ProjectProvider = ({ children }) => {
     // 9. Mixer Inserts (audio clips routed to mixer)
     const [mixerInserts, setMixerInserts] = useState([]);
 
-    // 10. Clipboard for copy/paste operations (global to allow cross-instrument/pattern)
-    const [clipboard, setClipboard] = useState([]);
-
     // 5. Picker Tab State (PAT/AUDIO/AUTO)
     const [pickerTab, setPickerTab] = useState('PAT');
 
@@ -103,7 +100,7 @@ export const ProjectProvider = ({ children }) => {
 
 
 
-    const loadProject = useCallback(async (data) => {
+    const loadProject = useCallback(async (data, projectFilePath) => {
         if (!data) return;
         try {
             if (data.patterns) setPatterns(data.patterns);
@@ -121,28 +118,68 @@ export const ProjectProvider = ({ children }) => {
             // Restore mixer inserts
             if (data.mixerInserts) setMixerInserts(data.mixerInserts);
 
-            // Restore audio clips from serialized data
-            if (data.audioClips && data.audioClips.length > 0) {
+            // Restore audio clips from companion audio folder
+            if (data.audioClips && data.audioClips.length > 0 && projectFilePath) {
+                const basePath = projectFilePath.replace(/\.[^.]+$/, ''); // strip extension
+                const audioDir = `${basePath}_audio`;
+
                 const restoredClips = [];
                 for (const serialized of data.audioClips) {
                     try {
-                        if (!serialized.audioData) {
-                            console.warn('Audio clip missing audio data:', serialized.name);
+                        const audioFileName = serialized.audioFileName;
+                        if (!audioFileName) {
+                            console.warn('Audio clip missing audioFileName:', serialized.name);
                             continue;
                         }
 
-                        // Decode base64 WAV back to AudioBuffer
-                        const audioBuffer = await deserializeAudioBuffer(serialized.audioData);
+                        // Build path using pathJoin for proper OS separator
+                        let audioFilePath;
+                        if (window.electronAPI?.pathJoin) {
+                            audioFilePath = await window.electronAPI.pathJoin(audioDir, audioFileName);
+                        } else {
+                            audioFilePath = `${audioDir}/${audioFileName}`;
+                        }
+
+                        // Check if file exists
+                        if (window.electronAPI?.fileExists) {
+                            const exists = await window.electronAPI.fileExists(audioFilePath);
+                            if (!exists) {
+                                console.warn('Audio file not found:', audioFilePath);
+                                continue;
+                            }
+                        }
+
+                        // Read the binary WAV file from disk (returns base64)
+                        if (!window.electronAPI?.readFileBinary) {
+                            console.warn('readFileBinary API not available');
+                            continue;
+                        }
+
+                        const fileResult = await window.electronAPI.readFileBinary(audioFilePath);
+                        if (!fileResult || !fileResult.success) {
+                            console.warn('Failed to read audio file:', audioFilePath, fileResult?.error);
+                            continue;
+                        }
+
+                        // Decode base64 back to ArrayBuffer
+                        const binaryString = atob(fileResult.data);
+                        const uint8Array = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            uint8Array[i] = binaryString.charCodeAt(i);
+                        }
+
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const audioBuffer = await audioContext.decodeAudioData(uint8Array.buffer.slice(0));
 
                         // Regenerate waveform from the AudioBuffer
                         const samplesPerSecond = 100;
                         const targetSamples = Math.max(2000, Math.floor(audioBuffer.duration * samplesPerSecond));
                         const waveform = generateWaveform(audioBuffer, targetSamples);
 
-                        // Recreate a File/Blob and blob URL for playback
-                        const wavBlob = audioBufferToWav(audioBuffer);
-                        const file = new File([wavBlob], serialized.fileName || 'audio.wav', { type: 'audio/wav' });
-                        const url = URL.createObjectURL(file);
+                        // Create File and blob URL for playback
+                        const blob = new Blob([uint8Array], { type: 'audio/wav' });
+                        const file = new File([blob], serialized.fileName || 'audio.wav', { type: 'audio/wav' });
+                        const url = URL.createObjectURL(blob);
 
                         // Recalculate durationBeats with the project's BPM
                         const projectBpm = data.bpm || 120;
@@ -1759,9 +1796,6 @@ export const ProjectProvider = ({ children }) => {
 
         // Mixer Inserts
         mixerInserts, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
-
-        // Clipboard
-        clipboard, setClipboard,
 
         // Audio Clips
         audioClips,

@@ -4,7 +4,7 @@ import NewProjectModal from './NewProjectModal';
 import { useProject } from '../contexts/ProjectContext';
 import { audioEngine } from '../audio/AudioEngine';
 import { exportWav, exportMp3, saveAudioBlob, getLastExportFormat, setLastExportFormat } from '../services/ExportService';
-import { serializeAudioBuffer } from '../utils/audioImport';
+import { audioBufferToWav } from '../utils/audioImport';
 import '../styles/blender-icons.css';
 import './Navbar.css';
 
@@ -54,55 +54,121 @@ function Navbar({
     };
   }, []);
 
-  const getProjectDataString = async () => {
-    // Serialize audio clips: convert AudioBuffers to base64 WAV data
-    const serializedAudioClips = await Promise.all(
-      audioClips.map(async (clip) => {
-        let audioData = null;
-        try {
-          if (clip.audioBuffer) {
-            audioData = await serializeAudioBuffer(clip.audioBuffer);
-          }
-        } catch (err) {
-          console.warn('Failed to serialize audio clip:', clip.name, err);
-        }
-        return {
-          id: clip.id,
-          fileName: clip.fileName,
-          name: clip.name,
-          audioData,
-          duration: clip.duration,
-          durationBeats: clip.durationBeats,
-          sampleRate: clip.sampleRate,
-          vol: clip.vol ?? 100,
-          pan: clip.pan ?? 50,
-          stemType: clip.stemType || null,
-          color: clip.color || null,
-          startOffset: clip.startOffset ?? 0,
-        };
-      })
-    );
+  // Build the JSON project data (audio files are saved externally)
+  const getProjectData = () => {
+    // Serialize audio clips metadata only (no audio data in JSON)
+    const serializedAudioClips = audioClips.map((clip) => {
+      // Use a safe filename based on clip id and original filename (always .wav)
+      const baseName = (clip.fileName || 'audio.wav').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const safeFileName = `${clip.id}_${baseName}.wav`;
+      return {
+        id: clip.id,
+        fileName: clip.fileName,
+        name: clip.name,
+        audioFileName: safeFileName, // relative name in the audio folder
+        duration: clip.duration,
+        durationBeats: clip.durationBeats,
+        sampleRate: clip.sampleRate,
+        vol: clip.vol ?? 100,
+        pan: clip.pan ?? 50,
+        stemType: clip.stemType || null,
+        color: clip.color || null,
+        startOffset: clip.startOffset ?? 0,
+      };
+    });
 
-    return JSON.stringify({
-      version: "1.1.0",
-      bpm,
-      activePatternId,
-      patterns,
-      channels,
-      playlistTracks,
-      audioClips: serializedAudioClips,
-      automations,
-      mixerInserts,
-    }, null, 2);
+    return {
+      json: JSON.stringify({
+        version: "1.2.0",
+        bpm,
+        activePatternId,
+        patterns,
+        channels,
+        playlistTracks,
+        audioClips: serializedAudioClips,
+        automations,
+        mixerInserts,
+      }, null, 2),
+      audioClipsMeta: serializedAudioClips,
+    };
+  };
+
+  // Helper: convert ArrayBuffer to base64 string in chunks (avoids call stack overflow)
+  const arrayBufferToBase64 = (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 32768;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode.apply(null, chunk);
+    }
+    return btoa(binary);
+  };
+
+  // Save audio clip WAV files to a companion folder next to the project file
+  const saveAudioFiles = async (projectFilePath) => {
+    if (!window.electronAPI?.ensureDir || !window.electronAPI?.saveAudioBuffer) return;
+    if (audioClips.length === 0) return;
+
+    // Create audio folder: <projectPath>_audio/
+    const basePath = projectFilePath.replace(/\.[^.]+$/, ''); // strip extension
+    const audioDir = `${basePath}_audio`;
+    const dirResult = await window.electronAPI.ensureDir(audioDir);
+    if (!dirResult?.success) {
+      console.error('Failed to create audio directory:', audioDir, dirResult?.error);
+      return;
+    }
+
+    for (const clip of audioClips) {
+      try {
+        if (!clip.audioBuffer) {
+          console.warn('Skipping clip with no audioBuffer:', clip.name);
+          continue;
+        }
+        // Build a safe filename: id + sanitized original name, always .wav extension
+        const baseName = (clip.fileName || 'audio.wav').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const safeFileName = `${clip.id}_${baseName}.wav`;
+
+        // Use pathJoin if available for proper OS path, otherwise simple concat
+        let filePath;
+        if (window.electronAPI.pathJoin) {
+          filePath = await window.electronAPI.pathJoin(audioDir, safeFileName);
+        } else {
+          filePath = `${audioDir}/${safeFileName}`;
+        }
+
+        // Check if file already exists to avoid rewriting unchanged clips
+        const exists = await window.electronAPI.fileExists(filePath);
+        if (exists) {
+          console.log('Audio file already exists, skipping:', filePath);
+          continue;
+        }
+
+        // Convert AudioBuffer to WAV blob, then to base64 for safe IPC transfer
+        const wavBlob = audioBufferToWav(clip.audioBuffer);
+        const arrayBuf = await wavBlob.arrayBuffer();
+        const base64Data = arrayBufferToBase64(arrayBuf);
+
+        const saveResult = await window.electronAPI.saveAudioBuffer(filePath, base64Data);
+        if (saveResult?.success) {
+          console.log('Saved audio file:', filePath);
+        } else {
+          console.error('Failed to write audio file:', filePath, saveResult?.error);
+        }
+      } catch (err) {
+        console.warn('Failed to save audio clip:', clip.name, err);
+      }
+    }
   };
 
   const handleSave = async () => {
     if (!window.electronAPI) return;
 
     if (currentProjectPath) {
-      const data = await getProjectDataString();
-      const result = await window.electronAPI.saveFileSilent(currentProjectPath, data);
+      const { json } = getProjectData();
+      const result = await window.electronAPI.saveFileSilent(currentProjectPath, json);
       if (result && result.success) {
+        await saveAudioFiles(currentProjectPath);
         console.log("Project saved to:", currentProjectPath);
       }
     } else {
@@ -112,10 +178,11 @@ function Navbar({
 
   const handleSaveAs = async () => {
     if (!window.electronAPI?.saveFile) return;
-    const data = await getProjectDataString();
-    const result = await window.electronAPI.saveFile(data);
+    const { json } = getProjectData();
+    const result = await window.electronAPI.saveFile(json);
     if (result && result.success) {
       setCurrentProjectPath(result.filePath);
+      await saveAudioFiles(result.filePath);
       console.log("Project saved as:", result.filePath);
       document.title = `Reson Studio - ${result.filePath.split(/[\\/]/).pop()}`;
     }
@@ -139,10 +206,11 @@ function Navbar({
       newPath = `${base}_2.${ext}`;
     }
 
-    const data = await getProjectDataString();
-    const result = await window.electronAPI.saveFileSilent(newPath, data);
+    const { json } = getProjectData();
+    const result = await window.electronAPI.saveFileSilent(newPath, json);
     if (result && result.success) {
       setCurrentProjectPath(newPath);
+      await saveAudioFiles(newPath);
       console.log("New version saved:", newPath);
       document.title = `Reson Studio - ${newPath.split(/[\\/]/).pop()}`;
     }
@@ -168,7 +236,7 @@ function Navbar({
           if (result && result.success) {
             try {
               const projectData = JSON.parse(result.content);
-              await loadProject(projectData);
+              await loadProject(projectData, filePath);
               setCurrentProjectPath(filePath);
               document.title = `Reson Studio - ${filePath.split(/[\\/]/).pop()}`;
             } catch (e) {
