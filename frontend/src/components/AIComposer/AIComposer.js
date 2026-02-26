@@ -2,8 +2,9 @@ import React, { useState, useCallback } from 'react';
 import SeedEditor from './SeedEditor';
 import GenerationControls from './GenerationControls';
 import ResultPreview from './ResultPreview';
-import { generateMusic, C_MAJOR_SEED } from '../../services/aiComposerService';
+import { generateMusic, getGeneratedHistory, getHistoryItem, C_MAJOR_SEED } from '../../services/aiComposerService';
 import { audioEngine } from '../../audio/AudioEngine';
+import * as Tone from 'tone';
 import './AIComposer.css';
 
 const DEFAULT_PARAMS = {
@@ -19,7 +20,30 @@ export default function AIComposer({ onImport }) {
     const [params, setParams] = useState(DEFAULT_PARAMS);
     const [isGenerating, setIsGenerating] = useState(false);
     const [result, setResult] = useState(null); // { notes, midiBase64, duration_seconds }
+    const [history, setHistory] = useState([]);
     const [error, setError] = useState(null);
+
+    const loadHistory = useCallback(async () => {
+        try {
+            const data = await getGeneratedHistory();
+            setHistory(data.files || []);
+        } catch (err) {
+            console.error('Failed to load history:', err);
+        }
+    }, []);
+
+    React.useEffect(() => {
+        loadHistory();
+    }, [loadHistory]);
+
+    const handleSelectHistoryItem = async (item) => {
+        try {
+            const data = await getHistoryItem(item.filename);
+            setResult({ ...data, filename: item.filename });
+        } catch (err) {
+            setError('Failed to load history item');
+        }
+    };
 
     const handleGenerate = useCallback(async () => {
         setIsGenerating(true);
@@ -33,6 +57,7 @@ export default function AIComposer({ onImport }) {
                 noteDuration: params.noteDuration,
             });
             setResult(data);
+            loadHistory(); // Refresh list
         } catch (err) {
             setError(err.message || 'Generation failed — is the backend running?');
         } finally {
@@ -44,25 +69,42 @@ export default function AIComposer({ onImport }) {
     const handlePlay = useCallback(async () => {
         if (!result?.notes?.length) return;
         try {
-            const ctx = audioEngine.context || new (window.AudioContext || window.webkitAudioContext)();
-            if (ctx.state === 'suspended') await ctx.resume();
+            // Use the global Tone.js context to avoid conflicts/crashes on multiple generations
+            await audioEngine.init();
+            const toneCtx = Tone.getContext();
+            const ctx = toneCtx.rawContext;
 
-            let time = ctx.currentTime + 0.05;
-            const dur = params.noteDuration;
+            if (toneCtx.state === 'suspended') await toneCtx.resume();
 
-            result.notes.forEach((midi) => {
+            const startTime = ctx.currentTime + 0.05;
+            const stepDuration = 15 / params.tempo;
+
+            const masterGain = audioEngine.getMasterGain();
+
+            result.notes.forEach((midi, i) => {
+                const time = startTime + i * stepDuration;
+                const dur = Math.max(0.05, stepDuration * 0.9);
+
                 const freq = 440 * Math.pow(2, (midi - 69) / 12);
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
                 osc.type = 'triangle';
                 osc.frequency.value = freq;
-                gain.gain.setValueAtTime(params.velocity / 127 * 0.3, time);
+
+                const velocity = params.velocity || 80;
+                gain.gain.setValueAtTime(velocity / 127 * 0.3, time);
                 gain.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.9);
+
                 osc.connect(gain);
-                gain.connect(ctx.destination);
+                // Connect to audioEngine's master gain so it respects global volume
+                if (masterGain && masterGain.input) {
+                    gain.connect(masterGain.input);
+                } else {
+                    gain.connect(ctx.destination);
+                }
+
                 osc.start(time);
                 osc.stop(time + dur);
-                time += dur;
             });
         } catch (e) {
             console.error('Preview playback failed:', e);
@@ -72,13 +114,26 @@ export default function AIComposer({ onImport }) {
     // Import notes into Piano Roll as MIDI notes
     const handleImport = useCallback((notes) => {
         if (onImport) {
-            const dur = params.noteDuration;
-            const midiNotes = notes.map((pitch, i) => ({
-                pitch,
-                startBeat: i * dur * (params.tempo / 60),
-                duration: dur * (params.tempo / 60) * 0.9,
-                velocity: params.velocity,
-            }));
+            const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+            const midiNotes = notes.map((pitch, i) => {
+                const octave = Math.floor(pitch / 12) - 1;
+                const noteName = `${NOTES[pitch % 12]}${octave}`;
+
+                // Convert to steps (16th notes)
+                // Each note in this simplified version is 1 step long by default
+                const startStep = i;
+                const length = 1;
+
+                return {
+                    id: `ai-${Date.now()}-${i}`,
+                    pitch,
+                    noteName,
+                    startStep,
+                    length,
+                    velocity: params.velocity || 80,
+                };
+            });
             onImport(midiNotes);
         } else {
             alert('Open the Piano Roll first, then import.');
@@ -97,7 +152,33 @@ export default function AIComposer({ onImport }) {
 
             {/* Body */}
             <div className="ai-composer-body">
-                {/* Left column: Seed Editor */}
+                {/* Left column: History Workspace */}
+                <div className="ai-composer-workspace">
+                    <div className="ai-section-label">History Workspace</div>
+                    <div className="ai-history-list">
+                        {history.length === 0 ? (
+                            <div className="ai-history-empty">No history yet</div>
+                        ) : (
+                            history.map((item, idx) => (
+                                <div
+                                    key={item.filename}
+                                    className={`ai-history-item ${result?.filename === item.filename ? 'active' : ''}`}
+                                    onClick={() => handleSelectHistoryItem(item)}
+                                >
+                                    <div className="ai-history-item-icon">🎵</div>
+                                    <div className="ai-history-item-info">
+                                        <div className="ai-history-item-name">Generation {history.length - idx}</div>
+                                        <div className="ai-history-item-date">
+                                            {new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Middle column: Seed Editor */}
                 <div className="ai-composer-left">
                     <div className="ai-section-label">Seed Notes (50)</div>
                     <SeedEditor seedNotes={seedNotes} onChange={setSeedNotes} />

@@ -2,6 +2,8 @@ import os
 import io
 import uuid
 import base64
+import json
+import time
 import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -30,7 +32,7 @@ def _get_model():
                 raise FileNotFoundError(
                     f"Model not found. Set MUSIC_MODEL_PATH env var, or place music_model.h5 in ai_models/ or D:\\Logiv\\"
                 )
-            _model = tf.keras.models.load_model(model_path)
+            _model = tf.keras.models.load_model(model_path, compile=False)
         except ImportError:
             raise HTTPException(status_code=500, detail="TensorFlow not installed — run: pip install tensorflow")
         except FileNotFoundError as e:
@@ -175,15 +177,83 @@ async def generate_music(req: GenerateMusicRequest):
     # Save temp file (optional, for debugging)
     temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
     os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, f"generated_{uuid.uuid4().hex[:8]}.mid")
+    fid = f"generated_{uuid.uuid4().hex[:8]}"
+    temp_path = os.path.join(temp_dir, f"{fid}.mid")
+    js_path = os.path.join(temp_dir, f"{fid}.json")
+    
     with open(temp_path, 'wb') as f:
         f.write(midi_bytes)
 
-    midi_b64 = base64.b64encode(midi_bytes).decode('utf-8')
     duration_seconds = len(generated_notes) * req.duration
+
+    # Save metadata for history workspace
+    with open(js_path, 'w') as f:
+        json.dump({
+            "notes": generated_notes, 
+            "duration_seconds": duration_seconds,
+            "params": req.dict(),
+            "timestamp": time.time()
+        }, f)
+
+    midi_b64 = base64.b64encode(midi_bytes).decode('utf-8')
 
     return GenerateMusicResponse(
         midi_base64=midi_b64,
         notes=generated_notes,
+        duration_seconds=duration_seconds,
+    )
+
+
+# ── History endpoints ─────────────────────────────────────────────────────────
+@router.get("/generated-history")
+async def get_generated_history():
+    temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+    if not os.path.exists(temp_dir):
+        return {"files": []}
+    files = []
+    for fn in os.listdir(temp_dir):
+        if fn.endswith(".mid") and fn.startswith("generated_"):
+            path = os.path.join(temp_dir, fn)
+            files.append({
+                "filename": fn,
+                "timestamp": os.path.getmtime(path),
+                "size": os.path.getsize(path)
+            })
+    # Sort by recent
+    files.sort(key=lambda x: x["timestamp"], reverse=True)
+    return {"files": files}
+
+
+class HistoryItemResponse(BaseModel):
+    midi_base64: str
+    notes: List[int]
+    duration_seconds: float
+
+
+@router.get("/generated-history/{filename}", response_model=HistoryItemResponse)
+async def get_history_item(filename: str):
+    if not filename.endswith(".mid") or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+    path = os.path.join(temp_dir, filename)
+    js_path = os.path.join(temp_dir, filename.replace(".mid", ".json"))
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    with open(path, 'rb') as f:
+        midi_bytes = f.read()
+
+    notes, duration_seconds = [], 0.0
+    if os.path.exists(js_path):
+        with open(js_path) as f:
+            data = json.load(f)
+            notes = data.get("notes", [])
+            duration_seconds = data.get("duration_seconds", 0.0)
+
+    return HistoryItemResponse(
+        midi_base64=base64.b64encode(midi_bytes).decode('utf-8'),
+        notes=notes,
         duration_seconds=duration_seconds,
     )

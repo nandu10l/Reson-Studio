@@ -25,6 +25,27 @@ export async function generateMusic({ seedNotes, numNotes, tempo, velocity, note
 }
 
 /**
+ * Fetch the list of generated MIDI files from the server.
+ * @returns {Promise<{ files: Array<{ filename: string, timestamp: number, size: number }> }>}
+ */
+export async function getGeneratedHistory() {
+    const res = await fetch(`${API_BASE}/api/generated-history`);
+    if (!res.ok) throw new Error('Failed to fetch generation history');
+    return res.json();
+}
+
+/**
+ * Fetch a specific history item's data (notes, midi base64).
+ * @param {string} filename 
+ * @returns {Promise<{ midi_base64: string, notes: number[], duration_seconds: number }>}
+ */
+export async function getHistoryItem(filename) {
+    const res = await fetch(`${API_BASE}/api/generated-history/${filename}`);
+    if (!res.ok) throw new Error('Failed to load history item');
+    return res.json();
+}
+
+/**
  * Trigger a browser download of a MIDI file from a base64 string.
  */
 export function downloadMidi(base64, filename = 'ai-generated.mid') {

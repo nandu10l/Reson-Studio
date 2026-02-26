@@ -129,8 +129,7 @@ export default function AIMusicGenerator() {
     } = useProject();
 
     // State
-    const [prompt, setPrompt] = useState('');
-    const [bpm, setBpm] = useState(90);
+    const [prompt, setPrompt] = useState(''); const [bpm, setBpm] = useState(90);
     const [temperature, setTemperature] = useState(1.0);
     const [status, setStatus] = useState('idle');
     const [errorMessage, setErrorMessage] = useState('');
@@ -139,6 +138,53 @@ export default function AIMusicGenerator() {
     const [elapsed, setElapsed] = useState(0);
     const [isDownloadingMidi, setIsDownloadingMidi] = useState(false);
     const [isAddingToTrack, setIsAddingToTrack] = useState(false);
+    const [history, setHistory] = useState([]);
+    const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+
+    const loadHistory = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/lyria-history`);
+            if (res.ok) {
+                const data = await res.json();
+                setHistory(data.files || []);
+            }
+        } catch (err) {
+            console.error('Failed to load history:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadHistory();
+    }, [loadHistory]);
+
+    const handleSelectHistoryItem = async (item) => {
+        try {
+            setSelectedHistoryItem(item.filename);
+            const res = await fetch(`${API_BASE}/lyria-history/${item.filename}`);
+            if (!res.ok) throw new Error('Failed to load history item');
+            const data = await res.json();
+
+            // Set prompt and params from meta
+            if (data.meta) {
+                setPrompt(data.meta.prompt || '');
+                setBpm(data.meta.bpm || 90);
+                setTemperature(data.meta.temperature || 1.0);
+            }
+
+            // Load audio from base64
+            const binaryStr = atob(data.audio_base64);
+            const pcmBytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {
+                pcmBytes[i] = binaryStr.charCodeAt(i);
+            }
+            accumulatedChunksRef.current = [pcmBytes];
+            setStatus('stopped');
+            setElapsed(0);
+        } catch (err) {
+            setErrorMessage('Failed to load history item');
+            setStatus('error');
+        }
+    };
 
     // Refs
     const wsRef = useRef(null);
@@ -610,6 +656,7 @@ export default function AIMusicGenerator() {
             if (isGeneratingRef.current) {
                 isGeneratingRef.current = false;
                 setStatus(prev => (prev === 'error' ? prev : 'stopped'));
+                loadHistory(); // Refresh history after generation
             }
         };
     }, [prompt, bpm, temperature, getAudioContext, handleAudioChunk]);
@@ -659,6 +706,33 @@ export default function AIMusicGenerator() {
 
             {/* Body */}
             <div className="music-gen-body">
+                {/* Left column: History Workspace */}
+                <div className="music-gen-workspace">
+                    <div className="mg-section-label">History Workspace</div>
+                    <div className="mg-history-list">
+                        {history.length === 0 ? (
+                            <div className="mg-history-empty">No history yet</div>
+                        ) : (
+                            history.map((item, idx) => (
+                                <div
+                                    key={item.filename}
+                                    className={`mg-history-item ${selectedHistoryItem === item.filename ? 'active' : ''}`}
+                                    onClick={() => handleSelectHistoryItem(item)}
+                                >
+                                    <div className="mg-history-item-icon">⚡</div>
+                                    <div className="mg-history-item-info">
+                                        <div className="mg-history-item-name">Generation {history.length - idx}</div>
+                                        <div className="mg-history-item-date">
+                                            {new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* Middle column: Prompt & Presets */}
                 <div className="music-gen-left">
                     <div className="mg-section-label">Prompt</div>
                     <div className="mg-prompt-wrapper">
@@ -698,6 +772,7 @@ export default function AIMusicGenerator() {
                     )}
                 </div>
 
+                {/* Right column: Controls */}
                 <div className="music-gen-right">
                     <div className="mg-section-label">Controls</div>
                     <div className="mg-slider-group">
