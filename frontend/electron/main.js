@@ -186,15 +186,54 @@ ipcMain.handle('save-audio-file', async (event, format) => {
     return { success: true, filePath };
 });
 
-// Save binary audio buffer to file
-ipcMain.handle('save-audio-buffer', async (event, filePath, bufferArray) => {
+// Save binary audio buffer to file (receives base64 string)
+ipcMain.handle('save-audio-buffer', async (event, filePath, base64Data) => {
     try {
-        const buffer = Buffer.from(bufferArray);
-        fs.writeFileSync(filePath, buffer);
-        return { success: true, filePath };
+        const normalizedPath = path.normalize(filePath);
+        const buffer = Buffer.from(base64Data, 'base64');
+        fs.writeFileSync(normalizedPath, buffer);
+        return { success: true, filePath: normalizedPath };
     } catch (e) {
         return { success: false, error: e.message };
     }
+});
+
+// Ensure a directory exists (recursive mkdir)
+ipcMain.handle('ensure-dir', async (event, dirPath) => {
+    try {
+        const normalizedPath = path.normalize(dirPath);
+        fs.mkdirSync(normalizedPath, { recursive: true });
+        return { success: true, path: normalizedPath };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Read a binary file and return as base64 string
+ipcMain.handle('read-file-binary', async (event, filePath) => {
+    try {
+        const normalizedPath = path.normalize(filePath);
+        const buffer = fs.readFileSync(normalizedPath);
+        // Return as base64 string — efficient and safe for IPC transfer
+        return { success: true, data: buffer.toString('base64') };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Check if a file exists
+ipcMain.handle('file-exists', async (event, filePath) => {
+    try {
+        const normalizedPath = path.normalize(filePath);
+        return fs.existsSync(normalizedPath);
+    } catch (e) {
+        return false;
+    }
+});
+
+// Resolve a path using path.join (so renderer doesn't need to know OS separator)
+ipcMain.handle('path-join', async (event, ...parts) => {
+    return path.join(...parts);
 });
 
 // This method will be called when Electron has finished

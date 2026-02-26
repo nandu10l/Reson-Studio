@@ -13,7 +13,7 @@ import './SampleEditor.css';
  * SampleEditor Component - Edison-style audio sample editor
  * Provides waveform visualization, selection, and editing tools
  */
-export default function SampleEditor({ audioClip, onClose, onSave }) {
+export default function SampleEditor({ audioClip, onClose, onSave, onApplyChanges }) {
     // Audio state
     const [audioBuffer, setAudioBuffer] = useState(null);
     const [waveformData, setWaveformData] = useState({ left: [], right: [] });
@@ -21,6 +21,7 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     const [isLooping, setIsLooping] = useState(false);
     const [playbackPosition, setPlaybackPosition] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [hasChanges, setHasChanges] = useState(false);
 
     // Selection state
     const [selection, setSelection] = useState({ start: 0, end: 0 });
@@ -1178,6 +1179,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         }
     };
 
+    // Apply changes — overwrite original audio clip with edited buffer
+    const handleApplyChanges = () => {
+        if (!audioBuffer || !hasChanges) return;
+
+        if (onApplyChanges) {
+            onApplyChanges(audioBuffer);
+            setHasChanges(false);
+        }
+    };
+
     // Helper: Convert AudioBuffer to WAV Blob
     const audioBufferToWav = (buffer) => {
         const numChannels = buffer.numberOfChannels;
@@ -1249,6 +1260,7 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         setAudioBuffer(newBuffer);
         setDuration(newBuffer.duration);
         generateWaveformData(newBuffer);
+        setHasChanges(true);
     };
 
     const handleUndo = () => {
@@ -1645,6 +1657,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                         title="Scroll Position"
                     />
                 )}
+
+                {/* Apply Changes Button */}
+                <button
+                    className={`apply-changes-btn ${hasChanges ? 'has-changes' : ''}`}
+                    onClick={handleApplyChanges}
+                    disabled={!hasChanges || isProcessing}
+                    title={hasChanges ? 'Apply edits to the original audio clip' : 'No changes to apply'}
+                >
+                    {isProcessing ? 'Processing...' : hasChanges ? '✓ Apply Changes' : 'No Changes'}
+                </button>
             </div>
         </div>
     );
