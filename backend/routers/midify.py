@@ -58,7 +58,8 @@ model_output, midi_data, note_events = predict(
     onset_threshold=onset_threshold,
     frame_threshold=frame_threshold,
     minimum_note_length=min_note_len,
-    midi_tempo=bpm
+    midi_tempo=bpm,
+    melodia_trick=True
 )
 
 # note_events: list of (start_time_s, end_time_s, midi_pitch, velocity, confidence)
@@ -84,135 +85,157 @@ with open(output_path, "w") as f:
 '''
 
 
-@router.post("/convert")
-async def convert_audio_to_midi(
-    file: UploadFile = File(...),
-    bpm: int = Query(120, description="Project BPM for beat-based timing"),
-    onset_threshold: float = Query(0.5, description="Note onset confidence threshold (0-1)"),
-    frame_threshold: float = Query(0.3, description="Frame activation threshold (0-1)"),
-    min_note_length_ms: int = Query(58, description="Minimum note duration in milliseconds")
-):
-    """
-    Analyze audio and convert to MIDI note data using Spotify's Basic Pitch.
-    Runs via Python 3.10 subprocess for compatibility.
-    """
+# ── MIDI Byte Packing Helper (Reused from generate_music.py) ──────────────────
+def build_midi_binary(notes: List[Dict[str, Any]], tempo_bpm: int) -> bytes:
+    """Build a standard MIDI file (type 0) from note data."""
+    def var_len(value: int) -> bytes:
+        result = [value & 0x7F]
+        value >>= 7
+        while value:
+            result.append((value & 0x7F) | 0x80)
+            value >>= 7
+        return bytes(reversed(result))
+
+    def pack_be(value: int, n_bytes: int) -> bytes:
+        return value.to_bytes(n_bytes, 'big')
+
+    microseconds_per_beat = int(60_000_000 / tempo_bpm)
+    ticks_per_beat = 480
+    
+    track_events = bytearray()
+    # Set tempo
+    track_events += b'\x00\xff\x51\x03'
+    track_events += microseconds_per_beat.to_bytes(3, 'big')
+    # Default instrument (Grand Piano)
+    track_events += b'\x00\xc0\x00'
+
+    last_tick = 0
+    # Basic Pitch notes are already sorted by start time
+    for n in notes:
+        start_tick = int(n["start"] * ticks_per_beat)
+        duration_ticks = int(n["duration"] * ticks_per_beat)
+        pitch = max(0, min(127, n["note"]))
+        velocity = int(n["velocity"] * 100)
+
+        # Delta time since last event
+        delta_on = start_tick - last_tick
+        track_events += var_len(max(0, delta_on)) + bytes([0x90, pitch, velocity])
+        
+        # Note Off (using 0x80 or 0x90 with velocity 0)
+        track_events += var_len(duration_ticks) + bytes([0x80, pitch, 0])
+        last_tick = start_tick + duration_ticks
+
+    # End of track
+    track_events += b'\x00\xff\x2f\x00'
+
+    track_bytes = bytes(track_events)
+    header = b'MThd' + pack_be(6, 4) + pack_be(0, 2) + pack_be(1, 2) + pack_be(ticks_per_beat, 2)
+    track_chunk = b'MTrk' + pack_be(len(track_bytes), 4) + track_bytes
+    return header + track_chunk
+
+
+async def _perform_midify_analysis(file: UploadFile, bpm: int, onset_threshold: float, frame_threshold: float, min_note_length_ms: int):
+    """Core logic for running basic-pitch analysis."""
     temp_path = None
     script_path = None
     output_path = None
     try:
-        # Save uploaded file to temp location
         content = await file.read()
         suffix = os.path.splitext(file.filename)[1] or '.wav'
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(content)
             temp_path = tmp.name
 
-        # Write the script to a temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.py', mode='w') as sf:
             sf.write(BASIC_PITCH_SCRIPT)
             script_path = sf.name
 
-        # Create temp output file for JSON results
         with tempfile.NamedTemporaryFile(delete=False, suffix='.json', mode='w') as of:
             output_path = of.name
 
-        # Run basic-pitch via Python 3.10 with TF warnings suppressed
         env = os.environ.copy()
         env["TF_CPP_MIN_LOG_LEVEL"] = "3"
         env["TF_ENABLE_ONEDNN_OPTS"] = "0"
         env["PYTHONWARNINGS"] = "ignore"
 
         result = subprocess.run(
-            [
-                "py", "-3.10", script_path,
-                temp_path,
-                str(bpm),
-                str(onset_threshold),
-                str(frame_threshold),
-                str(min_note_length_ms),
-                output_path
-            ],
-            capture_output=True,
-            text=True,
-            timeout=300,  # 5 min — first run loads the neural network model
-            env=env
+            ["py", "-3.10", script_path, temp_path, str(bpm), str(onset_threshold), str(frame_threshold), str(min_note_length_ms), output_path],
+            capture_output=True, text=True, timeout=300, env=env
         )
 
         if result.returncode != 0:
-            print(f"Basic Pitch stderr: {result.stderr}")
-            print(f"Basic Pitch stdout: {result.stdout}")
-            raise Exception(f"Basic Pitch process exited with code {result.returncode}: {result.stderr[-300:]}")
+            raise Exception(f"Basic Pitch failed: {result.stderr[-300:]}")
 
-        # Read JSON from output file (avoids stdout pollution from TF logs)
         with open(output_path, 'r') as f:
             data = json.load(f)
 
-        # Convert to beat-positioned notes
         beats_per_second = bpm / 60.0
         output_notes = []
-
         for event in data["notes"]:
-            start_sec = event["start_sec"]
-            end_sec = event["end_sec"]
-            midi_pitch = event["midi_pitch"]
-            velocity = event["velocity"]
-
-            duration_sec = end_sec - start_sec
-            if duration_sec < (min_note_length_ms / 1000.0):
-                continue
-
-            start_beat = start_sec * beats_per_second
+            duration_sec = event["end_sec"] - event["start_sec"]
+            if duration_sec < (min_note_length_ms / 1000.0): continue
+            start_beat = event["start_sec"] * beats_per_second
             duration_beats = duration_sec * beats_per_second
-
             output_notes.append({
-                "note": midi_pitch,
-                "noteName": midi_note_to_name(midi_pitch),
+                "note": event["midi_pitch"],
+                "noteName": midi_note_to_name(event["midi_pitch"]),
                 "start": round(start_beat, 4),
-                "duration": round(max(duration_beats, 0.25), 4),
-                "velocity": round(min(velocity, 1.0), 3)
+                "duration": round(duration_beats, 4),
+                "velocity": round(min(event["velocity"], 1.0), 3)
             })
-
-        # Sort by start time
         output_notes.sort(key=lambda n: n["start"])
-
-        return {
-            "success": True,
-            "filename": file.filename,
-            "duration_seconds": round(data.get("duration", 0), 2),
-            "notes_detected": len(output_notes),
-            "notes": output_notes,
-            "settings": {
-                "engine": "basic-pitch (Spotify)",
-                "onset_threshold": onset_threshold,
-                "frame_threshold": frame_threshold,
-                "min_note_length_ms": min_note_length_ms,
-                "bpm": bpm
-            }
-        }
-
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=500, detail="Midify timed out. Try a shorter audio clip.")
-    except FileNotFoundError:
-        raise HTTPException(
-            status_code=500,
-            detail="Python 3.10 not found. Install basic-pitch with: py -3.10 -m pip install basic-pitch"
-        )
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse Basic Pitch output: {str(e)}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Midify error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Audio to MIDI conversion failed: {str(e)}")
+        return {"notes": output_notes, "duration": data.get("duration", 0)}
     finally:
         for path in [temp_path, script_path, output_path]:
             if path and os.path.exists(path):
-                try:
-                    os.unlink(path)
-                except:
-                    pass
+                try: os.unlink(path)
+                except: pass
+
+
+@router.post("/convert")
+async def convert_audio_to_midi(
+    file: UploadFile = File(...),
+    bpm: int = Query(120),
+    onset_threshold: float = Query(0.3),
+    frame_threshold: float = Query(0.15),
+    min_note_length_ms: int = Query(30)
+):
+    try:
+        data = await _perform_midify_analysis(file, bpm, onset_threshold, frame_threshold, min_note_length_ms)
+        return {
+            "success": True,
+            "filename": file.filename,
+            "duration_seconds": round(data["duration"], 2),
+            "notes_detected": len(data["notes"]),
+            "notes": data["notes"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/convert-to-midi-file")
+async def convert_to_midi_file(
+    file: UploadFile = File(...),
+    bpm: int = Query(120),
+    onset_threshold: float = Query(0.5),
+    frame_threshold: float = Query(0.3),
+    min_note_length_ms: int = Query(58)
+):
+    """Transcription to binary .mid file download."""
+    try:
+        data = await _perform_midify_analysis(file, bpm, onset_threshold, frame_threshold, min_note_length_ms)
+        midi_bytes = build_midi_binary(data["notes"], bpm)
+        
+        from fastapi.responses import Response
+        filename = os.path.splitext(file.filename)[0] + ".mid"
+        return Response(
+            content=midi_bytes,
+            media_type="audio/midi",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/health")

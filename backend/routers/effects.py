@@ -79,46 +79,116 @@ async def effects_health():
     return {"status": "ok", "service": "effects-processing"}
 
 
+def _build_reverb_ir(sample_rate: int, decay: float, seed: int = 42) -> np.ndarray:
+    """
+    Build a synthetic room impulse response with early reflections + late
+    diffuse tail.  This produces an audible, realistic reverb.
+
+    Args:
+        sample_rate: Audio sample rate (e.g. 44100)
+        decay: Reverb tail length in seconds
+        seed: RNG seed for reproducible noise
+
+    Returns:
+        1-D float64 impulse response array
+    """
+    rng = np.random.default_rng(seed)
+
+    # --- 1. Early reflections (sparse taps) ---
+    er_times_ms = [12, 19, 26, 33, 41, 53, 67, 82, 97]  # typical small-room pattern
+    er_gains    = [0.75, 0.68, 0.55, 0.48, 0.40, 0.32, 0.25, 0.18, 0.12]
+    er_end_ms   = 100  # early reflections span
+    er_length   = int(er_end_ms / 1000 * sample_rate)
+
+    er = np.zeros(er_length, dtype=np.float64)
+    er[0] = 1.0  # direct impulse
+    for t_ms, g in zip(er_times_ms, er_gains):
+        idx = int(t_ms / 1000 * sample_rate)
+        if idx < er_length:
+            er[idx] += g * (1 if rng.random() > 0.5 else -1)  # random polarity
+
+    # --- 2. Late diffuse tail (shaped noise) ---
+    tail_length = int(decay * sample_rate)
+    t = np.arange(tail_length, dtype=np.float64)
+
+    # RT60 envelope: amplitude that decays to -60 dB over `decay` seconds
+    envelope = np.power(10.0, -3.0 * t / (decay * sample_rate))
+    # Gaussian noise shaped by envelope
+    noise = rng.standard_normal(tail_length) * envelope
+    # Scale so the tail start amplitude is below the early reflections
+    noise *= 0.35
+
+    # --- 3. Combine early + late ---
+    total_length = er_length + tail_length
+    ir = np.zeros(total_length, dtype=np.float64)
+    ir[:er_length] = er
+    ir[er_length:] = noise
+
+    # Normalize peak to 1.0
+    peak = np.max(np.abs(ir))
+    if peak > 0:
+        ir /= peak
+
+    return ir
+
+
 def apply_reverb(audio: AudioSegment, decay: float = 1.5, mix: float = 50) -> AudioSegment:
-    """Apply simple reverb effect using convolution"""
-    samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+    """
+    Apply convolution reverb with a synthetic impulse response
+    (early reflections + diffuse noise tail).
+    """
     sample_rate = audio.frame_rate
-    
-    # Create impulse response (exponential decay)
-    ir_length = int(decay * sample_rate)
-    ir = np.exp(-np.linspace(0, decay * 3, ir_length))
-    ir = ir / np.sum(ir)  # Normalize
-    
-    # Convolve (apply reverb)
-    if audio.channels == 2:
-        # Stereo
-        left = samples[::2]
-        right = samples[1::2]
-        left_reverb = signal.fftconvolve(left, ir, mode='full')[:len(left)]
-        right_reverb = signal.fftconvolve(right, ir, mode='full')[:len(right)]
-        
-        # Mix wet/dry
-        wet = mix / 100
-        left_out = left * (1 - wet) + left_reverb * wet
-        right_out = right * (1 - wet) + right_reverb * wet
-        
-        # Interleave
-        output = np.empty(len(samples), dtype=np.float32)
-        output[::2] = left_out
+    channels = audio.channels
+    sample_width = audio.sample_width
+    samples = np.array(audio.get_array_of_samples(), dtype=np.float64)
+
+    # Build impulse response(s)
+    ir_left  = _build_reverb_ir(sample_rate, decay, seed=42)
+    ir_right = _build_reverb_ir(sample_rate, decay, seed=137)  # different noise for stereo width
+
+    wet = np.clip(mix / 100.0, 0.0, 1.0)
+
+    if channels == 2:
+        left  = samples[::2].copy()
+        right = samples[1::2].copy()
+        n = len(left)
+
+        left_wet  = signal.fftconvolve(left,  ir_left,  mode='full')[:n]
+        right_wet = signal.fftconvolve(right, ir_right, mode='full')[:n]
+
+        left_out  = left  * (1.0 - wet) + left_wet  * wet
+        right_out = right * (1.0 - wet) + right_wet * wet
+
+        output = np.empty(len(samples), dtype=np.float64)
+        output[::2]  = left_out
         output[1::2] = right_out
     else:
-        # Mono
-        reverb = signal.fftconvolve(samples, ir, mode='full')[:len(samples)]
-        wet = mix / 100
-        output = samples * (1 - wet) + reverb * wet
-    
-    # Normalize to prevent clipping
-    max_val = np.max(np.abs(output))
-    if max_val > 0:
-        output = output / max_val * 0.95
-    output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
-    
-    return audio._spawn(output.tobytes())
+        n = len(samples)
+        reverbed = signal.fftconvolve(samples, ir_left, mode='full')[:n]
+        output = samples * (1.0 - wet) + reverbed * wet
+
+    # Soft-clip to prevent harsh distortion
+    max_sample = 2 ** (sample_width * 8 - 1) - 1
+    min_sample = -(2 ** (sample_width * 8 - 1))
+    peak = np.max(np.abs(output))
+    if peak > max_sample:
+        output = output * (max_sample / peak) * 0.95
+
+    output = np.clip(output, min_sample, max_sample)
+
+    if sample_width == 2:
+        raw = output.astype(np.int16).tobytes()
+    elif sample_width == 4:
+        raw = output.astype(np.int32).tobytes()
+    else:
+        raw = output.astype(np.int8).tobytes()
+
+    return AudioSegment(
+        data=raw,
+        sample_width=sample_width,
+        frame_rate=sample_rate,
+        channels=channels
+    )
 
 
 def apply_delay(audio: AudioSegment, time_ms: int = 300, feedback: float = 0.4, mix: float = 50) -> AudioSegment:
@@ -183,7 +253,9 @@ def apply_eq(audio: AudioSegment, low_gain: float = 0, mid_gain: float = 0, high
 async def apply_effect(
     file: UploadFile = File(...),
     effect_type: str = Form(...),
-    params: Optional[str] = Form(None)
+    params: Optional[str] = Form(None),
+    start_ms: Optional[int] = Form(None),
+    end_ms: Optional[int] = Form(None)
 ):
     """
     Apply an effect to an audio file.
@@ -192,6 +264,8 @@ async def apply_effect(
         file: Audio file (WAV/MP3)
         effect_type: Type of effect to apply
         params: JSON string of effect parameters
+        start_ms: Start of selection region in ms (None = apply to whole audio)
+        end_ms: End of selection region in ms (None = apply to whole audio)
     
     Returns:
         Processed audio file as WAV
@@ -266,39 +340,66 @@ async def apply_effect(
         
         print(f"[Effects] Audio loaded: {audio.frame_rate}Hz, {audio.channels}ch, {len(audio)}ms")
         
-        # Apply effect
+        # Determine if we need to apply to a selection only
+        has_selection = (start_ms is not None and end_ms is not None
+                         and start_ms >= 0 and end_ms > start_ms)
+        
+        if has_selection:
+            total_ms = len(audio)
+            sel_start = max(0, min(start_ms, total_ms))
+            sel_end   = max(sel_start, min(end_ms, total_ms))
+            # Split into before / selected / after
+            before   = audio[:sel_start] if sel_start > 0 else AudioSegment.empty()
+            selected = audio[sel_start:sel_end]
+            after    = audio[sel_end:] if sel_end < total_ms else AudioSegment.empty()
+            target_audio = selected
+            print(f"[Effects] Selection: {sel_start}ms - {sel_end}ms ({sel_end - sel_start}ms)")
+        else:
+            target_audio = audio
+
+        # Apply effect to target audio
         if effect_type == "reverb":
             processed = apply_reverb(
-                audio,
+                target_audio,
                 decay=effect_params.get("decay", 1.5),
                 mix=effect_params.get("mix", 50)
             )
         elif effect_type == "delay":
             processed = apply_delay(
-                audio,
+                target_audio,
                 time_ms=effect_params.get("time_ms", 300),
                 feedback=effect_params.get("feedback", 0.4),
                 mix=effect_params.get("mix", 50)
             )
         elif effect_type == "compressor":
             processed = compress_dynamic_range(
-                audio,
+                target_audio,
                 threshold=effect_params.get("threshold", -20),
                 ratio=effect_params.get("ratio", 4.0),
                 attack=effect_params.get("attack_ms", 5.0)
             )
         elif effect_type == "eq":
             processed = apply_eq(
-                audio,
+                target_audio,
                 low_gain=effect_params.get("low_gain", 0),
                 mid_gain=effect_params.get("mid_gain", 0),
                 high_gain=effect_params.get("high_gain", 0)
             )
         elif effect_type == "normalize":
             headroom = effect_params.get("headroom_db", 0.1)
-            processed = normalize(audio, headroom=headroom)
+            processed = normalize(target_audio, headroom=headroom)
         else:
-            processed = audio
+            processed = target_audio
+        
+        # If selection, splice processed region back into full audio
+        if has_selection:
+            final = AudioSegment.empty()
+            if len(before) > 0:
+                final = before
+            final = final + processed
+            if len(after) > 0:
+                final = final + after
+            processed = final
         
         # Export as WAV
         wav_buffer = io.BytesIO()

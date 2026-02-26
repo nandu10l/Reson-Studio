@@ -304,6 +304,15 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             <span style={{ fontSize: 14 }}>✨</span>
             <span className="transport-view-label">AI</span>
           </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.musicGenerator ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('musicGenerator')}
+            title="AI Music Generator — Real-time music with Lyria"
+            style={activeWindows?.musicGenerator ? { borderColor: '#7c3aed', color: '#c4b5fd' } : {}}
+          >
+            <span style={{ fontSize: 14 }}>🎵</span>
+            <span className="transport-view-label">Music</span>
+          </button>
         </div>
       </div>
 

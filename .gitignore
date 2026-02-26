@@ -183,6 +183,7 @@ debug/
 *.seed
 *.pid.lock
 pids/
+nul
 
 ############################
 # Audio exports

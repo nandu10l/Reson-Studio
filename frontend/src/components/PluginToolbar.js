@@ -89,13 +89,36 @@ const PLUGIN_CATEGORIES = {
         name: 'Instruments',
         icon: Music,
         plugins: [
-            { id: 'synth-1', name: 'Analog Synth', type: 'synthesizer' },
+            // Keyboards
             { id: 'piano-1', name: 'Grand Piano', type: 'sampler' },
-            { id: 'guitar-1', name: 'Electric Guitar', type: 'sampler' },
-            { id: 'bass-1', name: 'Bass Synth', type: 'synthesizer' },
-            { id: 'bass-2', name: 'Electric Bass', type: 'sampler' },
-            { id: 'drum-1', name: 'Drum Machine', type: 'drums' },
+            { id: 'organ-1', name: 'Organ', type: 'sampler' },
+            { id: 'harmonium-1', name: 'Harmonium', type: 'sampler' },
+            // Strings
+            { id: 'violin-1', name: 'Violin', type: 'sampler' },
+            { id: 'cello-1', name: 'Cello', type: 'sampler' },
+            { id: 'contrabass-1', name: 'Contrabass', type: 'sampler' },
             { id: 'strings-1', name: 'String Ensemble', type: 'sampler' },
+            { id: 'harp-1', name: 'Harp', type: 'sampler' },
+            // Guitars & Bass
+            { id: 'guitar-acoustic-1', name: 'Acoustic Guitar', type: 'sampler' },
+            { id: 'guitar-electric-1', name: 'Electric Guitar', type: 'sampler' },
+            { id: 'guitar-nylon-1', name: 'Nylon Guitar', type: 'sampler' },
+            { id: 'bass-electric-1', name: 'Electric Bass', type: 'sampler' },
+            // Woodwinds
+            { id: 'flute-1', name: 'Flute', type: 'sampler' },
+            { id: 'clarinet-1', name: 'Clarinet', type: 'sampler' },
+            { id: 'bassoon-1', name: 'Bassoon', type: 'sampler' },
+            { id: 'saxophone-1', name: 'Saxophone', type: 'sampler' },
+            // Brass
+            { id: 'trumpet-1', name: 'Trumpet', type: 'sampler' },
+            { id: 'trombone-1', name: 'Trombone', type: 'sampler' },
+            { id: 'tuba-1', name: 'Tuba', type: 'sampler' },
+            { id: 'french-horn-1', name: 'French Horn', type: 'sampler' },
+            // Percussion
+            { id: 'xylophone-1', name: 'Xylophone', type: 'sampler' },
+            { id: 'drum-1', name: 'Drum Machine', type: 'drums' },
+            // Synths
+            { id: 'synth-1', name: 'Analog Synth', type: 'synthesizer' },
         ]
     },
     effects: {

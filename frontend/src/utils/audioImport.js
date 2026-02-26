@@ -116,14 +116,55 @@ export const audioDurationToBeats = (audioBuffer, bpm) => {
 };
 
 /**
- * Create a data URL from audio buffer for caching
+ * Convert an ArrayBuffer (or Uint8Array) to a base64 string
+ * @param {ArrayBuffer|Uint8Array} buffer
+ * @returns {string}
+ */
+export const arrayBufferToBase64 = (buffer) => {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+};
+
+/**
+ * Convert a base64 string back to an ArrayBuffer
+ * @param {string} base64
+ * @returns {ArrayBuffer}
+ */
+export const base64ToArrayBuffer = (base64) => {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+};
+
+/**
+ * Serialize an AudioBuffer to a base64-encoded WAV string
  * @param {AudioBuffer} audioBuffer
  * @returns {Promise<string>}
  */
-export const audioBufferToDataUrl = async (audioBuffer) => {
-  // For now, we'll store the file reference
-  // In a full implementation, you might want to convert to WAV and create a blob URL
-  return null;
+export const serializeAudioBuffer = async (audioBuffer) => {
+  const wavBlob = audioBufferToWav(audioBuffer);
+  const arrayBuf = await wavBlob.arrayBuffer();
+  return arrayBufferToBase64(arrayBuf);
+};
+
+/**
+ * Deserialize a base64-encoded WAV string back to an AudioBuffer
+ * @param {string} base64Data
+ * @returns {Promise<AudioBuffer>}
+ */
+export const deserializeAudioBuffer = async (base64Data) => {
+  const arrayBuf = base64ToArrayBuffer(base64Data);
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  return await audioContext.decodeAudioData(arrayBuf);
 };
 
 /**

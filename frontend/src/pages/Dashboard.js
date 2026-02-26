@@ -26,6 +26,7 @@ import WelcomeModal from '../components/WelcomeModal';
 import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
 import AIComposer from '../components/AIComposer/AIComposer';
+import AIMusicGenerator from '../components/MusicGen/AIMusicGenerator';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
@@ -39,6 +40,7 @@ function Dashboard() {
     channelRack: false,
     sampleEditor: false,
     aiComposer: false,
+    musicGenerator: false,
     playlist: true, // Default view
     browser: true
   });
@@ -479,6 +481,19 @@ function Dashboard() {
           height={480}
         >
           <AIComposer />
+        </DraggableWindow>
+      )}
+
+      {/* AI Music Generator (Lyria RealTime) */}
+      {activeWindows.musicGenerator && (
+        <DraggableWindow
+          title="🎵 AI Music Generator"
+          onClose={() => toggleWindow('musicGenerator')}
+          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 380), y: 100 }}
+          width={760}
+          height={440}
+        >
+          <AIMusicGenerator />
         </DraggableWindow>
       )}
 

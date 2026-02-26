@@ -4,6 +4,7 @@ import NewProjectModal from './NewProjectModal';
 import { useProject } from '../contexts/ProjectContext';
 import { audioEngine } from '../audio/AudioEngine';
 import { exportWav, exportMp3, saveAudioBlob, getLastExportFormat, setLastExportFormat } from '../services/ExportService';
+import { serializeAudioBuffer } from '../utils/audioImport';
 import '../styles/blender-icons.css';
 import './Navbar.css';
 
@@ -21,6 +22,7 @@ function Navbar({
     playlistTracks,
     audioClips,
     automations,
+    mixerInserts,
     bpm,
     currentProjectPath,
     setCurrentProjectPath,
@@ -52,13 +54,45 @@ function Navbar({
     };
   }, []);
 
-  const getProjectDataString = () => {
+  const getProjectDataString = async () => {
+    // Serialize audio clips: convert AudioBuffers to base64 WAV data
+    const serializedAudioClips = await Promise.all(
+      audioClips.map(async (clip) => {
+        let audioData = null;
+        try {
+          if (clip.audioBuffer) {
+            audioData = await serializeAudioBuffer(clip.audioBuffer);
+          }
+        } catch (err) {
+          console.warn('Failed to serialize audio clip:', clip.name, err);
+        }
+        return {
+          id: clip.id,
+          fileName: clip.fileName,
+          name: clip.name,
+          audioData,
+          duration: clip.duration,
+          durationBeats: clip.durationBeats,
+          sampleRate: clip.sampleRate,
+          vol: clip.vol ?? 100,
+          pan: clip.pan ?? 50,
+          stemType: clip.stemType || null,
+          color: clip.color || null,
+          startOffset: clip.startOffset ?? 0,
+        };
+      })
+    );
+
     return JSON.stringify({
-      version: "1.0.0",
+      version: "1.1.0",
       bpm,
+      activePatternId,
       patterns,
       channels,
-      playlistTracks
+      playlistTracks,
+      audioClips: serializedAudioClips,
+      automations,
+      mixerInserts,
     }, null, 2);
   };
 
@@ -66,7 +100,7 @@ function Navbar({
     if (!window.electronAPI) return;
 
     if (currentProjectPath) {
-      const data = getProjectDataString();
+      const data = await getProjectDataString();
       const result = await window.electronAPI.saveFileSilent(currentProjectPath, data);
       if (result && result.success) {
         console.log("Project saved to:", currentProjectPath);
@@ -78,7 +112,7 @@ function Navbar({
 
   const handleSaveAs = async () => {
     if (!window.electronAPI?.saveFile) return;
-    const data = getProjectDataString();
+    const data = await getProjectDataString();
     const result = await window.electronAPI.saveFile(data);
     if (result && result.success) {
       setCurrentProjectPath(result.filePath);
@@ -105,7 +139,7 @@ function Navbar({
       newPath = `${base}_2.${ext}`;
     }
 
-    const data = getProjectDataString();
+    const data = await getProjectDataString();
     const result = await window.electronAPI.saveFileSilent(newPath, data);
     if (result && result.success) {
       setCurrentProjectPath(newPath);
@@ -134,7 +168,7 @@ function Navbar({
           if (result && result.success) {
             try {
               const projectData = JSON.parse(result.content);
-              loadProject(projectData);
+              await loadProject(projectData);
               setCurrentProjectPath(filePath);
               document.title = `Reson Studio - ${filePath.split(/[\\/]/).pop()}`;
             } catch (e) {

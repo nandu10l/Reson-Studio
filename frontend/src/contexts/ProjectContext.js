@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
-import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile } from '../utils/audioImport';
+import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile, deserializeAudioBuffer, audioBufferToWav } from '../utils/audioImport';
 import * as Tone from 'tone';
 
 const ProjectContext = createContext();
@@ -100,7 +100,7 @@ export const ProjectProvider = ({ children }) => {
 
 
 
-    const loadProject = useCallback((data) => {
+    const loadProject = useCallback(async (data) => {
         if (!data) return;
         try {
             if (data.patterns) setPatterns(data.patterns);
@@ -111,6 +111,70 @@ export const ProjectProvider = ({ children }) => {
                 audioEngine.setBpm(data.bpm);
             }
             if (data.activePatternId) setActivePatternId(data.activePatternId);
+
+            // Restore automations
+            if (data.automations) setAutomations(data.automations);
+
+            // Restore mixer inserts
+            if (data.mixerInserts) setMixerInserts(data.mixerInserts);
+
+            // Restore audio clips from serialized data
+            if (data.audioClips && data.audioClips.length > 0) {
+                const restoredClips = [];
+                for (const serialized of data.audioClips) {
+                    try {
+                        if (!serialized.audioData) {
+                            console.warn('Audio clip missing audio data:', serialized.name);
+                            continue;
+                        }
+
+                        // Decode base64 WAV back to AudioBuffer
+                        const audioBuffer = await deserializeAudioBuffer(serialized.audioData);
+
+                        // Regenerate waveform from the AudioBuffer
+                        const samplesPerSecond = 100;
+                        const targetSamples = Math.max(2000, Math.floor(audioBuffer.duration * samplesPerSecond));
+                        const waveform = generateWaveform(audioBuffer, targetSamples);
+
+                        // Recreate a File/Blob and blob URL for playback
+                        const wavBlob = audioBufferToWav(audioBuffer);
+                        const file = new File([wavBlob], serialized.fileName || 'audio.wav', { type: 'audio/wav' });
+                        const url = URL.createObjectURL(file);
+
+                        // Recalculate durationBeats with the project's BPM
+                        const projectBpm = data.bpm || 120;
+                        const durationBeats = audioDurationToBeats(audioBuffer, projectBpm);
+
+                        restoredClips.push({
+                            id: serialized.id,
+                            fileName: serialized.fileName,
+                            name: serialized.name,
+                            file,
+                            audioBuffer,
+                            waveform,
+                            duration: audioBuffer.duration,
+                            durationBeats,
+                            sampleRate: audioBuffer.sampleRate,
+                            url,
+                            vol: serialized.vol ?? 100,
+                            pan: serialized.pan ?? 50,
+                            stemType: serialized.stemType || undefined,
+                            color: serialized.color || undefined,
+                            startOffset: serialized.startOffset ?? 0,
+                        });
+
+                        console.log('Restored audio clip:', serialized.name);
+                    } catch (clipError) {
+                        console.error('Failed to restore audio clip:', serialized.name, clipError);
+                    }
+                }
+
+                if (restoredClips.length > 0) {
+                    setAudioClips(restoredClips);
+                    console.log(`Restored ${restoredClips.length} audio clip(s)`);
+                }
+            }
+
             console.log('Project loaded successfully');
         } catch (error) {
             console.error('Error loading project data:', error);
@@ -258,23 +322,20 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
-    // Initialize Audio Engine
+    // Initialize Audio Engine channels (mount-only, never resets user changes)
     React.useEffect(() => {
-        const initAudio = async () => {
-            // Initialize engine (user interaction might be needed for full start, 
-            // but we can prepare channels)
-            INITIAL_CHANNELS.forEach(ch => {
-                audioEngine.createChannel(ch.id, ch.name);
-                // Sync initial values
-                audioEngine.updateChannelVolume(ch.id, ch.vol);
-                audioEngine.updateChannelPan(ch.id, ch.pan);
-            });
+        INITIAL_CHANNELS.forEach(ch => {
+            audioEngine.createChannel(ch.id, ch.name);
+            // Sync initial values
+            audioEngine.updateChannelVolume(ch.id, ch.vol);
+            audioEngine.updateChannelPan(ch.id, ch.pan);
+        });
+    }, []); // eslint-disable-line
 
-            // Sync BPM to audio engine on initialization
-            audioEngine.setBpm(bpm);
-            console.log('Initial BPM synced:', bpm);
-        };
-        initAudio();
+    // Sync BPM to audio engine whenever it changes
+    React.useEffect(() => {
+        audioEngine.setBpm(bpm);
+        console.log('BPM synced:', bpm);
     }, [bpm]);
 
     // --- Actions ---
@@ -674,7 +735,9 @@ export const ProjectProvider = ({ children }) => {
                             duration: audioBuffer.duration,
                             durationBeats: durationBeats,
                             sampleRate: audioBuffer.sampleRate,
-                            url: URL.createObjectURL(file)
+                            url: URL.createObjectURL(file),
+                            vol: 100,
+                            pan: 50
                         };
 
                         setAudioClips(prev => [...prev, audioClip]);
@@ -751,6 +814,27 @@ export const ProjectProvider = ({ children }) => {
         // Update UI State
         setChannels(prev => prev.map(ch =>
             ch.id === channelId ? { ...ch, pan: pan } : ch
+        ));
+    }, []);
+
+    // Audio Clip Volume/Pan
+    const updateAudioClipVolume = useCallback((clipId, volume) => {
+        // Update any active audio players for this clip
+        audioEngine.updateAudioClipVolume(clipId, volume);
+
+        // Update UI State
+        setAudioClips(prev => prev.map(ac =>
+            ac.id === clipId ? { ...ac, vol: volume } : ac
+        ));
+    }, []);
+
+    const updateAudioClipPan = useCallback((clipId, pan) => {
+        // Update any active audio players for this clip
+        audioEngine.updateAudioClipPan(clipId, pan);
+
+        // Update UI State
+        setAudioClips(prev => prev.map(ac =>
+            ac.id === clipId ? { ...ac, pan: pan } : ac
         ));
     }, []);
 
@@ -994,7 +1078,9 @@ export const ProjectProvider = ({ children }) => {
                 durationBeats: durationBeats,
                 sampleRate: audioBuffer.sampleRate,
                 // Create blob URL for playback
-                url: URL.createObjectURL(file)
+                url: URL.createObjectURL(file),
+                vol: 100,
+                pan: 50
             };
 
             // Add to audio clips list
@@ -1083,7 +1169,9 @@ export const ProjectProvider = ({ children }) => {
                     sampleRate: audioBuffer.sampleRate,
                     url: URL.createObjectURL(blob),
                     stemType: stemName,
-                    color: stemColors[stemName] || '#60a5fa'  // Default blue if unknown stem
+                    color: stemColors[stemName] || '#60a5fa',  // Default blue if unknown stem
+                    vol: 100,
+                    pan: 50
                 };
 
                 stemClips.push(audioClip);
@@ -1626,6 +1714,8 @@ export const ProjectProvider = ({ children }) => {
         setPlaylistTracks,
         updateChannelVolume,
         updateChannelPan,
+        updateAudioClipVolume,
+        updateAudioClipPan,
         toggleTrackMute,
         toggleTrackSolo,
         previewChannelSound,

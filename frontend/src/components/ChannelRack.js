@@ -9,6 +9,11 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
     const [isDragging, setIsDragging] = useState(false);
     const startY = useRef(0);
     const startValue = useRef(0);
+    const onChangeRef = useRef(onChange);
+
+    // Keep the ref always pointing to the latest onChange callback
+    // This avoids re-creating event listeners on every parent re-render
+    onChangeRef.current = onChange;
 
     useEffect(() => {
         const handlePointerMove = (e) => {
@@ -16,13 +21,12 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
             e.preventDefault();
 
             const deltaY = startY.current - e.clientY;
-            const range = max - min;
             const sensitivity = 0.5;
 
             let newValue = startValue.current + (deltaY * sensitivity);
             newValue = Math.max(min, Math.min(max, newValue));
 
-            onChange(Math.round(newValue));
+            onChangeRef.current(Math.round(newValue));
         };
 
         const handlePointerUp = () => {
@@ -40,7 +44,7 @@ const VerticalDragKnob = ({ value, min = 0, max = 100, onChange, className, titl
             window.removeEventListener('pointermove', handlePointerMove);
             window.removeEventListener('pointerup', handlePointerUp);
         };
-    }, [isDragging, min, max, onChange]);
+    }, [isDragging, min, max]);
 
     const handlePointerDown = (e) => {
         e.preventDefault();
@@ -171,6 +175,22 @@ const Channel = React.memo(({ id, name, vol, pan, steps = [], color, isPlaying, 
 // Audio Channel component - displays waveform instead of step sequencer
 const AudioChannel = React.memo(({ audioClip, isSelected, onSelect }) => {
     const waveformRef = useRef(null);
+    const { updateAudioClipVolume, updateAudioClipPan } = useProject();
+    const { useGuideHandlers } = useGuide();
+
+    const vol = audioClip.vol !== undefined ? audioClip.vol : 100;
+    const pan = audioClip.pan !== undefined ? audioClip.pan : 50;
+
+    const getPanText = (val) => {
+        if (val === 50) return 'Audio clip panning: centered';
+        const percent = Math.abs(val - 50) * 2;
+        const side = val < 50 ? 'left' : 'right';
+        return `Audio clip panning: ${percent}% ${side}`;
+    };
+
+    const getVolText = (val) => {
+        return `Audio clip volume: ${Math.round(val)}%`;
+    };
 
     return (
         <div className="channel-row audio-channel-row">
@@ -179,19 +199,45 @@ const AudioChannel = React.memo(({ audioClip, isSelected, onSelect }) => {
                 {/* Color Indicator */}
                 <div
                     className="channel-color-indicator"
-                    style={{ backgroundColor: '#4ade80' }}
+                    style={{ backgroundColor: audioClip.color || '#4ade80' }}
                     title="Audio Clip"
                 />
 
                 {/* Pan Knob */}
-                <div className="rack-knob pan-knob" title="Pan: 50%">
-                    <div className="knob-indicator" style={{ transform: 'translate(-50%, -50%) rotate(0deg)' }} />
-                </div>
+                <VerticalDragKnob
+                    className="rack-knob pan-knob"
+                    title={`Pan: ${pan}%`}
+                    value={pan}
+                    min={0}
+                    max={100}
+                    onChange={(v) => updateAudioClipPan(audioClip.id, v)}
+                    {...useGuideHandlers(getPanText(pan))}
+                >
+                    <div
+                        className="knob-indicator"
+                        style={{
+                            transform: `translate(-50%, -50%) rotate(${(pan - 50) * 2.7}deg)`,
+                        }}
+                    />
+                </VerticalDragKnob>
 
                 {/* Volume Knob */}
-                <div className="rack-knob vol-knob" title="Vol: 100%">
-                    <div className="knob-indicator" style={{ transform: 'translate(-50%, -50%) rotate(135deg)' }} />
-                </div>
+                <VerticalDragKnob
+                    className="rack-knob vol-knob"
+                    title={`Vol: ${vol}%`}
+                    value={vol}
+                    min={0}
+                    max={100}
+                    onChange={(v) => updateAudioClipVolume(audioClip.id, v)}
+                    {...useGuideHandlers(getVolText(vol))}
+                >
+                    <div
+                        className="knob-indicator"
+                        style={{
+                            transform: `translate(-50%, -50%) rotate(${(vol - 50) * 2.7}deg)`,
+                        }}
+                    />
+                </VerticalDragKnob>
             </div>
 
             {/* Channel Name */}

@@ -11,6 +11,7 @@ import base64
 import subprocess
 import shutil
 import traceback
+import numpy as np
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 
@@ -285,32 +286,124 @@ async def cut_audio(
 async def fade_audio(
     file: UploadFile = File(...),
     fade_type: str = "in",
-    duration_ms: int = 500
+    start_ms: int = -1,
+    end_ms: int = -1
 ):
     """
-    Apply fade in or fade out effect.
-    
+    Apply FL Studio (Edison) style fade in or fade out.
+
+    Uses a logarithmic/exponential curve like FL Studio:
+    - Fade In:  exponential ramp (slow start → fast finish) — natural volume build
+    - Fade Out: logarithmic ramp (fast start → slow tail) — natural volume decay
+
+    The fade is applied only within the [start_ms, end_ms] region.
+    Audio outside that region is left untouched.
+
     Args:
         file: Audio file (WAV/MP3)
         fade_type: "in" for fade in, "out" for fade out
-        duration_ms: Duration of fade in milliseconds
-    
+        start_ms: Start of fade region in ms (-1 = beginning of audio)
+        end_ms: End of fade region in ms (-1 = end of audio)
+
     Returns:
         Audio with fade applied as WAV
     """
     try:
         audio_data = await file.read()
         audio = load_audio_flexible(audio_data, file.filename)
-        
-        if fade_type == "in":
-            result = audio.fade_in(duration_ms)
+
+        total_ms = len(audio)
+        # Resolve defaults
+        if start_ms < 0:
+            start_ms = 0
+        if end_ms < 0:
+            end_ms = total_ms
+        start_ms = max(0, min(start_ms, total_ms))
+        end_ms   = max(start_ms, min(end_ms, total_ms))
+        fade_len_ms = end_ms - start_ms
+        if fade_len_ms <= 0:
+            fade_len_ms = min(500, total_ms)
+            if fade_type == "in":
+                start_ms, end_ms = 0, fade_len_ms
+            else:
+                start_ms, end_ms = total_ms - fade_len_ms, total_ms
+
+        # --- Build the gain envelope via numpy for speed ---
+        sample_rate = audio.frame_rate
+        channels    = audio.channels
+        sample_width = audio.sample_width
+
+        samples = np.array(audio.get_array_of_samples(), dtype=np.float64)
+        # Reshape to (num_frames, channels) for multi-channel
+        if channels > 1:
+            samples = samples.reshape(-1, channels)
+        total_frames = samples.shape[0] if channels > 1 else len(samples)
+
+        fade_start_frame = int(start_ms * sample_rate / 1000)
+        fade_end_frame   = int(end_ms   * sample_rate / 1000)
+        fade_start_frame = max(0, min(fade_start_frame, total_frames))
+        fade_end_frame   = max(fade_start_frame, min(fade_end_frame, total_frames))
+        fade_frames = fade_end_frame - fade_start_frame
+
+        if fade_frames > 0:
+            # t goes from 0.0 → 1.0 across the fade region
+            t = np.linspace(0.0, 1.0, fade_frames)
+
+            # FL Studio curve shape factor (controls how steep the curve is)
+            # Higher = more pronounced log/exp shape.  ~4 matches FL Studio closely.
+            curve = 4.0
+
+            if fade_type == "in":
+                # Exponential ramp: slow start, fast finish (FL Studio fade-in)
+                gain = (np.exp(curve * t) - 1.0) / (np.exp(curve) - 1.0)
+            else:
+                # Logarithmic ramp: fast drop, slow tail (FL Studio fade-out)
+                gain = (np.exp(curve * (1.0 - t)) - 1.0) / (np.exp(curve) - 1.0)
+
+            if channels > 1:
+                gain_2d = gain[:, np.newaxis]  # broadcast to all channels
+                samples[fade_start_frame:fade_end_frame] *= gain_2d
+            else:
+                samples[fade_start_frame:fade_end_frame] *= gain
+
+            # Silence the region before fade-in or after fade-out
+            if fade_type == "in" and fade_start_frame > 0:
+                if channels > 1:
+                    samples[:fade_start_frame] = 0
+                else:
+                    samples[:fade_start_frame] = 0
+            elif fade_type == "out" and fade_end_frame < total_frames:
+                if channels > 1:
+                    samples[fade_end_frame:] = 0
+                else:
+                    samples[fade_end_frame:] = 0
+
+        # Clip and convert back
+        max_val = (2 ** (sample_width * 8 - 1)) - 1
+        min_val = -(2 ** (sample_width * 8 - 1))
+        samples = np.clip(samples, min_val, max_val)
+
+        if channels > 1:
+            samples = samples.flatten()
+
+        if sample_width == 2:
+            raw = samples.astype(np.int16).tobytes()
+        elif sample_width == 4:
+            raw = samples.astype(np.int32).tobytes()
         else:
-            result = audio.fade_out(duration_ms)
-        
+            raw = samples.astype(np.int8).tobytes()
+
+        result = AudioSegment(
+            data=raw,
+            sample_width=sample_width,
+            frame_rate=sample_rate,
+            channels=channels
+        )
+
         wav_buffer = io.BytesIO()
         result.export(wav_buffer, format="wav")
         wav_buffer.seek(0)
-        
+
         return Response(
             content=wav_buffer.read(),
             media_type="audio/wav",

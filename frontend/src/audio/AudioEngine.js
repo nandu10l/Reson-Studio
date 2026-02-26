@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { loadInstrument } from './SampleLibrary';
 
 class AudioEngine {
     constructor() {
@@ -360,12 +361,31 @@ class AudioEngine {
                     }
 
                     if (player) {
-                        player.volume.value = -6;
+                        // Tag player with source audio clip ID for volume/pan updates
+                        player._audioClipId = audioClip.id;
+
+                        // Apply stored or default volume/pan settings
+                        const clipSettings = this.getAudioClipSettings(audioClip.id);
+                        const clipVol = audioClip.vol !== undefined ? audioClip.vol : clipSettings.vol;
+                        const clipPan = audioClip.pan !== undefined ? audioClip.pan : clipSettings.pan;
+
+                        if (clipVol === 0) {
+                            player.mute = true;
+                        } else {
+                            const db = Tone.gainToDb(clipVol / 100 * 1.2);
+                            player.volume.value = db;
+                        }
+
+                        // Create a panner for this player to support pan
+                        const panVal = (clipPan - 50) / 50;
+                        const panner = new Tone.Panner(Math.max(-1, Math.min(1, panVal)));
 
                         if (this.masterGain) {
-                            player.connect(this.masterGain);
+                            player.connect(panner);
+                            panner.connect(this.masterGain);
                         } else {
-                            player.toDestination();
+                            player.connect(panner);
+                            panner.toDestination();
                         }
                         // Store by Instance ID (clip.id) for unique player per clip placement
                         this.audioPlayers.set(clip.id, player);
@@ -579,8 +599,31 @@ class AudioEngine {
         let source;
         const n = name.toLowerCase();
 
-        // Basic Synthesis logic based on name
-        // Wrap everything in PolySynth to handle overlapping hits (Song Mode concurrency)
+        // ── Helper: load a CDN sampler with an immediate synth fallback ──
+        // The fallback plays instantly; once CDN samples load we swap to the real thing.
+        const loadSampledInstrument = (instrumentKey, fallbackSynth) => {
+            let loaded = false;
+            fallbackSynth.connect(channel);
+            source = fallbackSynth;
+
+            const sampler = loadInstrument(instrumentKey, {
+                onload: () => {
+                    loaded = true;
+                    console.log(`${instrumentKey} (ch ${id}): CDN samples loaded!`);
+                    try { fallbackSynth.disconnect(channel); } catch (_) { }
+                    sampler.connect(channel);
+                    this.sources.set(id, sampler);
+                },
+                onerror: (err) => {
+                    console.warn(`${instrumentKey} CDN failed, using synth fallback:`, err);
+                }
+            });
+            setTimeout(() => {
+                if (!loaded) console.warn(`${instrumentKey} CDN timeout — using synth fallback for ch ${id}`);
+            }, 6000);
+        };
+
+        // ── Drum sounds (synthesized — no CDN samples) ──
         if (n.includes('kick')) {
             source = new Tone.PolySynth(Tone.MembraneSynth, {
                 maxPolyphony: 128,
@@ -590,99 +633,222 @@ class AudioEngine {
             }).connect(channel);
         } else if (n.includes('snare')) {
             source = new Tone.NoiseSynth({
-                noise: { type: 'white' }, // white noise is punchier/snappier than pink
+                noise: { type: 'white' },
                 envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.05 }
             }).connect(channel);
         } else if (n.includes('clap')) {
             source = new Tone.NoiseSynth({
-                noise: { type: 'white' }, // White noise for crispness
+                noise: { type: 'white' },
                 envelope: { attack: 0.001, decay: 0.15, sustain: 0 }
             }).connect(channel);
         } else if (n.includes('hat') || n.includes('cymbal')) {
             source = new Tone.PolySynth(Tone.MetalSynth, {
                 maxPolyphony: 128,
-                frequency: 400, // brighter/more cymbal-like (was 200)
+                frequency: 400,
                 harmonicity: 5.1,
                 modulationIndex: 32,
                 envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
                 volume: -8
             }).connect(channel);
-        } else if (n.includes('bass')) {
-            source = new Tone.PolySynth(Tone.MonoSynth, {
+
+            // ── Sampled instruments (CDN + synth fallback) ──
+        } else if (n.includes('piano')) {
+            loadSampledInstrument('piano', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 32,
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.5 },
+                volume: -4
+            }));
+        } else if (n.includes('violin')) {
+            loadSampledInstrument('violin', new Tone.PolySynth(Tone.AMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 2,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.1, decay: 0.3, sustain: 0.8, release: 0.5 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 0.5 }
+            }));
+        } else if (n.includes('cello')) {
+            loadSampledInstrument('cello', new Tone.PolySynth(Tone.AMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 1.5,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.15, decay: 0.4, sustain: 0.8, release: 0.6 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.4, decay: 0.3, sustain: 0.7, release: 0.6 }
+            }));
+        } else if (n.includes('contrabass')) {
+            loadSampledInstrument('contrabass', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.15, decay: 0.5, sustain: 0.7, release: 0.8 },
+                volume: -2
+            }));
+        } else if (n.includes('flute')) {
+            loadSampledInstrument('flute', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.05, decay: 0.15, sustain: 0.8, release: 0.3 },
+                volume: -2
+            }));
+        } else if (n.includes('clarinet')) {
+            loadSampledInstrument('clarinet', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'square' },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.3 },
+                volume: -6
+            }));
+        } else if (n.includes('bassoon')) {
+            loadSampledInstrument('bassoon', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.08, decay: 0.3, sustain: 0.7, release: 0.4 },
+                volume: -4
+            }));
+        } else if (n.includes('saxophone') || n.includes('sax')) {
+            loadSampledInstrument('saxophone', new Tone.PolySynth(Tone.MonoSynth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'square' },
+                filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+                filterEnvelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3, baseFrequency: 400, octaves: 2 },
+                envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.3 }
+            }));
+        } else if (n.includes('trumpet')) {
+            loadSampledInstrument('trumpet', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 1,
+                modulationIndex: 3,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.02, decay: 0.2, sustain: 0.7, release: 0.3 },
+                modulation: { type: 'square' },
+                modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 }
+            }));
+        } else if (n.includes('trombone')) {
+            loadSampledInstrument('trombone', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 0.5,
+                modulationIndex: 2,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.04, decay: 0.3, sustain: 0.7, release: 0.4 },
+                modulation: { type: 'square' },
+                modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.5, release: 0.4 }
+            }));
+        } else if (n.includes('tuba')) {
+            loadSampledInstrument('tuba', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 0.5,
+                modulationIndex: 1.5,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.06, decay: 0.4, sustain: 0.7, release: 0.5 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.05, decay: 0.4, sustain: 0.5, release: 0.5 },
+                volume: -2
+            }));
+        } else if (n.includes('french') && n.includes('horn')) {
+            loadSampledInstrument('french-horn', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 1,
+                modulationIndex: 2,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 0.4 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.04, decay: 0.3, sustain: 0.5, release: 0.4 }
+            }));
+        } else if (n.includes('organ')) {
+            loadSampledInstrument('organ', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 16,
+                harmonicity: 2,
+                modulationIndex: 1,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 }
+            }));
+        } else if (n.includes('harmonium')) {
+            loadSampledInstrument('harmonium', new Tone.PolySynth(Tone.FMSynth, {
+                maxPolyphony: 8,
+                harmonicity: 2,
+                modulationIndex: 1.5,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0.85, release: 0.4 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.4 }
+            }));
+        } else if (n.includes('harp')) {
+            loadSampledInstrument('harp', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 16,
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.002, decay: 1.2, sustain: 0, release: 1.5 },
+                volume: -2
+            }));
+        } else if (n.includes('xylophone')) {
+            loadSampledInstrument('xylophone', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 16,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.3 },
+                volume: -4
+            }));
+        } else if (n.includes('acoustic') && n.includes('guitar')) {
+            loadSampledInstrument('guitar-acoustic', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.002, decay: 0.8, sustain: 0.1, release: 1.0 }
+            }));
+        } else if (n.includes('nylon') && n.includes('guitar')) {
+            loadSampledInstrument('guitar-nylon', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.002, decay: 0.9, sustain: 0.1, release: 1.2 }
+            }));
+        } else if (n.includes('electric') && n.includes('bass')) {
+            loadSampledInstrument('bass-electric', new Tone.PolySynth(Tone.MonoSynth, {
                 maxPolyphony: 8,
                 oscillator: { type: 'square' },
                 filter: { Q: 2, type: 'lowpass', rolloff: -24 },
                 filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
                 envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.4 }
-            }).connect(channel);
-        } else if (n.includes('piano')) {
-            // Grand Piano — tries Salamander CDN, falls back to a synthesized piano after 4s
-            let pianoLoaded = false;
-            const pianoFallback = new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 32,
-                oscillator: { type: 'triangle' },
-                envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.5 },
-                volume: -4
-            });
-            pianoFallback.connect(channel);
-            source = pianoFallback;
-
-            const sampler = new Tone.Sampler({
-                urls: {
-                    "A0": "A0.mp3", "C1": "C1.mp3", "D#1": "Ds1.mp3", "F#1": "Fs1.mp3",
-                    "A1": "A1.mp3", "C2": "C2.mp3", "D#2": "Ds2.mp3", "F#2": "Fs2.mp3",
-                    "A2": "A2.mp3", "C3": "C3.mp3", "D#3": "Ds3.mp3", "F#3": "Fs3.mp3",
-                    "A3": "A3.mp3", "C4": "C4.mp3", "D#4": "Ds4.mp3", "F#4": "Fs4.mp3",
-                    "A4": "A4.mp3", "C5": "C5.mp3", "D#5": "Ds5.mp3", "F#5": "Fs5.mp3",
-                    "A5": "A5.mp3", "C6": "C6.mp3", "D#6": "Ds6.mp3", "F#6": "Fs6.mp3",
-                    "A6": "A6.mp3", "C7": "C7.mp3", "D#7": "Ds7.mp3", "F#7": "Fs7.mp3",
-                    "A7": "A7.mp3", "C8": "C8.mp3"
-                },
-                release: 1,
-                baseUrl: "https://tonejs.github.io/audio/salamander/",
-                onload: () => {
-                    pianoLoaded = true;
-                    console.log(`Grand Piano (ch ${id}): Salamander samples loaded!`);
-                    // Disconnect fallback FIRST — prevents both sources playing simultaneously
-                    // (which causes muddy doubled audio on the piano channel).
-                    try { pianoFallback.disconnect(channel); } catch (_) { }
-                    sampler.connect(channel);
-                    this.sources.set(id, sampler);
-                },
-                onerror: (err) => {
-                    console.warn(`Piano sampler CDN failed, using synth fallback:`, err);
-                }
-            });
-            setTimeout(() => {
-                if (!pianoLoaded) {
-                    console.warn(`Piano CDN timeout — using synthesized piano for ch ${id}`);
-                }
-            }, 4000);
-        } else if (n.includes('guitar')) {
-            // Electric Guitar
-            // Use PolySynth(Synth) — the most reliable base; sawtooth oscillator
-            // gives natural harmonic content that sounds string-like.
-            // Chebyshev distortion adds warm even-order harmonics (guitar saturation).
-            source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 8 }).connect(channel);
-            source.set({
+            }));
+        } else if (n.includes('electric') && n.includes('guitar')) {
+            loadSampledInstrument('guitar-electric', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
                 oscillator: { type: 'sawtooth' },
-                envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 }
-            });
-            source.volume.value = 4;
-
-            // Guitar signal processing chain (in parallel — source also goes direct)
-            try {
-                const gSat = new Tone.Chebyshev(3);     // 3rd-order adds warm harmonics
-                const gFilter = new Tone.Filter(4500, 'lowpass');
-                source.connect(gSat);
-                gSat.connect(gFilter);
-                gFilter.connect(channel);
-                gSat.wet.value = 0.5;                   // 50% dry/wet blend
-            } catch (e) {
-                // If Chebyshev is unavailable, direct connection already handles output
-                console.warn('Guitar effect chain skipped:', e.message);
-            }
-
+                envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 },
+                volume: 4
+            }));
+        } else if (n.includes('bass')) {
+            // Generic bass (synth)
+            loadSampledInstrument('bass-electric', new Tone.PolySynth(Tone.MonoSynth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'square' },
+                filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
+                envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.4 }
+            }));
+        } else if (n.includes('guitar')) {
+            // Generic guitar fallback
+            loadSampledInstrument('guitar-electric', new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 8,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 },
+                volume: 4
+            }));
+        } else if (n.includes('string')) {
+            // String Ensemble — use cello samples
+            loadSampledInstrument('cello', new Tone.PolySynth(Tone.AMSynth, {
+                maxPolyphony: 16,
+                harmonicity: 1.5,
+                oscillator: { type: 'fatsawtooth', spread: 30, count: 3 },
+                envelope: { attack: 0.3, decay: 0.4, sustain: 0.8, release: 1.0 },
+                modulation: { type: 'sine' },
+                modulationEnvelope: { attack: 0.5, decay: 0.3, sustain: 0.7, release: 0.8 }
+            }));
+        } else if (n.includes('synth') || n.includes('analog')) {
+            // Analog Synth — keep as pure synthesis
+            source = new Tone.PolySynth(Tone.Synth, {
+                maxPolyphony: 16,
+                oscillator: { type: 'sawtooth' },
+                envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.4 }
+            }).connect(channel);
         } else {
             // Default Synth
             source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 128 }).connect(channel);
@@ -718,6 +884,57 @@ class AudioEngine {
             const clampedPan = Math.max(-1, Math.min(1, panVal));
             channel.pan.rampTo(clampedPan, 0.1);
         }
+    }
+
+    // --- Audio Clip Volume/Pan Management ---
+
+    /**
+     * Update volume for all active audio players associated with a given audio clip ID.
+     * Audio players are keyed by playlist clip instance ID, so we iterate and check
+     * all players to find those associated with the given source audio clip.
+     */
+    updateAudioClipVolume(audioClipId, volume0to100) {
+        // Store the volume setting for this audio clip so new players pick it up
+        if (!this._audioClipSettings) this._audioClipSettings = new Map();
+        const settings = this._audioClipSettings.get(audioClipId) || { vol: 100, pan: 50 };
+        settings.vol = volume0to100;
+        this._audioClipSettings.set(audioClipId, settings);
+
+        // Update any active players that match this audio clip
+        this.audioPlayers.forEach((player) => {
+            // Check if this player is linked to the audio clip via instance mapping
+            if (player._audioClipId === audioClipId) {
+                if (volume0to100 === 0) {
+                    player.mute = true;
+                } else {
+                    player.mute = false;
+                    const db = Tone.gainToDb(volume0to100 / 100 * 1.2);
+                    player.volume.rampTo(db, 0.1);
+                }
+            }
+        });
+    }
+
+    /**
+     * Update pan for all active audio players associated with a given audio clip ID.
+     */
+    updateAudioClipPan(audioClipId, pan0to100) {
+        if (!this._audioClipSettings) this._audioClipSettings = new Map();
+        const settings = this._audioClipSettings.get(audioClipId) || { vol: 100, pan: 50 };
+        settings.pan = pan0to100;
+        this._audioClipSettings.set(audioClipId, settings);
+
+        // Note: Tone.Player doesn't have a built-in pan property.
+        // For real-time pan on audio clips, we'd need a Tone.Panner node.
+        // We store the setting and apply it when players are created in schedulePlaylist.
+    }
+
+    /**
+     * Get stored volume/pan settings for an audio clip.
+     */
+    getAudioClipSettings(audioClipId) {
+        if (!this._audioClipSettings) return { vol: 100, pan: 50 };
+        return this._audioClipSettings.get(audioClipId) || { vol: 100, pan: 50 };
     }
 
     // --- Effect Chain Management ---
@@ -1936,7 +2153,7 @@ class AudioEngine {
             }).toDestination();
             offlineChannels.set(channel.id, offlineChannel);
 
-            // Create source based on channel name
+            // Create source based on channel name (synth fallbacks for offline — no CDN)
             let source;
             const n = (channel.name || '').toLowerCase();
 
@@ -1944,8 +2161,8 @@ class AudioEngine {
                 source = new Tone.PolySynth(Tone.MembraneSynth).connect(offlineChannel);
             } else if (n.includes('snare')) {
                 source = new Tone.NoiseSynth({
-                    noise: { type: 'pink' },
-                    envelope: { attack: 0.005, decay: 0.25, sustain: 0 }
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.05 }
                 }).connect(offlineChannel);
             } else if (n.includes('clap')) {
                 source = new Tone.NoiseSynth({
@@ -1954,24 +2171,123 @@ class AudioEngine {
                 }).connect(offlineChannel);
             } else if (n.includes('hat') || n.includes('cymbal')) {
                 source = new Tone.PolySynth(Tone.MetalSynth, {
-                    frequency: 200, harmonicity: 5.1, modulationIndex: 32,
-                    envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
-                    volume: -10
+                    frequency: 400, harmonicity: 5.1, modulationIndex: 32,
+                    envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
+                    volume: -8
                 }).connect(offlineChannel);
             } else if (n.includes('piano')) {
-                // For offline, use a synthesized piano (sampler CDN won't be reliable)
                 source = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "triangle" },
+                    oscillator: { type: 'triangle' },
                     envelope: { attack: 0.005, decay: 0.8, sustain: 0.2, release: 1.5 },
                     volume: -4
                 }).connect(offlineChannel);
+            } else if (n.includes('violin')) {
+                source = new Tone.PolySynth(Tone.AMSynth, {
+                    maxPolyphony: 8, harmonicity: 2, oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.1, decay: 0.3, sustain: 0.8, release: 0.5 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 0.5 }
+                }).connect(offlineChannel);
+            } else if (n.includes('cello') || n.includes('string')) {
+                source = new Tone.PolySynth(Tone.AMSynth, {
+                    maxPolyphony: 8, harmonicity: 1.5, oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.15, decay: 0.4, sustain: 0.8, release: 0.6 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.4, decay: 0.3, sustain: 0.7, release: 0.6 }
+                }).connect(offlineChannel);
+            } else if (n.includes('contrabass')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 8, oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.15, decay: 0.5, sustain: 0.7, release: 0.8 }, volume: -2
+                }).connect(offlineChannel);
+            } else if (n.includes('flute')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 8, oscillator: { type: 'sine' },
+                    envelope: { attack: 0.05, decay: 0.15, sustain: 0.8, release: 0.3 }, volume: -2
+                }).connect(offlineChannel);
+            } else if (n.includes('clarinet')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 8, oscillator: { type: 'square' },
+                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.3 }, volume: -6
+                }).connect(offlineChannel);
+            } else if (n.includes('bassoon')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 8, oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.08, decay: 0.3, sustain: 0.7, release: 0.4 }, volume: -4
+                }).connect(offlineChannel);
+            } else if (n.includes('saxophone') || n.includes('sax')) {
+                source = new Tone.PolySynth(Tone.MonoSynth, {
+                    maxPolyphony: 8, oscillator: { type: 'square' },
+                    filter: { Q: 2, type: 'lowpass', rolloff: -12 },
+                    filterEnvelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3, baseFrequency: 400, octaves: 2 },
+                    envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.3 }
+                }).connect(offlineChannel);
+            } else if (n.includes('trumpet')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 8, harmonicity: 1, modulationIndex: 3,
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.02, decay: 0.2, sustain: 0.7, release: 0.3 },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.3 }
+                }).connect(offlineChannel);
+            } else if (n.includes('trombone')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 8, harmonicity: 0.5, modulationIndex: 2,
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.04, decay: 0.3, sustain: 0.7, release: 0.4 },
+                    modulation: { type: 'square' },
+                    modulationEnvelope: { attack: 0.02, decay: 0.3, sustain: 0.5, release: 0.4 }
+                }).connect(offlineChannel);
+            } else if (n.includes('tuba')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 8, harmonicity: 0.5, modulationIndex: 1.5,
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.06, decay: 0.4, sustain: 0.7, release: 0.5 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.05, decay: 0.4, sustain: 0.5, release: 0.5 }, volume: -2
+                }).connect(offlineChannel);
+            } else if (n.includes('french') && n.includes('horn')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 8, harmonicity: 1, modulationIndex: 2,
+                    oscillator: { type: 'sawtooth' },
+                    envelope: { attack: 0.05, decay: 0.3, sustain: 0.7, release: 0.4 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.04, decay: 0.3, sustain: 0.5, release: 0.4 }
+                }).connect(offlineChannel);
+            } else if (n.includes('organ')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 16, harmonicity: 2, modulationIndex: 1,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.01, decay: 0.1, sustain: 0.9, release: 0.3 }
+                }).connect(offlineChannel);
+            } else if (n.includes('harmonium')) {
+                source = new Tone.PolySynth(Tone.FMSynth, {
+                    maxPolyphony: 8, harmonicity: 2, modulationIndex: 1.5,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.85, release: 0.4 },
+                    modulation: { type: 'sine' },
+                    modulationEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.4 }
+                }).connect(offlineChannel);
+            } else if (n.includes('harp')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 16, oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.002, decay: 1.2, sustain: 0, release: 1.5 }, volume: -2
+                }).connect(offlineChannel);
+            } else if (n.includes('xylophone')) {
+                source = new Tone.PolySynth(Tone.Synth, {
+                    maxPolyphony: 16, oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.3 }, volume: -4
+                }).connect(offlineChannel);
             } else if (n.includes('bass')) {
                 source = new Tone.PolySynth(Tone.MonoSynth, {
-                    oscillator: { type: "square" },
-                    envelope: { attack: 0.05, decay: 0.2, sustain: 0.6, release: 0.3 }
+                    oscillator: { type: 'square' },
+                    filter: { Q: 2, type: 'lowpass', rolloff: -24 },
+                    filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
+                    envelope: { attack: 0.03, decay: 0.2, sustain: 0.7, release: 0.4 }
                 }).connect(offlineChannel);
             } else if (n.includes('guitar')) {
-                // Match real-time guitar: PolySynth(Synth) sawtooth — guaranteed output
                 source = new Tone.PolySynth(Tone.Synth, { maxPolyphony: 8 }).connect(offlineChannel);
                 source.set({
                     oscillator: { type: 'sawtooth' },
@@ -1986,7 +2302,6 @@ class AudioEngine {
                     ogFilter.connect(offlineChannel);
                     ogSat.wet.value = 0.5;
                 } catch (e) { /* direct already connected */ }
-
             } else {
                 source = new Tone.PolySynth(Tone.Synth).connect(offlineChannel);
             }

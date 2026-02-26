@@ -453,7 +453,7 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     };
 
     // Backend API calls for effects
-    const applyEffect = async (effectType, params = {}) => {
+    const applyEffect = async (effectType, params = {}, selectionRegion = null) => {
         if (!audioBuffer) {
             console.error('No audio buffer available');
             return;
@@ -468,6 +468,10 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
             formData.append('file', wavBlob, 'audio.wav');
             formData.append('effect_type', effectType);
             formData.append('params', JSON.stringify(params));
+            if (selectionRegion) {
+                formData.append('start_ms', String(selectionRegion.startMs));
+                formData.append('end_ms', String(selectionRegion.endMs));
+            }
 
             const response = await fetch('http://localhost:8000/effects/apply', {
                 method: 'POST',
@@ -624,20 +628,29 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     };
 
     const handleFadeIn = async () => {
-        if (!audioClip?.file) return;
+        if (!audioBuffer) {
+            alert('No audio loaded to apply fade in.');
+            return;
+        }
 
-        const fadeDuration = selection.start !== selection.end
-            ? Math.round(Math.abs(selection.end - selection.start) * duration * 1000)
-            : 500; // Default 500ms
+        // Selection region in ms (FL Studio applies fade within the selected region)
+        const hasSelection = selection.start !== selection.end;
+        const startMs = hasSelection
+            ? Math.round(Math.min(selection.start, selection.end) * duration * 1000)
+            : -1; // -1 = start of audio (server default)
+        const endMs = hasSelection
+            ? Math.round(Math.max(selection.start, selection.end) * duration * 1000)
+            : -1; // -1 = server picks default 500ms from start
 
         setIsProcessing(true);
         setProcessingMessage('Applying fade in...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch(`http://localhost:8000/audio/fade?fade_type=in&duration_ms=${fadeDuration}`, {
+            const response = await fetch(`http://localhost:8000/audio/fade?fade_type=in&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -662,20 +675,29 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
     };
 
     const handleFadeOut = async () => {
-        if (!audioClip?.file) return;
+        if (!audioBuffer) {
+            alert('No audio loaded to apply fade out.');
+            return;
+        }
 
-        const fadeDuration = selection.start !== selection.end
-            ? Math.round(Math.abs(selection.end - selection.start) * duration * 1000)
-            : 500; // Default 500ms
+        // Selection region in ms (FL Studio applies fade within the selected region)
+        const hasSelection = selection.start !== selection.end;
+        const startMs = hasSelection
+            ? Math.round(Math.min(selection.start, selection.end) * duration * 1000)
+            : -1; // -1 = end of audio minus default (server default)
+        const endMs = hasSelection
+            ? Math.round(Math.max(selection.start, selection.end) * duration * 1000)
+            : -1; // -1 = end of audio (server default)
 
         setIsProcessing(true);
         setProcessingMessage('Applying fade out...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch(`http://localhost:8000/audio/fade?fade_type=out&duration_ms=${fadeDuration}`, {
+            const response = await fetch(`http://localhost:8000/audio/fade?fade_type=out&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -701,7 +723,16 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
 
     // Reverb effect — open the EffectEditor window
     const handleReverb = () => {
-        setEditingEffect({ type: 'reverb', enabled: true, params: effectParams['reverb'] || {} });
+        setEditingEffect({ type: 'spatial', enabled: true, params: effectParams['spatial'] || {} });
+    };
+
+    // Map EffectEditor UI type keys to backend effect names
+    const uiTypeToBackendEffect = {
+        spatial: 'reverb',
+        temporal: 'delay',
+        compressor: 'compressor',
+        eq: 'eq',
+        normalize: 'normalize'
     };
 
     // Apply effect from EffectEditor and close
@@ -709,14 +740,15 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
         if (!editingEffect) return;
         // Map EffectEditor param names to backend param names
         const editorParams = editingEffect.params || {};
+        const backendEffectType = uiTypeToBackendEffect[editingEffect.type] || editingEffect.type;
         let backendParams = {};
 
-        if (editingEffect.type === 'reverb') {
+        if (editingEffect.type === 'spatial') {
             backendParams = {
-                decay: editorParams.decay ?? 1.5,
+                decay: editorParams.decay ?? 2.5,
                 mix: (editorParams.wet ?? 0.6) * 100  // EffectEditor wet is 0-1, backend mix is 0-100
             };
-        } else if (editingEffect.type === 'delay') {
+        } else if (editingEffect.type === 'temporal') {
             backendParams = {
                 time_ms: (editorParams.delayTime ?? 0.3) * 1000,
                 feedback: editorParams.feedback ?? 0.4,
@@ -726,7 +758,14 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
             backendParams = editorParams;
         }
 
-        await applyEffect(editingEffect.type, backendParams);
+        // Pass selection region if a selection exists
+        const hasSelection = selection.start !== selection.end;
+        const selectionRegion = hasSelection ? {
+            startMs: Math.round(Math.min(selection.start, selection.end) * duration * 1000),
+            endMs: Math.round(Math.max(selection.start, selection.end) * duration * 1000)
+        } : null;
+
+        await applyEffect(backendEffectType, backendParams, selectionRegion);
         setEditingEffect(null);
     };
 
@@ -1344,7 +1383,7 @@ export default function SampleEditor({ audioClip, onClose, onSave }) {
                     <button className="toolbar-btn" onClick={handleFadeIn} title="Fade In">
                         <span style={{ fontSize: '9px', fontWeight: 'bold' }}>↗FD</span>
                     </button>
-                    <button className={`toolbar-btn ${editingEffect?.type === 'reverb' ? 'active' : ''}`} onClick={handleReverb} title="Reverb">
+                    <button className={`toolbar-btn ${editingEffect?.type === 'spatial' ? 'active' : ''}`} onClick={handleReverb} title="Reverb">
                         <Waves size={14} />
                     </button>
                     <button className="toolbar-btn" onClick={handleEQ} title="Equalize">
