@@ -126,28 +126,73 @@ ipcMain.handle('open-file-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openFile'],
         filters: [
+            { name: 'Reson Project', extensions: ['reson'] },
             { name: 'All Files', extensions: ['*'] }
         ]
     });
     return result.filePaths;
 });
 
+// Open a project folder: user picks a folder, we find the .reson file inside
+ipcMain.handle('open-folder-dialog', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Open Project Folder',
+        properties: ['openDirectory']
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+        return { canceled: true };
+    }
+
+    const folderPath = result.filePaths[0];
+    try {
+        // Find .reson file(s) in the selected folder
+        const files = fs.readdirSync(folderPath);
+        const resonFiles = files.filter(f => f.endsWith('.reson'));
+
+        if (resonFiles.length === 0) {
+            return { success: false, error: 'No .reson project file found in this folder.' };
+        }
+
+        // Use the first .reson file found
+        const resonFilePath = path.join(folderPath, resonFiles[0]);
+        const content = fs.readFileSync(resonFilePath, 'utf-8');
+
+        return { success: true, filePath: resonFilePath, content };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+});
+
+// Save project as a folder: shows folder-name dialog, creates folder, writes .reson inside
 ipcMain.handle('save-file', async (event, content) => {
+    // Ask user for a folder location + project name
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Save Project',
-        defaultPath: 'project.reson',
+        defaultPath: 'project',
         filters: [
-            { name: 'Reson Project', extensions: ['reson'] },
-            { name: 'JSON Project', extensions: ['json'] },
-            { name: 'All Files', extensions: ['*'] }
+            { name: 'Reson Project Folder', extensions: ['*'] }
         ]
     });
 
-    if (filePath) {
-        fs.writeFileSync(filePath, content);
-        return { success: true, filePath };
+    if (!filePath) return { canceled: true };
+
+    try {
+        // filePath is the folder the user chose (e.g. C:\Projects\MyProject)
+        const projectDir = path.normalize(filePath);
+        const projectName = path.basename(projectDir);
+        const resonFilePath = path.join(projectDir, `${projectName}.reson`);
+
+        // Create project directory
+        fs.mkdirSync(projectDir, { recursive: true });
+
+        // Write .reson JSON file inside
+        fs.writeFileSync(resonFilePath, content);
+
+        return { success: true, filePath: resonFilePath, projectDir };
+    } catch (e) {
+        return { success: false, error: e.message };
     }
-    return { canceled: true };
 });
 
 ipcMain.handle('save-file-silent', async (event, filePath, content) => {
@@ -234,6 +279,11 @@ ipcMain.handle('file-exists', async (event, filePath) => {
 // Resolve a path using path.join (so renderer doesn't need to know OS separator)
 ipcMain.handle('path-join', async (event, ...parts) => {
     return path.join(...parts);
+});
+
+// Get the directory name of a file path
+ipcMain.handle('path-dirname', async (event, filePath) => {
+    return path.dirname(filePath);
 });
 
 // This method will be called when Electron has finished

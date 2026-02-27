@@ -118,10 +118,20 @@ export const ProjectProvider = ({ children }) => {
             // Restore mixer inserts
             if (data.mixerInserts) setMixerInserts(data.mixerInserts);
 
-            // Restore audio clips from companion audio folder
+            // Restore audio clips from audio/ subfolder in the project folder
             if (data.audioClips && data.audioClips.length > 0 && projectFilePath) {
-                const basePath = projectFilePath.replace(/\.[^.]+$/, ''); // strip extension
-                const audioDir = `${basePath}_audio`;
+                // Get the project folder (parent dir of .reson file)
+                let projectDir;
+                if (window.electronAPI?.pathDirname) {
+                    projectDir = await window.electronAPI.pathDirname(projectFilePath);
+                } else {
+                    projectDir = projectFilePath.replace(/[\/][^\/]+$/, '');
+                }
+
+                // Audio files live in audio/ subfolder inside the project folder
+                const audioDir = window.electronAPI?.pathJoin
+                    ? await window.electronAPI.pathJoin(projectDir, 'audio')
+                    : `${projectDir}/audio`;
 
                 const restoredClips = [];
                 for (const serialized of data.audioClips) {

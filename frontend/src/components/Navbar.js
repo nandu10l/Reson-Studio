@@ -105,14 +105,21 @@ function Navbar({
     return btoa(binary);
   };
 
-  // Save audio clip WAV files to a companion folder next to the project file
+  // Save audio clip WAV files into audio/ subfolder inside the project folder
   const saveAudioFiles = async (projectFilePath) => {
     if (!window.electronAPI?.ensureDir || !window.electronAPI?.saveAudioBuffer) return;
     if (audioClips.length === 0) return;
 
-    // Create audio folder: <projectPath>_audio/
-    const basePath = projectFilePath.replace(/\.[^.]+$/, ''); // strip extension
-    const audioDir = `${basePath}_audio`;
+    // Get the project folder (parent directory of the .reson file)
+    let projectDir;
+    if (window.electronAPI.pathDirname) {
+      projectDir = await window.electronAPI.pathDirname(projectFilePath);
+    } else {
+      projectDir = projectFilePath.replace(/[\/][^\/]+$/, '');
+    }
+
+    // Create audio/ subfolder inside the project folder
+    const audioDir = await window.electronAPI.pathJoin(projectDir, 'audio');
     const dirResult = await window.electronAPI.ensureDir(audioDir);
     if (!dirResult?.success) {
       console.error('Failed to create audio directory:', audioDir, dirResult?.error);
@@ -129,13 +136,7 @@ function Navbar({
         const baseName = (clip.fileName || 'audio.wav').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
         const safeFileName = `${clip.id}_${baseName}.wav`;
 
-        // Use pathJoin if available for proper OS path, otherwise simple concat
-        let filePath;
-        if (window.electronAPI.pathJoin) {
-          filePath = await window.electronAPI.pathJoin(audioDir, safeFileName);
-        } else {
-          filePath = `${audioDir}/${safeFileName}`;
-        }
+        const filePath = await window.electronAPI.pathJoin(audioDir, safeFileName);
 
         // Check if file already exists to avoid rewriting unchanged clips
         const exists = await window.electronAPI.fileExists(filePath);
@@ -166,6 +167,11 @@ function Navbar({
 
     if (currentProjectPath) {
       const { json } = getProjectData();
+      // Ensure the project folder still exists (in case it was deleted)
+      if (window.electronAPI.pathDirname) {
+        const projectDir = await window.electronAPI.pathDirname(currentProjectPath);
+        await window.electronAPI.ensureDir(projectDir);
+      }
       const result = await window.electronAPI.saveFileSilent(currentProjectPath, json);
       if (result && result.success) {
         await saveAudioFiles(currentProjectPath);
@@ -198,12 +204,18 @@ function Navbar({
     const ext = newPath.split('.').pop();
     const base = newPath.substring(0, newPath.lastIndexOf('.'));
 
-    const match = base.match(/_(\d+)$/);
+    const match = base.match(/_v(\d+)$/);
     if (match) {
       const num = parseInt(match[1]) + 1;
-      newPath = base.substring(0, base.lastIndexOf('_')) + `_${num}.${ext}`;
+      newPath = base.substring(0, base.lastIndexOf('_v')) + `_v${num}.${ext}`;
     } else {
-      newPath = `${base}_2.${ext}`;
+      newPath = `${base}_v2.${ext}`;
+    }
+
+    // Ensure the parent folder exists
+    if (window.electronAPI.pathDirname) {
+      const parentDir = await window.electronAPI.pathDirname(newPath);
+      await window.electronAPI.ensureDir(parentDir);
     }
 
     const { json } = getProjectData();
@@ -249,6 +261,26 @@ function Navbar({
         // Fallback or Web implementation (optional)
         console.warn("File opening is only supported in the desktop version.");
         alert("File opening is only supported in the desktop version.");
+      }
+    }
+    if (action === 'open_folder') {
+      if (window.electronAPI?.openFolderDialog) {
+        const result = await window.electronAPI.openFolderDialog();
+        if (result && result.success && result.content) {
+          try {
+            const projectData = JSON.parse(result.content);
+            await loadProject(projectData, result.filePath);
+            setCurrentProjectPath(result.filePath);
+            document.title = `Reson Studio - ${result.filePath.split(/[\\/]/).pop()}`;
+          } catch (e) {
+            console.error("Failed to parse project file:", e);
+            alert("Error: Invalid project file format.");
+          }
+        } else if (result && !result.success && result.error) {
+          alert(result.error);
+        }
+      } else {
+        alert("Folder opening is only supported in the desktop version.");
       }
     }
     if (action === 'add_audio_file') {
@@ -381,6 +413,7 @@ function Navbar({
       { label: "New (Basic 808 with limiter)", action: "new" },
       { label: "New from template", action: "new_template", right: ">" },
       { label: "Open...", action: "open", shortcut: "Ctrl+O" },
+      { label: "Open Project Folder...", action: "open_folder" },
       { type: "divider" },
       { label: "Save", action: "save", shortcut: "Ctrl+S" },
       { label: "Save as...", action: "save_as", shortcut: "Shift+Ctrl+S" },

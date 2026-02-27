@@ -467,7 +467,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
               if (sampleData.type === 'audioPackSample' && onAddAudioPackSample) {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
-                const offset = Math.floor(x / pixelsPerBeat);
+                const offset = x / pixelsPerBeat;
                 onAddAudioPackSample(track.id, offset, sampleData);
                 return;
               }
@@ -484,17 +484,17 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
             if (data.type === 'pattern') {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const offset = Math.floor(x / pixelsPerBeat);
+              const offset = x / pixelsPerBeat;
               onAddClip(track.id, offset, data.patternId);
             } else if (data.type === 'audio') {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const offset = Math.floor(x / pixelsPerBeat);
+              const offset = x / pixelsPerBeat;
               onAddAudioClip(track.id, offset, data.audioClipId);
             } else if (data.type === 'automation') {
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const offset = Math.floor(x / pixelsPerBeat);
+              const offset = x / pixelsPerBeat;
               // We need onAddAutomationClip prop.
               if (onAddAutomationClip) onAddAutomationClip(track.id, offset, data.automationId);
             }
@@ -506,7 +506,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
           if (e.button !== 0) return;
           const rect = e.currentTarget.getBoundingClientRect();
           const x = e.clientX - rect.left;
-          const offset = Math.floor(x / pixelsPerBeat);
+          const offset = x / pixelsPerBeat;
           onAddClip(track.id, offset);
         }}
       >
@@ -1336,11 +1336,9 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       const deltaBeats = deltaX / pixelsPerBeat;
 
       if (rs.side === 'left') {
-        // Resizing from left - adjust offset and length
+        // Resizing from left - adjust offset and length (free movement, no snap)
         const newOffset = Math.max(0, rs.startOffset + deltaBeats);
         const newLength = Math.max(0.25, rs.startLength - deltaBeats);
-        const snappedOffset = Math.round(newOffset * 4) / 4;
-        const snappedLength = Math.round(newLength * 4) / 4;
 
         setPlaylistTracks(prev => prev.map(t => {
           if (t.id !== rs.trackId) return t;
@@ -1348,22 +1346,21 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           if (newClips[rs.clipIndex]) {
             newClips[rs.clipIndex] = {
               ...newClips[rs.clipIndex],
-              offset: snappedOffset,
-              length: snappedLength
+              offset: newOffset,
+              length: newLength
             };
           }
           return { ...t, clips: newClips };
         }));
       } else {
-        // Resizing from right - adjust length only
+        // Resizing from right - adjust length only (free movement, no snap)
         const newLength = Math.max(0.25, rs.startLength + deltaBeats);
-        const snappedLength = Math.round(newLength * 4) / 4;
 
         setPlaylistTracks(prev => prev.map(t => {
           if (t.id !== rs.trackId) return t;
           const newClips = [...t.clips];
           if (newClips[rs.clipIndex]) {
-            newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: snappedLength };
+            newClips[rs.clipIndex] = { ...newClips[rs.clipIndex], length: newLength };
           }
           return { ...t, clips: newClips };
         }));
@@ -1400,7 +1397,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     if (clipArea) {
       const rect = clipArea.getBoundingClientRect();
       const relativeX = Math.max(0, e.clientX - rect.left);
-      newOffset = Math.round(relativeX / pixelsPerBeat);
+      newOffset = relativeX / pixelsPerBeat;
     }
 
     setPlaylistTracks(prev => {

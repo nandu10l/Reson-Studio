@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
     toTray: () => ipcRenderer.invoke('window-to-tray'),
     openFileDialog: () => ipcRenderer.invoke('open-file-dialog'),
+    openFolderDialog: () => ipcRenderer.invoke('open-folder-dialog'),
     saveFile: (content) => ipcRenderer.invoke('save-file', content),
     saveFileSilent: (path, content) => ipcRenderer.invoke('save-file-silent', path, content),
     readFile: (path) => ipcRenderer.invoke('read-file', path),
@@ -57,5 +58,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ensureDir: (dirPath) => ipcRenderer.invoke('ensure-dir', dirPath),
     readFileBinary: (filePath) => ipcRenderer.invoke('read-file-binary', filePath),
     fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),
-    pathJoin: (...parts) => ipcRenderer.invoke('path-join', ...parts)
+    pathJoin: (...parts) => ipcRenderer.invoke('path-join', ...parts),
+    pathDirname: (filePath) => ipcRenderer.invoke('path-dirname', filePath)
 });

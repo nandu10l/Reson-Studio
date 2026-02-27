@@ -73,7 +73,7 @@ export default function ResonTrackList({ tracks = [], scrollLeft = 0, onSelectCl
       const rect = clipArea.getBoundingClientRect();
       // Convert clientX into content coordinates accounting for the applied translateX(-scrollLeft)
       const contentX = e.clientX - rect.left - scrollLeft;
-      newOffset = Math.max(0, Math.round(contentX / 60));
+      newOffset = Math.max(0, contentX / 60);
     }
 
     setLocalTracks(prev => {
@@ -123,7 +123,7 @@ export default function ResonTrackList({ tracks = [], scrollLeft = 0, onSelectCl
     if (e.target.classList.contains('reson-track-clips') || e.target.classList.contains('reson-track-grid')) {
       const rect = e.currentTarget.querySelector('.reson-track-clips').getBoundingClientRect();
       const contentX = e.clientX - rect.left - scrollLeft;
-      const offset = Math.max(0, Math.round(contentX / 60));
+      const offset = Math.max(0, contentX / 60);
       addClip(trackId, offset);
     }
   };
