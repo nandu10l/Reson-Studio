@@ -277,7 +277,10 @@ class AudioEngine {
 
                     // Schedule if step hasn't passed in current loop iteration
                     if (stepTimeInLoop >= positionInLoop) {
-                        const time = `0:0:${index}`; // bars:quarters:sixteenths
+                        const measure = Math.floor(index / 16);
+                        const beat = Math.floor((index % 16) / 4);
+                        const sixteenth = index % 4;
+                        const time = `${measure}:${beat}:${sixteenth}`;
                         Tone.Transport.schedule((t) => {
                             this.previewSound(id, t);
                         }, time);
@@ -298,7 +301,10 @@ class AudioEngine {
 
             // Schedule if note hasn't passed in current loop iteration
             if (noteStartInLoop >= positionInLoop) {
-                const time = `0:0:${note.startStep}`;
+                const measure = Math.floor(note.startStep / 16);
+                const beat = Math.floor((note.startStep % 16) / 4);
+                const sixteenth = note.startStep % 4;
+                const time = `${measure}:${beat}:${sixteenth}`;
 
                 Tone.Transport.schedule((t) => {
                     // Use dedicated poly synth or channel instrument
