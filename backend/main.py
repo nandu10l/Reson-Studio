@@ -25,6 +25,14 @@ app.include_router(midify.router)
 app.include_router(generate_music.router)
 app.include_router(lyria_music.router)
 
+# MIDI-LLM (optional — requires CUDA GPU + transformers + anticipation)
+try:
+    from routers import midi_llm
+    app.include_router(midi_llm.router)
+    print("✓ MIDI-LLM router registered")
+except ImportError as e:
+    print(f"⚠ MIDI-LLM router not available: {e}")
+
 @app.get("/")
 async def root():
     return {"message": "Welcome to Reson Studio API"}

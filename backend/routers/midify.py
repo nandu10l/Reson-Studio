@@ -85,9 +85,118 @@ with open(output_path, "w") as f:
 '''
 
 
-# ── MIDI Byte Packing Helper (Reused from generate_music.py) ──────────────────
+# ── Post-Processing: Clean up basic-pitch output ─────────────────────────────
+def _postprocess_notes(notes: List[Dict[str, Any]], bpm: int, quantize_steps: int = 8) -> List[Dict[str, Any]]:
+    """
+    Filter artifacts, remove harmonics, merge near-duplicates, and optionally
+    quantize timing. This dramatically improves accuracy for full-mix audio.
+
+    Args:
+        notes: Raw note list from basic-pitch with start (beats), duration (beats), note, velocity.
+        bpm: Tempo in BPM.
+        quantize_steps: Grid resolution in subdivisions per beat (4=16ths, 8=32nds, 0=off).
+    """
+    if not notes:
+        return notes
+
+    # ── 1. Remove very quiet notes (likely ghost detections) ────────────────
+    # Raise the floor to 18% — basic-pitch often produces faint phantom notes
+    # at pitches that aren't actually in the audio (harmonics, noise floor).
+    min_velocity = 0.18
+    notes = [n for n in notes if n["velocity"] >= min_velocity]
+
+    # ── 2. Remove extremely short notes (< 0.1 beats ≈ 50ms at 120bpm) ────
+    min_dur_beats = 0.1
+    notes = [n for n in notes if n["duration"] >= min_dur_beats]
+
+    # ── 3. Merge near-duplicate notes at same pitch ────────────────────────
+    # If two notes of the same pitch start within 0.15 beats of each other,
+    # keep only the louder one (the other is likely a detection artifact).
+    notes.sort(key=lambda n: (n["note"], n["start"]))
+    merged = []
+    i = 0
+    while i < len(notes):
+        current = notes[i]
+        j = i + 1
+        best = current
+        while j < len(notes) and notes[j]["note"] == current["note"] and abs(notes[j]["start"] - current["start"]) < 0.15:
+            if notes[j]["velocity"] > best["velocity"]:
+                best = notes[j]
+            j += 1
+        merged.append(best)
+        i = j
+    notes = merged
+
+    # ── 4. Remove harmonic artifacts ───────────────────────────────────────
+    # If a loud note exists and a quieter note at a harmonic interval (octave,
+    # fifth, etc.) starts within 0.15 beats, the quieter one is almost certainly
+    # a harmonic overtone detected by the neural network — not a real note.
+    # Also handle nearby pitches (±1 semitone of harmonic) for slightly
+    # detuned harmonics common in real audio.
+    notes.sort(key=lambda n: n["start"])
+    harmonic_intervals = {7, 12, 19, 24}  # fifth, octave, octave+fifth, 2 octaves
+    # Expand to include ±1 semitone tolerance for each harmonic
+    harmonic_set = set()
+    for h in harmonic_intervals:
+        harmonic_set.update([h - 1, h, h + 1])
+
+    to_remove = set()
+    for i, n1 in enumerate(notes):
+        if i in to_remove:
+            continue
+        for j, n2 in enumerate(notes):
+            if i == j or j in to_remove:
+                continue
+            if abs(n1["start"] - n2["start"]) > 0.15:
+                continue
+            interval = abs(n2["note"] - n1["note"])
+            if interval in harmonic_set:
+                # The quieter note is the harmonic — use 75% threshold
+                if n2["velocity"] < n1["velocity"] * 0.75:
+                    to_remove.add(j)
+                elif n1["velocity"] < n2["velocity"] * 0.75:
+                    to_remove.add(i)
+    notes = [n for i, n in enumerate(notes) if i not in to_remove]
+
+    # ── 5. Remove statistical outliers ─────────────────────────────────────
+    # If a note's velocity is far below the median, it's likely a false detection.
+    if len(notes) > 10:
+        velocities = sorted(n["velocity"] for n in notes)
+        median_vel = velocities[len(velocities) // 2]
+        # Remove notes below 25% of the median velocity
+        outlier_threshold = median_vel * 0.25
+        notes = [n for n in notes if n["velocity"] >= outlier_threshold]
+
+    # ── 6. Quantize to grid ────────────────────────────────────────────────
+    if quantize_steps > 0:
+        grid = 1.0 / quantize_steps  # size of one grid cell in beats
+        for n in notes:
+            n["start"] = round(round(n["start"] / grid) * grid, 4)
+            # Quantize duration to nearest grid, minimum 1 grid cell
+            n["duration"] = round(max(grid, round(n["duration"] / grid) * grid), 4)
+
+    # ── 7. De-duplicate after quantization ─────────────────────────────────
+    # Quantization can cause multiple notes to snap to the same start + pitch.
+    # Keep only the loudest note at each (start, pitch) position.
+    seen = {}
+    for n in notes:
+        key = (n["start"], n["note"])
+        if key not in seen or n["velocity"] > seen[key]["velocity"]:
+            seen[key] = n
+    notes = list(seen.values())
+
+    # ── 8. Final sort by start time ────────────────────────────────────────
+    notes.sort(key=lambda n: (n["start"], n["note"]))
+    return notes
+
+
+# ── MIDI Byte Packing Helper ─────────────────────────────────────────────────
 def build_midi_binary(notes: List[Dict[str, Any]], tempo_bpm: int) -> bytes:
-    """Build a standard MIDI file (type 0) from note data."""
+    """
+    Build a standard MIDI file (type 0) from note data.
+    Correctly handles polyphonic (overlapping) notes by interleaving
+    note-on and note-off events sorted by absolute tick time.
+    """
     def var_len(value: int) -> bytes:
         result = [value & 0x7F]
         value >>= 7
@@ -101,7 +210,21 @@ def build_midi_binary(notes: List[Dict[str, Any]], tempo_bpm: int) -> bytes:
 
     microseconds_per_beat = int(60_000_000 / tempo_bpm)
     ticks_per_beat = 480
-    
+
+    # ── Build a list of ALL events (note-on + note-off) sorted by tick ────
+    events = []  # (absolute_tick, event_type, pitch, velocity)
+    for n in notes:
+        start_tick = int(n["start"] * ticks_per_beat)
+        duration_ticks = max(1, int(n["duration"] * ticks_per_beat))
+        pitch = max(0, min(127, n["note"]))
+        velocity = max(1, min(127, int(n["velocity"] * 127)))  # Proper 0-127 scaling
+
+        events.append((start_tick, 0x90, pitch, velocity))      # Note On
+        events.append((start_tick + duration_ticks, 0x80, pitch, 0))  # Note Off
+
+    # Sort: by tick, then note-off before note-on at same tick (avoids stuck notes)
+    events.sort(key=lambda e: (e[0], 0 if e[1] == 0x80 else 1))
+
     track_events = bytearray()
     # Set tempo
     track_events += b'\x00\xff\x51\x03'
@@ -110,20 +233,10 @@ def build_midi_binary(notes: List[Dict[str, Any]], tempo_bpm: int) -> bytes:
     track_events += b'\x00\xc0\x00'
 
     last_tick = 0
-    # Basic Pitch notes are already sorted by start time
-    for n in notes:
-        start_tick = int(n["start"] * ticks_per_beat)
-        duration_ticks = int(n["duration"] * ticks_per_beat)
-        pitch = max(0, min(127, n["note"]))
-        velocity = int(n["velocity"] * 100)
-
-        # Delta time since last event
-        delta_on = start_tick - last_tick
-        track_events += var_len(max(0, delta_on)) + bytes([0x90, pitch, velocity])
-        
-        # Note Off (using 0x80 or 0x90 with velocity 0)
-        track_events += var_len(duration_ticks) + bytes([0x80, pitch, 0])
-        last_tick = start_tick + duration_ticks
+    for abs_tick, status, pitch, vel in events:
+        delta = max(0, abs_tick - last_tick)
+        track_events += var_len(delta) + bytes([status, pitch, vel])
+        last_tick = abs_tick
 
     # End of track
     track_events += b'\x00\xff\x2f\x00'
@@ -184,6 +297,11 @@ async def _perform_midify_analysis(file: UploadFile, bpm: int, onset_threshold: 
                 "velocity": round(min(event["velocity"], 1.0), 3)
             })
         output_notes.sort(key=lambda n: n["start"])
+
+        # Post-process: filter artifacts, harmonics, quantize to 16th-note grid
+        # (frontend PianoRoll uses 4 steps per beat = 16th notes)
+        output_notes = _postprocess_notes(output_notes, bpm, quantize_steps=4)
+
         return {"notes": output_notes, "duration": data.get("duration", 0)}
     finally:
         for path in [temp_path, script_path, output_path]:
@@ -196,9 +314,9 @@ async def _perform_midify_analysis(file: UploadFile, bpm: int, onset_threshold: 
 async def convert_audio_to_midi(
     file: UploadFile = File(...),
     bpm: int = Query(120),
-    onset_threshold: float = Query(0.3),
-    frame_threshold: float = Query(0.15),
-    min_note_length_ms: int = Query(30)
+    onset_threshold: float = Query(0.5),
+    frame_threshold: float = Query(0.3),
+    min_note_length_ms: int = Query(58)
 ):
     try:
         data = await _perform_midify_analysis(file, bpm, onset_threshold, frame_threshold, min_note_length_ms)

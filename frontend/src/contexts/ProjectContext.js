@@ -1432,22 +1432,20 @@ export const ProjectProvider = ({ children }) => {
         const clipName = clip.name || clip.fileName?.replace(/\.[^/.]+$/, '') || 'Audio';
         const startId = Date.now();
 
-        // Create new channel for the midified instrument
-        let newChannelId;
+        // Pre-compute the channel ID to avoid setState race condition
+        const newChannelId = Math.max(...channels.map(c => c.id), -1) + 1;
+        const newChannel = {
+            id: newChannelId,
+            name: `Midify: ${clipName}`,
+            vol: 80,
+            pan: 50,
+            effects: [],
+            pluginId: 'sampler'
+        };
+
+        // Create channel
         setChannels(prev => {
-            newChannelId = Math.max(...prev.map(c => c.id), -1) + 1;
-            const newChannel = {
-                id: newChannelId,
-                name: `Midify: ${clipName}`,
-                vol: 80,
-                pan: 50,
-                effects: [],
-                pluginId: 'sampler'
-            };
-
-            // Register with audio engine
             audioEngine.createChannel(newChannelId, newChannel.name);
-
             return [...prev, newChannel];
         });
 
@@ -1492,7 +1490,7 @@ export const ProjectProvider = ({ children }) => {
         setPickerTab('PAT');
 
         console.log(`Midify: Created pattern "Midify - ${clipName}" with ${patternNotes.length} notes`);
-    }, [bpm, audioClips]);
+    }, [bpm, audioClips, channels]);
 
 
 

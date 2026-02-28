@@ -27,6 +27,7 @@ import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
 import AIComposer from '../components/AIComposer/AIComposer';
 import AIMusicGenerator from '../components/MusicGen/AIMusicGenerator';
+import MidiLLMGenerator from '../components/MidiLLM/MidiLLMGenerator';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
@@ -41,6 +42,7 @@ function Dashboard() {
     sampleEditor: false,
     aiComposer: false,
     musicGenerator: false,
+    midiLlm: false,
     playlist: true, // Default view
     browser: true
   });
@@ -140,7 +142,7 @@ function Dashboard() {
 
       // Revoke old URL to prevent memory leaks
       if (editingSample.url && editingSample.url.startsWith('blob:')) {
-        try { URL.revokeObjectURL(editingSample.url); } catch (_) {}
+        try { URL.revokeObjectURL(editingSample.url); } catch (_) { }
       }
 
       // Overwrite the audio clip in audioClips state
@@ -562,6 +564,19 @@ function Dashboard() {
           height={440}
         >
           <AIMusicGenerator />
+        </DraggableWindow>
+      )}
+
+      {/* MIDI-LLM Generator */}
+      {activeWindows.midiLlm && (
+        <DraggableWindow
+          title="🎹 MIDI-LLM Generator"
+          onClose={() => toggleWindow('midiLlm')}
+          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 360), y: 120 }}
+          width={720}
+          height={400}
+        >
+          <MidiLLMGenerator />
         </DraggableWindow>
       )}
 

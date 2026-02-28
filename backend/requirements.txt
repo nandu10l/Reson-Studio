@@ -33,3 +33,11 @@ tensorflow>=2.15.0
 # Lyria RealTime music generation (Gemini API)
 google-genai>=1.0.0
 websockets>=12.0
+
+# MIDI-LLM — Text-to-MIDI generation (optional, requires CUDA GPU)
+# Install separately: pip install transformers accelerate bitsandbytes
+# pip install "anticipation @ git+https://github.com/jthickstun/anticipation.git"
+transformers>=4.40.0
+accelerate>=0.30.0
+bitsandbytes>=0.43.0
+anticipation @ git+https://github.com/jthickstun/anticipation.git

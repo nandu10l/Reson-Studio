@@ -27,57 +27,6 @@ const STATUS_LABELS = {
 const WS_URL = `ws://${window.location.hostname || 'localhost'}:8000/ws/music`;
 const API_BASE = `http://${window.location.hostname || 'localhost'}:8000`;
 
-// ── Instrument Classification (Acoustic Heuristic) ─────────
-// Basic-pitch detects ACTUAL frequencies, not GM drum map pitches.
-// A real hi-hat vibrates at 3000-5000+ Hz (MIDI ~95+), snare body
-// resonates at 150-250 Hz (MIDI ~50-59). We classify by acoustic
-// pitch + note duration instead of the GM channel-10 convention.
-
-const PERC_HARD_THRESHOLD = 1.5;  // beats — shorter than this = almost certainly percussive
-const PERC_SOFT_THRESHOLD = 3.0;  // beats — below this AND low pitch = still likely a drum hit
-
-/**
- * Classify a note into an instrument group using pitch + duration.
- * Basic-pitch reports full note decay, so drum hits can easily reach
- * 0.5-1.5 beats. True melodic notes sustain much longer (> 2-3 beats).
- */
-function classifyNote(pitch, duration) {
-    const isShort = duration <= PERC_HARD_THRESHOLD;
-    const isMedium = duration <= PERC_SOFT_THRESHOLD;
-
-    // ── Clearly percussive (short notes) ─────────────────
-    if (isShort) {
-        if (pitch < 50) return 'Kick';
-        if (pitch < 65) return 'Snare';
-        if (pitch < 80) return 'Tom';
-        return 'HiHat';
-    }
-
-    // ── Moderately short + low pitch = still likely a drum ──
-    // Real bass notes sustain well beyond 3 beats; drum hits
-    // with resonance tail sit in the 1.5-3.0 range.
-    if (isMedium && pitch < 50) return 'Kick';
-    if (isMedium && pitch < 65) return 'Snare';
-
-    // ── Sustained / melodic notes ─────────────────────────
-    if (pitch < 48) return 'Bass';
-    if (pitch < 72) return 'Piano';
-    if (pitch < 96) return 'Lead';
-    return 'High';
-}
-
-// Channel name patterns for matching instrument groups to existing channels
-const INSTRUMENT_CHANNEL_PATTERNS = {
-    'Kick': { terms: ['kick', '808 kick'], isDrum: true, newPlugin: '808 Kick', color: '#f97316' },
-    'Snare': { terms: ['snare', '808 snare', 'clap', '808 clap'], isDrum: true, newPlugin: '808 Snare', color: '#f97316' },
-    'Tom': { terms: ['tom'], isDrum: true, newPlugin: '808 Tom', color: '#f97316' },
-    'HiHat': { terms: ['hihat', 'hi hat', 'hi-hat', '808 hihat', 'cymbal'], isDrum: true, newPlugin: '808 HiHat', color: '#eab308' },
-    'Bass': { terms: ['flex bass', 'electric bass', 'bass', 'contrabass'], isDrum: false, newPlugin: 'Electric Bass', color: '#8b5cf6' },
-    'Piano': { terms: ['grand piano', 'piano', 'organ', 'harmonium'], isDrum: false, newPlugin: 'Grand Piano', color: '#22c55e' },
-    'Lead': { terms: ['analog synth', 'violin', 'flute', 'saxophone', 'trumpet'], isDrum: false, newPlugin: 'Analog Synth', color: '#06b6d4' },
-    'High': { terms: ['xylophone', 'flute'], isDrum: false, newPlugin: 'Xylophone', color: '#06b6d4' },
-};
-
 // ── Helper: PCM → WAV for decodeAudioData ─────────────────────
 function pcmToWav(pcmBytes, sampleRate = 48000, numChannels = 2, bitsPerSample = 16) {
     const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
@@ -436,15 +385,7 @@ export default function AIMusicGenerator() {
         }
     }, [generateFullWavBlob, projectBpm, prompt, playlistTracks, setAudioClips, setPlaylistTracks]);
 
-    // ── Add to Track (MIDI) — Instrument-Aware ──────────────
-    const findMatchingChannel = useCallback((searchTerms) => {
-        for (const term of searchTerms) {
-            const match = channels.find(ch => ch.name.toLowerCase().includes(term.toLowerCase()));
-            if (match) return match;
-        }
-        return null;
-    }, [channels]);
-
+    // ── Add to Track (MIDI) ────────────────────────────────
     const handleAddMidiToTrack = useCallback(async () => {
         const blob = generateFullWavBlob();
         if (!blob) return;
@@ -454,12 +395,14 @@ export default function AIMusicGenerator() {
             const formData = new FormData();
             formData.append('file', blob, 'audio.wav');
 
-            // Use aggressive thresholds for AI-generated audio (cleaner signal than real recordings)
+            // CRITICAL: Use projectBpm (DAW tempo) for seconds→beats conversion,
+            // NOT the generator bpm. The DAW plays notes at projectBpm, so beat
+            // positions must be relative to that tempo for correct absolute timing.
             const params = new URLSearchParams({
-                bpm: bpm,
-                onset_threshold: 0.25,
-                frame_threshold: 0.12,
-                min_note_length_ms: 25
+                bpm: projectBpm,
+                onset_threshold: 0.5,
+                frame_threshold: 0.3,
+                min_note_length_ms: 58
             });
 
             const response = await fetch(`${API_BASE}/midify/convert?${params}`, {
@@ -475,128 +418,94 @@ export default function AIMusicGenerator() {
                 return;
             }
 
-            // ── Classify notes into instrument groups ──────
-            const instrumentGroups = {};
+            console.log(`🎵 AI MIDI: ${data.notes.length} notes detected from audio`);
 
-            for (const note of data.notes) {
-                const pitch = note.note;
-                const duration = note.duration;
-                const groupName = classifyNote(pitch, duration);
+            // ── Create a single channel for all detected notes ──────
+            // Basic-pitch detects pitches, NOT instruments. Creating separate
+            // "Kick", "Snare", "Piano" etc. channels from pitch ranges would
+            // fabricate instruments that don't exist in the audio. Instead, put
+            // ALL detected notes into one unified pattern on one channel.
+            const channelVol = Math.round(volume * 100);
+            const channelId = Math.max(...channels.map(c => c.id), -1) + 1;
+            const promptLabel = prompt ? prompt.slice(0, 25).trim() : 'Generated';
 
-                if (!instrumentGroups[groupName]) {
-                    instrumentGroups[groupName] = [];
-                }
-                instrumentGroups[groupName].push(note);
-            }
+            const newChannel = {
+                id: channelId,
+                name: `AI: ${promptLabel}`,
+                vol: channelVol,
+                pan: 50,
+                effects: [],
+                pluginId: 'sampler'
+            };
 
-            console.log(`🎵 Classifying ${data.notes.length} notes (hard: ${PERC_HARD_THRESHOLD}b, soft: ${PERC_SOFT_THRESHOLD}b)`);
-            console.table(data.notes.slice(0, 20).map(n => ({
-                pitch: n.note, noteName: n.noteName, duration: n.duration?.toFixed(2),
-                classified: classifyNote(n.note, n.duration)
-            })));
-            console.log('Instrument groups detected:', Object.keys(instrumentGroups).map(k => `${k} (${instrumentGroups[k].length} notes)`));
+            setChannels(prev => {
+                audioEngine.createChannel(channelId, newChannel.name);
+                audioEngine.updateChannelVolume(channelId, channelVol);
+                return [...prev, newChannel];
+            });
 
-            // ── Create channels & patterns for each group ──
+            // ── Build pattern notes from ALL detected notes ─────────
             const startId = Date.now();
-            let groupIndex = 0;
+            const patternNotes = data.notes.map((n, idx) => ({
+                id: startId + idx,
+                noteName: n.noteName,
+                channelId: channelId,
+                startStep: Math.round(n.start * 4),
+                length: Math.max(1, Math.round(n.duration * 4)),
+                velocity: n.velocity || 0.8,
+            }));
+
+            const maxStep = Math.max(...patternNotes.map(n => n.startStep + n.length), 16);
+            const patternLength = Math.ceil(maxStep / 16) * 16;
+
+            // ── Create the steps object ─────────────────────────────
             const createEmptySteps = (length) => {
                 const steps = {};
                 channels.forEach(ch => { steps[ch.id] = Array(length).fill(false); });
+                steps[channelId] = Array(length).fill(false);
                 return steps;
             };
 
-            for (const [groupName, notes] of Object.entries(instrumentGroups)) {
-                // Lookup the instrument channel pattern for this group
-                const groupInfo = INSTRUMENT_CHANNEL_PATTERNS[groupName] || { terms: [], isDrum: false, newPlugin: groupName, color: '#22c55e' };
+            // ── Create pattern and place on timeline ────────────────
+            setPatterns(prev => {
+                const nextPatId = Math.max(...prev.map(p => p.id), 0) + 1;
+                const newSteps = createEmptySteps(patternLength);
 
-                // Find or create channel
-                let channelId;
-                const existingCh = findMatchingChannel(groupInfo.terms);
-                if (existingCh) {
-                    channelId = existingCh.id;
-                }
+                const newPattern = {
+                    id: nextPatId,
+                    name: `AI Gen - ${promptLabel}`,
+                    color: '#22c55e',
+                    length: patternLength,
+                    data: { steps: newSteps, notes: patternNotes },
+                };
 
-                // No existing channel found → create new one
-                if (channelId === undefined) {
-                    const newChannelName = groupInfo.isDrum ? `808 ${groupName}` : groupInfo.newPlugin;
-                    // Convert generator volume (0-1) to channel rack scale (0-100)
-                    const channelVol = Math.round(volume * 100);
+                setActivePatternId(nextPatId);
 
-                    setChannels(prev => {
-                        channelId = Math.max(...prev.map(c => c.id), -1) + 1;
-                        const newChannel = {
-                            id: channelId,
-                            name: newChannelName,
-                            vol: channelVol,
-                            pan: 50,
-                            effects: [],
-                            pluginId: groupInfo.isDrum ? 'drums' : 'sampler'
-                        };
-                        audioEngine.createChannel(channelId, newChannel.name);
-                        audioEngine.updateChannelVolume(channelId, channelVol);
-                        return [...prev, newChannel];
-                    });
-                }
-
-                // Build pattern notes
-                const patternNotes = notes.map((n, idx) => ({
-                    id: startId + (groupIndex * 10000) + idx,
-                    noteName: n.noteName,
-                    channelId: channelId,
-                    startStep: Math.round(n.start * 4),
-                    length: Math.max(1, Math.round(n.duration * 4)),
-                    velocity: n.velocity || 0.8,
-                }));
-
-                const maxStep = Math.max(...patternNotes.map(n => n.startStep + n.length), 16);
-                const patternLength = Math.ceil(maxStep / 16) * 16;
-
-                // Create pattern
-                setPatterns(prev => {
-                    const nextPatId = Math.max(...prev.map(p => p.id), 0) + 1;
-                    const newSteps = createEmptySteps(patternLength);
-                    if (!newSteps[channelId]) newSteps[channelId] = Array(patternLength).fill(false);
-
-                    const groupColor = groupInfo.color;
-
-                    const newPattern = {
-                        id: nextPatId,
-                        name: `AI Gen - ${groupName}`,
-                        color: groupColor,
-                        length: patternLength,
-                        data: { steps: newSteps, notes: patternNotes },
-                    };
-
-                    setActivePatternId(nextPatId);
-
-                    // Place on timeline
-                    setPlaylistTracks(prevTracks => {
-                        const targetTrack = prevTracks.find(t => t.clips.length === 0)
-                            || prevTracks[prevTracks.length - 1];
-                        if (targetTrack) {
-                            return prevTracks.map(t =>
-                                t.id === targetTrack.id
-                                    ? { ...t, clips: [...t.clips, { id: Date.now() + groupIndex + nextPatId, type: 'pattern', patternId: nextPatId, offset: 0, length: patternLength }] }
-                                    : t
-                            );
-                        }
-                        return prevTracks;
-                    });
-
-                    return [...prev, newPattern];
+                // Place on timeline
+                setPlaylistTracks(prevTracks => {
+                    const targetTrack = prevTracks.find(t => t.clips.length === 0)
+                        || prevTracks[prevTracks.length - 1];
+                    if (targetTrack) {
+                        return prevTracks.map(t =>
+                            t.id === targetTrack.id
+                                ? { ...t, clips: [...t.clips, { id: Date.now() + nextPatId, type: 'pattern', patternId: nextPatId, offset: 0, length: patternLength }] }
+                                : t
+                        );
+                    }
+                    return prevTracks;
                 });
 
-                groupIndex++;
-            }
+                return [...prev, newPattern];
+            });
 
-            console.log(`AI MIDI added to track: ${Object.keys(instrumentGroups).length} instrument groups`);
+            console.log(`AI MIDI added to track: 1 pattern, ${data.notes.length} notes`);
         } catch (err) {
             console.error('Add MIDI to track error:', err);
             alert('Failed to add MIDI to track. Make sure the backend is running with basic-pitch installed.');
         } finally {
             setIsAddingToTrack(false);
         }
-    }, [generateFullWavBlob, bpm, volume, channels, patterns, findMatchingChannel, setChannels, setPatterns, setActivePatternId, setPlaylistTracks]);
+    }, [generateFullWavBlob, projectBpm, volume, channels, prompt, setChannels, setPatterns, setActivePatternId, setPlaylistTracks]);
 
     // ── Generate ─────────────────────────────────────────────
     const handleGenerate = useCallback(() => {

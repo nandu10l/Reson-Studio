@@ -694,7 +694,7 @@ class AudioEngine {
             }));
         } else if (n.includes('violin')) {
             loadSampledInstrument('violin', new Tone.PolySynth(Tone.AMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 2,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.1, decay: 0.3, sustain: 0.8, release: 0.5 },
@@ -703,7 +703,7 @@ class AudioEngine {
             }));
         } else if (n.includes('cello')) {
             loadSampledInstrument('cello', new Tone.PolySynth(Tone.AMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 1.5,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.15, decay: 0.4, sustain: 0.8, release: 0.6 },
@@ -712,35 +712,35 @@ class AudioEngine {
             }));
         } else if (n.includes('contrabass')) {
             loadSampledInstrument('contrabass', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.15, decay: 0.5, sustain: 0.7, release: 0.8 },
                 volume: -2
             }));
         } else if (n.includes('flute')) {
             loadSampledInstrument('flute', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'sine' },
                 envelope: { attack: 0.05, decay: 0.15, sustain: 0.8, release: 0.3 },
                 volume: -2
             }));
         } else if (n.includes('clarinet')) {
             loadSampledInstrument('clarinet', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'square' },
                 envelope: { attack: 0.05, decay: 0.2, sustain: 0.7, release: 0.3 },
                 volume: -6
             }));
         } else if (n.includes('bassoon')) {
             loadSampledInstrument('bassoon', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.08, decay: 0.3, sustain: 0.7, release: 0.4 },
                 volume: -4
             }));
         } else if (n.includes('saxophone') || n.includes('sax')) {
             loadSampledInstrument('saxophone', new Tone.PolySynth(Tone.MonoSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'square' },
                 filter: { Q: 2, type: 'lowpass', rolloff: -12 },
                 filterEnvelope: { attack: 0.02, decay: 0.2, sustain: 0.6, release: 0.3, baseFrequency: 400, octaves: 2 },
@@ -748,7 +748,7 @@ class AudioEngine {
             }));
         } else if (n.includes('trumpet')) {
             loadSampledInstrument('trumpet', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 1,
                 modulationIndex: 3,
                 oscillator: { type: 'sawtooth' },
@@ -758,7 +758,7 @@ class AudioEngine {
             }));
         } else if (n.includes('trombone')) {
             loadSampledInstrument('trombone', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 0.5,
                 modulationIndex: 2,
                 oscillator: { type: 'sawtooth' },
@@ -768,7 +768,7 @@ class AudioEngine {
             }));
         } else if (n.includes('tuba')) {
             loadSampledInstrument('tuba', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 0.5,
                 modulationIndex: 1.5,
                 oscillator: { type: 'sawtooth' },
@@ -779,7 +779,7 @@ class AudioEngine {
             }));
         } else if (n.includes('french') && n.includes('horn')) {
             loadSampledInstrument('french-horn', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 1,
                 modulationIndex: 2,
                 oscillator: { type: 'sawtooth' },
@@ -789,7 +789,7 @@ class AudioEngine {
             }));
         } else if (n.includes('organ')) {
             loadSampledInstrument('organ', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 16,
+                maxPolyphony: 32,
                 harmonicity: 2,
                 modulationIndex: 1,
                 oscillator: { type: 'sine' },
@@ -799,7 +799,7 @@ class AudioEngine {
             }));
         } else if (n.includes('harmonium')) {
             loadSampledInstrument('harmonium', new Tone.PolySynth(Tone.FMSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 harmonicity: 2,
                 modulationIndex: 1.5,
                 oscillator: { type: 'sine' },
@@ -809,33 +809,33 @@ class AudioEngine {
             }));
         } else if (n.includes('harp')) {
             loadSampledInstrument('harp', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 16,
+                maxPolyphony: 32,
                 oscillator: { type: 'triangle' },
                 envelope: { attack: 0.002, decay: 1.2, sustain: 0, release: 1.5 },
                 volume: -2
             }));
         } else if (n.includes('xylophone')) {
             loadSampledInstrument('xylophone', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 16,
+                maxPolyphony: 32,
                 oscillator: { type: 'sine' },
                 envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.3 },
                 volume: -4
             }));
         } else if (n.includes('acoustic') && n.includes('guitar')) {
             loadSampledInstrument('guitar-acoustic', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'triangle' },
                 envelope: { attack: 0.002, decay: 0.8, sustain: 0.1, release: 1.0 }
             }));
         } else if (n.includes('nylon') && n.includes('guitar')) {
             loadSampledInstrument('guitar-nylon', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'triangle' },
                 envelope: { attack: 0.002, decay: 0.9, sustain: 0.1, release: 1.2 }
             }));
         } else if (n.includes('electric') && n.includes('bass')) {
             loadSampledInstrument('bass-electric', new Tone.PolySynth(Tone.MonoSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'square' },
                 filter: { Q: 2, type: 'lowpass', rolloff: -24 },
                 filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
@@ -843,7 +843,7 @@ class AudioEngine {
             }));
         } else if (n.includes('electric') && n.includes('guitar')) {
             loadSampledInstrument('guitar-electric', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 },
                 volume: 4
@@ -851,7 +851,7 @@ class AudioEngine {
         } else if (n.includes('bass')) {
             // Generic bass (synth)
             loadSampledInstrument('bass-electric', new Tone.PolySynth(Tone.MonoSynth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'square' },
                 filter: { Q: 2, type: 'lowpass', rolloff: -24 },
                 filterEnvelope: { attack: 0.01, decay: 0.15, sustain: 0.5, release: 0.5, baseFrequency: 200, octaves: 2.5 },
@@ -860,7 +860,7 @@ class AudioEngine {
         } else if (n.includes('guitar')) {
             // Generic guitar fallback
             loadSampledInstrument('guitar-electric', new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 8,
+                maxPolyphony: 32,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.003, decay: 0.15, sustain: 0.55, release: 1.2 },
                 volume: 4
@@ -868,7 +868,7 @@ class AudioEngine {
         } else if (n.includes('string')) {
             // String Ensemble — use cello samples
             loadSampledInstrument('cello', new Tone.PolySynth(Tone.AMSynth, {
-                maxPolyphony: 16,
+                maxPolyphony: 32,
                 harmonicity: 1.5,
                 oscillator: { type: 'fatsawtooth', spread: 30, count: 3 },
                 envelope: { attack: 0.3, decay: 0.4, sustain: 0.8, release: 1.0 },
@@ -878,7 +878,7 @@ class AudioEngine {
         } else if (n.includes('synth') || n.includes('analog')) {
             // Analog Synth — keep as pure synthesis
             source = new Tone.PolySynth(Tone.Synth, {
-                maxPolyphony: 16,
+                maxPolyphony: 32,
                 oscillator: { type: 'sawtooth' },
                 envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 0.4 }
             }).connect(channel);

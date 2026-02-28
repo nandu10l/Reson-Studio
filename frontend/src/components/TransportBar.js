@@ -313,6 +313,15 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             <span style={{ fontSize: 14 }}>🎵</span>
             <span className="transport-view-label">Music</span>
           </button>
+          <button
+            className={`transport-view-btn ${activeWindows?.midiLlm ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('midiLlm')}
+            title="MIDI-LLM — Text to MIDI"
+            style={activeWindows?.midiLlm ? { borderColor: '#8b5cf6', color: '#c4b5fd' } : {}}
+          >
+            <span style={{ fontSize: 14 }}>🎹</span>
+            <span className="transport-view-label">MIDI</span>
+          </button>
         </div>
       </div>
 

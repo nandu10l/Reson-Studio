@@ -1,0 +1,517 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MidiLLMGenerator — Text-to-MIDI generation panel
+   Purple/violet accent to distinguish from Lyria (green/teal)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.midi-llm-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.midi-llm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #2d1b69 0%, #1a1a2e 100%);
+    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    flex-shrink: 0;
+}
+
+.midi-llm-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #c4b5fd;
+}
+
+.midi-llm-title-icon {
+    font-size: 16px;
+}
+
+.midi-llm-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.midi-llm-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #888;
+}
+
+.midi-llm-status .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #555;
+}
+
+.midi-llm-status.available .status-dot {
+    background: #22c55e;
+}
+
+.midi-llm-status.generating .status-dot {
+    background: #a78bfa;
+    animation: midi-llm-pulse 1s ease-in-out infinite;
+}
+
+.midi-llm-status.error .status-dot {
+    background: #ef4444;
+}
+
+.midi-llm-status.loading .status-dot {
+    background: #f59e0b;
+    animation: midi-llm-pulse 1.5s ease-in-out infinite;
+}
+
+.midi-llm-status.unavailable .status-dot {
+    background: #ef4444;
+}
+
+@keyframes midi-llm-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* ── Body ───────────────────────────────────────────────────────────────── */
+.midi-llm-body {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    padding: 12px;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* Left: Prompt */
+.midi-llm-left {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* Right: Controls */
+.midi-llm-right {
+    flex: 0.8;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 180px;
+}
+
+/* ── Section label ──────────────────────────────────────────────────────── */
+.mll-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #7c3aed;
+    margin-bottom: 2px;
+}
+
+/* ── Prompt ──────────────────────────────────────────────────────────────── */
+.mll-prompt-wrapper {
+    position: relative;
+    flex: 1;
+}
+
+.mll-prompt-textarea {
+    width: 100%;
+    height: 100%;
+    min-height: 70px;
+    padding: 10px 12px;
+    background: #16162a;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 13px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.mll-prompt-textarea:focus {
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.mll-prompt-textarea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.mll-prompt-textarea::placeholder {
+    color: #555;
+}
+
+.mll-char-count {
+    position: absolute;
+    bottom: 6px;
+    right: 10px;
+    font-size: 10px;
+    color: #555;
+}
+
+.mll-char-count.near-limit {
+    color: #f59e0b;
+}
+
+.mll-char-count.at-limit {
+    color: #ef4444;
+}
+
+/* ── Presets ─────────────────────────────────────────────────────────────── */
+.mll-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.mll-preset-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    background: rgba(139, 92, 246, 0.08);
+    color: #a78bfa;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.mll-preset-btn:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.mll-preset-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Sliders ─────────────────────────────────────────────────────────────── */
+.mll-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mll-slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.mll-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mll-slider-label {
+    font-size: 11px;
+    color: #999;
+}
+
+.mll-slider-value {
+    font-size: 11px;
+    color: #c4b5fd;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.mll-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: #2a2a4a;
+    outline: none;
+}
+
+.mll-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #8b5cf6;
+    cursor: pointer;
+    border: 2px solid #1a1a2e;
+}
+
+.mll-slider:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Action buttons ──────────────────────────────────────────────────────── */
+.mll-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: auto;
+}
+
+.mll-generate-btn {
+    flex: 1;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #a78bfa 100%);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.mll-generate-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.mll-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.mll-stop-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.mll-stop-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────── */
+.mll-error-banner {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    border-radius: 8px;
+    margin-top: 4px;
+    word-break: break-word;
+}
+
+/* ── Results bar ─────────────────────────────────────────────────────────── */
+.mll-results {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(139, 92, 246, 0.06);
+    border-top: 1px solid rgba(139, 92, 246, 0.15);
+    flex-shrink: 0;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease-out;
+}
+
+.mll-results.visible {
+    opacity: 1;
+    max-height: 60px;
+    padding: 10px 16px;
+}
+
+.mll-results-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: #a78bfa;
+}
+
+.mll-results-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mll-results-stat strong {
+    color: #c4b5fd;
+}
+
+.mll-results-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.mll-add-btn,
+.mll-download-btn {
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.mll-add-btn {
+    color: white;
+    background: #7c3aed;
+    border: none;
+}
+
+.mll-add-btn:hover:not(:disabled) {
+    background: #6d28d9;
+}
+
+.mll-download-btn {
+    color: #a78bfa;
+    background: transparent;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.mll-download-btn:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.mll-add-btn:disabled,
+.mll-download-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.mll-add-btn.loading,
+.mll-download-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+.mll-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #c4b5fd;
+    border-radius: 50%;
+    animation: mll-spin 0.6s linear infinite;
+}
+
+.mll-spinner.sm {
+    width: 10px;
+    height: 10px;
+    border-width: 1.5px;
+}
+
+@keyframes mll-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Unavailable overlay ─────────────────────────────────────────────────── */
+.mll-unavailable {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 12px;
+    padding: 32px 24px;
+    text-align: center;
+}
+
+.mll-unavailable-icon {
+    font-size: 36px;
+    opacity: 0.5;
+}
+
+.mll-unavailable-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c4b5fd;
+}
+
+.mll-unavailable-reason {
+    font-size: 12px;
+    color: #888;
+    max-width: 360px;
+    line-height: 1.5;
+}
+
+/* ── Loading overlay ─────────────────────────────────────────────────────── */
+.mll-loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(26, 26, 46, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    border-radius: 8px;
+}
+
+.mll-loading-text {
+    font-size: 13px;
+    color: #a78bfa;
+    font-weight: 500;
+}
+
+.mll-loading-subtext {
+    font-size: 11px;
+    color: #666;
+}
+
+.mll-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(139, 92, 246, 0.15);
+    border-top-color: #8b5cf6;
+    border-radius: 50%;
+    animation: mll-spin 0.8s linear infinite;
+}
