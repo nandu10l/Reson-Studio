@@ -329,9 +329,10 @@ class AudioEngine {
 
         Tone.Transport.loop = false;
 
-        // Cleanup: Dispose and clear all existing players to prevent overlap/duplication
+        // Cleanup: Unsync, stop, dispose all existing players to prevent overlap/duplication
         this.audioPlayers.forEach(player => {
             try {
+                player.unsync();
                 player.stop();
                 player.dispose();
             } catch (e) { }
@@ -409,51 +410,44 @@ class AudioEngine {
 
                     if (player && player.loaded) {
                         try {
-                            // FL Studio-style scheduling: clips play when playhead reaches them
-                            // 1. Overlap Check: Are we starting IN THE MIDDLE of this clip?
-                            if (startTime >= clipStartTime && startTime < clipEndTime) {
-                                // Calculate where in the audio file we should be
-                                const timeSinceStart = startTime - clipStartTime;
-                                const currentOffset = startOffset + timeSinceStart;
-                                const remainingDuration = Math.max(0, clipDuration - timeSinceStart);
-
-                                if (remainingDuration > 0) {
-                                    // Use a small look-ahead to schedule reliably at transport start
-                                    Tone.Transport.schedule((t) => {
-                                        try {
-                                            player.start(t, currentOffset, remainingDuration);
-                                        } catch (e) {
-                                            console.warn('Player start error (overlap):', e.message);
-                                        }
-                                    }, startTime);
-                                }
-                            }
-                            // 2. Future Check: Is this clip ahead of the playhead?
-                            else if (clipStartTime >= startTime) {
-                                Tone.Transport.schedule((time) => {
-                                    try {
-                                        player.start(time, startOffset, clipDuration);
-                                    } catch (e) {
-                                        console.warn('Player start error (future):', e.message);
-                                    }
-                                }, clipStartTime);
-                            }
-
+                            // Use Tone.js sync mechanism for sample-accurate transport-integrated scheduling.
+                            // sync() ties the player to the transport so it auto-pauses/resumes.
+                            // start(transportTime, bufferOffset, duration) registers when to play.
+                            // Tone.js internally handles:
+                            //   - Future clips: waits until transport reaches clipStartTime
+                            //   - Overlap clips: computes how far past clipStartTime we are,
+                            //     adjusts buffer offset and remaining duration automatically
+                            player.sync().start(clipStartTime, startOffset, clipDuration);
                         } catch (err) {
                             console.error(`Failed to schedule player for clip ${clip.name}: `, err);
                         }
                     } else if (player) {
                         // Player not loaded yet (URL-based) — schedule once loaded
                         console.warn(`Player for ${clip.name} not loaded yet, waiting...`);
-                        const capturedClip = { ...clip };
                         player.buffer.onload = () => {
                             try {
-                                if (clipStartTime >= startTime) {
-                                    Tone.Transport.schedule((time) => {
-                                        try {
-                                            player.start(time, startOffset, clipDuration);
-                                        } catch (e) { }
-                                    }, clipStartTime);
+                                // Sync and register start — if transport is already running,
+                                // manually handle overlap since the 'start' event already fired.
+                                player.sync();
+                                if (Tone.Transport.state === 'started') {
+                                    const currentPos = Tone.Transport.seconds;
+                                    if (currentPos >= clipStartTime && currentPos < clipEndTime) {
+                                        // Currently inside this clip — start immediately from the right position
+                                        const elapsed = currentPos - clipStartTime;
+                                        const adjOffset = startOffset + elapsed;
+                                        const remaining = Math.max(0, clipDuration - elapsed);
+                                        if (remaining > 0) {
+                                            player.unsync();
+                                            player.start(Tone.now() + 0.005, adjOffset, remaining);
+                                        }
+                                    } else if (currentPos < clipStartTime) {
+                                        // Clip is still in the future — sync().start() will work
+                                        player.start(clipStartTime, startOffset, clipDuration);
+                                    }
+                                    // else: clip already passed, don't play
+                                } else {
+                                    // Transport not running — register for future start
+                                    player.start(clipStartTime, startOffset, clipDuration);
                                 }
                             } catch (err) {
                                 console.warn('Late-load scheduling failed:', err);
@@ -498,7 +492,7 @@ class AudioEngine {
                             const bar = Math.floor(playlistStepIndex / 16);
                             const beat = Math.floor((playlistStepIndex % 16) / 4);
                             const sixteen = playlistStepIndex % 4;
-                            const time = `${bar}:${beat}:${sixteen} `;
+                            const time = `${bar}:${beat}:${sixteen}`;
 
                             Tone.Transport.schedule((t) => {
                                 this.previewSound(id, t);
@@ -526,7 +520,7 @@ class AudioEngine {
                         const bar = Math.floor(playlistStepIndex / 16);
                         const beat = Math.floor((playlistStepIndex % 16) / 4);
                         const sixteen = playlistStepIndex % 4;
-                        const time = `${bar}:${beat}:${sixteen} `;
+                        const time = `${bar}:${beat}:${sixteen}`;
 
                         // Clamp duration to the end of the clip
                         // This ensures notes don't play past the cut point if the second half is deleted
@@ -536,7 +530,7 @@ class AudioEngine {
                         const dBar = Math.floor(durationStep / 16);
                         const dBeat = Math.floor((durationStep % 16) / 4);
                         const dSixteen = durationStep % 4;
-                        const duration = `${dBar}:${dBeat}:${dSixteen} `;
+                        const duration = `${dBar}:${dBeat}:${dSixteen}`;
 
                         Tone.Transport.schedule((t) => {
                             if (note.noteName) {

@@ -229,6 +229,14 @@ async def lyria_music_stream(ws: WebSocket):
             await ws.close()
             return
 
+        # Validate prompt is a meaningful music description
+        from services.prompt_validator import validate_music_prompt
+        is_valid, error_msg = validate_music_prompt(prompt)
+        if not is_valid:
+            await _send_json(ws, {"type": "error", "message": error_msg})
+            await ws.close()
+            return
+
         bpm = max(60, min(200, int(config.get("bpm", 90))))
         temperature = max(0.5, min(2.0, float(config.get("temperature", 1.0))))
 

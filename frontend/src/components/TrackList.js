@@ -1302,7 +1302,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
 
 
   // Resize state
-  const resizeState = useRef({ resizing: false, trackId: null, clipIndex: null, startX: 0, startLength: 0, startOffset: 0, side: 'right' });
+  const resizeState = useRef({ resizing: false, trackId: null, clipIndex: null, startX: 0, startLength: 0, origOffset: 0, origStartOffset: 0, side: 'right' });
 
   const onResizeStart = (e, trackId, clipIndex, side = 'right') => {
     if (e.button && e.button !== 0) return;
@@ -1320,7 +1320,8 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       clipIndex,
       startX: e.clientX,
       startLength: clip.length,
-      startOffset: clip.offset,
+      origOffset: clip.offset,        // Original position on timeline (beats)
+      origStartOffset: clip.startOffset || 0, // Original offset into the audio/pattern buffer (beats)
       side: side // 'left' or 'right'
     };
 
@@ -1336,9 +1337,13 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       const deltaBeats = deltaX / pixelsPerBeat;
 
       if (rs.side === 'left') {
-        // Resizing from left - adjust offset and length (free movement, no snap)
-        const newOffset = Math.max(0, rs.startOffset + deltaBeats);
+        // Resizing from left - adjust offset, length, AND startOffset
+        // deltaBeats > 0 means dragging right (trimming start), < 0 means dragging left (extending start)
+        const newOffset = Math.max(0, rs.origOffset + deltaBeats);
         const newLength = Math.max(0.25, rs.startLength - deltaBeats);
+        // startOffset tracks how far into the source buffer we've trimmed
+        // Can't go below 0 (can't reveal audio before the buffer start)
+        const newStartOffset = Math.max(0, rs.origStartOffset + deltaBeats);
 
         setPlaylistTracks(prev => prev.map(t => {
           if (t.id !== rs.trackId) return t;
@@ -1347,7 +1352,8 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
             newClips[rs.clipIndex] = {
               ...newClips[rs.clipIndex],
               offset: newOffset,
-              length: newLength
+              length: newLength,
+              startOffset: newStartOffset
             };
           }
           return { ...t, clips: newClips };

@@ -105,7 +105,6 @@ export const ProjectProvider = ({ children }) => {
         try {
             if (data.patterns) setPatterns(data.patterns);
             if (data.channels) setChannels(data.channels);
-            if (data.playlistTracks) setPlaylistTracks(data.playlistTracks);
             if (data.bpm) {
                 setBpm(data.bpm);
                 audioEngine.setBpm(data.bpm);
@@ -118,7 +117,12 @@ export const ProjectProvider = ({ children }) => {
             // Restore mixer inserts
             if (data.mixerInserts) setMixerInserts(data.mixerInserts);
 
+            // Always clear audio clips first so stale state doesn't persist
+            setAudioClips([]);
+
             // Restore audio clips from audio/ subfolder in the project folder
+            const restoredClips = [];
+            const failedClipIds = [];
             if (data.audioClips && data.audioClips.length > 0 && projectFilePath) {
                 // Get the project folder (parent dir of .reson file)
                 let projectDir;
@@ -133,21 +137,29 @@ export const ProjectProvider = ({ children }) => {
                     ? await window.electronAPI.pathJoin(projectDir, 'audio')
                     : `${projectDir}/audio`;
 
-                const restoredClips = [];
                 for (const serialized of data.audioClips) {
                     try {
                         const audioFileName = serialized.audioFileName;
                         if (!audioFileName) {
-                            console.warn('Audio clip missing audioFileName:', serialized.name);
-                            continue;
+                            console.warn('Audio clip missing audioFileName, trying fallback:', serialized.name);
+                            // Try to reconstruct audioFileName from id + fileName
+                            if (serialized.id && serialized.fileName) {
+                                const baseName = (serialized.fileName || 'audio.wav').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+                                const fallbackName = `${serialized.id}_${baseName}.wav`;
+                                console.log('Trying fallback audioFileName:', fallbackName);
+                                serialized.audioFileName = fallbackName;
+                            } else {
+                                failedClipIds.push(serialized.id);
+                                continue;
+                            }
                         }
 
                         // Build path using pathJoin for proper OS separator
                         let audioFilePath;
                         if (window.electronAPI?.pathJoin) {
-                            audioFilePath = await window.electronAPI.pathJoin(audioDir, audioFileName);
+                            audioFilePath = await window.electronAPI.pathJoin(audioDir, serialized.audioFileName);
                         } else {
-                            audioFilePath = `${audioDir}/${audioFileName}`;
+                            audioFilePath = `${audioDir}/${serialized.audioFileName}`;
                         }
 
                         // Check if file exists
@@ -155,6 +167,7 @@ export const ProjectProvider = ({ children }) => {
                             const exists = await window.electronAPI.fileExists(audioFilePath);
                             if (!exists) {
                                 console.warn('Audio file not found:', audioFilePath);
+                                failedClipIds.push(serialized.id);
                                 continue;
                             }
                         }
@@ -162,12 +175,14 @@ export const ProjectProvider = ({ children }) => {
                         // Read the binary WAV file from disk (returns base64)
                         if (!window.electronAPI?.readFileBinary) {
                             console.warn('readFileBinary API not available');
+                            failedClipIds.push(serialized.id);
                             continue;
                         }
 
                         const fileResult = await window.electronAPI.readFileBinary(audioFilePath);
                         if (!fileResult || !fileResult.success) {
                             console.warn('Failed to read audio file:', audioFilePath, fileResult?.error);
+                            failedClipIds.push(serialized.id);
                             continue;
                         }
 
@@ -216,12 +231,37 @@ export const ProjectProvider = ({ children }) => {
                         console.log('Restored audio clip:', serialized.name);
                     } catch (clipError) {
                         console.error('Failed to restore audio clip:', serialized.name, clipError);
+                        failedClipIds.push(serialized.id);
                     }
                 }
+            }
 
-                if (restoredClips.length > 0) {
-                    setAudioClips(restoredClips);
-                    console.log(`Restored ${restoredClips.length} audio clip(s)`);
+            // Always set audioClips — even if empty or partial
+            setAudioClips(restoredClips);
+            if (restoredClips.length > 0) {
+                console.log(`Restored ${restoredClips.length} audio clip(s)`);
+            }
+
+            // Set playlist tracks AFTER audio clips are restored,
+            // and clean up any dangling references to clips that failed to load
+            if (data.playlistTracks) {
+                const restoredIds = new Set(restoredClips.map(c => c.id));
+                if (failedClipIds.length > 0) {
+                    console.warn(`${failedClipIds.length} audio clip(s) failed to restore — cleaning playlist references`);
+                    // Remove playlist clip entries that reference missing audio clips
+                    const cleanedTracks = data.playlistTracks.map(track => ({
+                        ...track,
+                        clips: track.clips.filter(clip => {
+                            if (clip.type === 'audio' && !restoredIds.has(clip.audioClipId)) {
+                                console.warn(`Removing dangling playlist reference to audio clip ${clip.audioClipId} (${clip.name})`);
+                                return false;
+                            }
+                            return true;
+                        })
+                    }));
+                    setPlaylistTracks(cleanedTracks);
+                } else {
+                    setPlaylistTracks(data.playlistTracks);
                 }
             }
 
@@ -651,6 +691,11 @@ export const ProjectProvider = ({ children }) => {
         if (isPlaying) {
             // Pause playback
             audioEngine.pause();
+            // Immediately sync playhead state to the paused Transport position
+            // so that visual position and next resume start from the correct spot
+            const pausedSeconds = Tone.Transport.seconds;
+            const pausedBeats = pausedSeconds * (bpm / 60);
+            setPlayheadPosition(pausedBeats);
             setIsPlaying(false);
         } else {
             // Start or resume playback from current playhead position

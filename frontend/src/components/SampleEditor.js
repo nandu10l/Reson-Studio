@@ -504,8 +504,8 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             alert('Please select a region to cut');
             return;
         }
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -516,8 +516,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         setProcessingMessage('Cutting selection...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch(`http://localhost:8000/audio/cut?start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
@@ -549,8 +550,8 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             alert('Please select a region to keep');
             return;
         }
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -561,8 +562,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         setProcessingMessage('Trimming to selection...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch(`http://localhost:8000/audio/trim?start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
@@ -592,8 +594,8 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
     const handleNormalize = () => applyEffect('normalize', { headroom_db: 0.1 });
 
     const handleReverse = async () => {
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -601,8 +603,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         setProcessingMessage('Reversing audio...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch('http://localhost:8000/audio/reverse', {
                 method: 'POST',
@@ -781,8 +784,8 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
 
     // Denoise - calls backend spectral gating
     const handleDenoise = async () => {
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -790,8 +793,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         setProcessingMessage('Removing noise...');
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch('http://localhost:8000/audio/denoise?strength=1.0', {
                 method: 'POST',
@@ -819,8 +823,8 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
 
     // Time stretch - calls backend librosa processing
     const handleTimeStretch = async () => {
-        if (!audioClip?.file) {
-            console.error('No audio file available');
+        if (!audioBuffer) {
+            console.error('No audio buffer available');
             return;
         }
 
@@ -836,8 +840,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         setProcessingMessage(`Time stretching (${factor}x)...`);
 
         try {
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}`, {
                 method: 'POST',
@@ -1102,7 +1107,7 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
 
     // Trim side noise (remove silence from start/end)
     const handleTrimSideNoise = async () => {
-        if (!audioClip?.file) return;
+        if (!audioBuffer) return;
 
         // Simple implementation: trim first and last 50ms of silence
         // A full implementation would analyze the waveform for silence thresholds
@@ -1133,8 +1138,9 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const startMs = Math.round((startSample / sampleRate) * 1000);
             const endMs = Math.round((endSample / sampleRate) * 1000);
 
+            const wavBlob = audioBufferToWav(audioBuffer);
             const formData = new FormData();
-            formData.append('file', audioClip.file);
+            formData.append('file', wavBlob, 'audio.wav');
 
             const response = await fetch(`http://localhost:8000/audio/trim?start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',

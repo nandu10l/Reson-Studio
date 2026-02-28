@@ -138,14 +138,8 @@ function Navbar({
 
         const filePath = await window.electronAPI.pathJoin(audioDir, safeFileName);
 
-        // Check if file already exists to avoid rewriting unchanged clips
-        const exists = await window.electronAPI.fileExists(filePath);
-        if (exists) {
-          console.log('Audio file already exists, skipping:', filePath);
-          continue;
-        }
-
-        // Convert AudioBuffer to WAV blob, then to base64 for safe IPC transfer
+        // Always write the WAV file — audio may have been modified in-memory
+        // (e.g. via SampleEditor) even if the file already exists on disk
         const wavBlob = audioBufferToWav(clip.audioBuffer);
         const arrayBuf = await wavBlob.arrayBuffer();
         const base64Data = arrayBufferToBase64(arrayBuf);

@@ -51,7 +51,12 @@ async def midi_llm_health():
 async def generate_midi(req: GenerateRequest):
     """Generate MIDI notes from a text prompt. Returns JSON with notes array."""
     from services.midi_llm_service import midi_llm_service
+    from services.prompt_validator import validate_music_prompt
 
+    # Validate prompt before doing any work
+    is_valid, error_msg = validate_music_prompt(req.prompt)
+    if not is_valid:
+        raise HTTPException(status_code=422, detail=error_msg)
     # Lazy-load model on first request
     if midi_llm_service.status == "idle":
         midi_llm_service.load_model()
@@ -89,7 +94,12 @@ async def generate_midi(req: GenerateRequest):
 async def generate_midi_file(req: GenerateRequest):
     """Generate MIDI from text and return as downloadable .mid file."""
     from services.midi_llm_service import midi_llm_service
+    from services.prompt_validator import validate_music_prompt
 
+    # Validate prompt before doing any work
+    is_valid, error_msg = validate_music_prompt(req.prompt)
+    if not is_valid:
+        raise HTTPException(status_code=422, detail=error_msg)
     # Lazy-load model on first request
     if midi_llm_service.status == "idle":
         midi_llm_service.load_model()

@@ -15,6 +15,30 @@ const GENRE_PRESETS = [
 
 const API_BASE = `http://${window.location.hostname || 'localhost'}:8000`;
 
+// ── Prompt Validator ──────────────────────────────────────────────────────
+function validateMusicPrompt(prompt) {
+    const trimmed = (prompt || '').trim();
+    if (!trimmed) return 'Prompt cannot be empty. Please describe the music you want to generate.';
+    if (trimmed.length < 10)
+        return 'Prompt is too short. Please describe the music you want (e.g., "a calm piano melody in C minor with soft dynamics").';
+    const words = trimmed.match(/[a-zA-Z]{2,}/g) || [];
+    if (words.length < 2)
+        return 'Please enter a valid music description with at least two words (e.g., "upbeat jazz piano").';
+    const hasVowels = words.some(w => /[aeiouAEIOU]/.test(w));
+    if (!hasVowels)
+        return 'Your input doesn\'t appear to be a valid music description. Please describe the style, mood, or instruments you want.';
+    const unique = new Set(trimmed.toLowerCase().replace(/\s/g, ''));
+    if (unique.size < 4)
+        return 'Please enter a meaningful music description instead of repeated characters.';
+    const alphaCount = [...trimmed].filter(c => /[a-zA-Z]/.test(c)).length;
+    if (alphaCount / trimmed.length < 0.4)
+        return 'Your prompt contains too many numbers or symbols. Please describe the music you want in words.';
+    const consonantRuns = trimmed.match(/[bcdfghjklmnpqrstvwxyz]{5,}/gi) || [];
+    if (consonantRuns.length >= 2)
+        return 'Your input looks like random text. Please enter a real music description (e.g., "smooth jazz with piano and saxophone").';
+    return null;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MidiLLMGenerator() {
     const {
@@ -65,6 +89,14 @@ export default function MidiLLMGenerator() {
     // ── Generate ────────────────────────────────────────────────────────
     const handleGenerate = useCallback(async () => {
         if (!prompt.trim()) return;
+
+        // Validate prompt before sending to backend
+        const validationError = validateMusicPrompt(prompt);
+        if (validationError) {
+            setErrorMessage(validationError);
+            setStatus('error');
+            return;
+        }
 
         setStatus('generating');
         setErrorMessage('');
@@ -203,6 +235,14 @@ export default function MidiLLMGenerator() {
     // ── Download .mid ───────────────────────────────────────────────────
     const handleDownload = useCallback(async () => {
         if (!prompt.trim()) return;
+
+        // Validate prompt before downloading
+        const validationError = validateMusicPrompt(prompt);
+        if (validationError) {
+            setErrorMessage(validationError);
+            setStatus('error');
+            return;
+        }
 
         setIsDownloading(true);
         try {
