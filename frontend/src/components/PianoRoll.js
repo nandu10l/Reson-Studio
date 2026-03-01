@@ -873,24 +873,6 @@ const PianoRoll = () => {
             return;
         }
 
-        // Ctrl+Z - Undo
-        if (isCtrl && !e.shiftKey && e.key.toLowerCase() === 'z') {
-            e.preventDefault();
-            undoNotes();
-            setSelection([]);
-            console.log('Undo');
-            return;
-        }
-
-        // Ctrl+Shift+Z or Ctrl+Y - Redo
-        if ((isCtrl && e.shiftKey && e.key.toLowerCase() === 'z') || (isCtrl && e.key.toLowerCase() === 'y')) {
-            e.preventDefault();
-            redoNotes();
-            setSelection([]);
-            console.log('Redo');
-            return;
-        }
-
         // Arrow Key Movement
         // Shift+Arrows = Semitone / Step
         // Ctrl+Arrows = Octave / Step

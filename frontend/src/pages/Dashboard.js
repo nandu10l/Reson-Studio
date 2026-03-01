@@ -28,7 +28,7 @@ import { tourSteps } from '../config/tourSteps';
 import AIStudio from '../components/AIStudio/AIStudio';
 
 function Dashboard() {
-  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
+  const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips, globalUndo, globalRedo, cutTrackClips, copyTrackClips, pasteTrackClips } = useProject();
   const [showWelcome, setShowWelcome] = useState(true);
   const [activeTour, setActiveTour] = useState(null); // 'main', 'pianoRoll', 'channelRack', 'mixer'
 
@@ -232,6 +232,45 @@ function Dashboard() {
       resizeObserver.disconnect();
     };
   }, [playlistTracks]); // Update when tracks change
+
+  // Global keyboard shortcuts for Edit actions (Ctrl+Z, Ctrl+Y, Ctrl+X, Ctrl+C, Ctrl+V)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Skip if user is typing in an input/textarea
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key.toLowerCase()) {
+          case 'z':
+            e.preventDefault();
+            globalUndo?.();
+            break;
+          case 'y':
+            e.preventDefault();
+            globalRedo?.();
+            break;
+          case 'x':
+            e.preventDefault();
+            cutTrackClips?.();
+            break;
+          case 'c':
+            e.preventDefault();
+            copyTrackClips?.();
+            break;
+          case 'v':
+            e.preventDefault();
+            pasteTrackClips?.();
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [globalUndo, globalRedo, cutTrackClips, copyTrackClips, pasteTrackClips]);
 
   // Auto-scroll to keep playhead visible during playback (using rAF for smoothness)
   useEffect(() => {

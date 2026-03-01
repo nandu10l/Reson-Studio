@@ -88,10 +88,25 @@ export const ProjectProvider = ({ children }) => {
     const [currentProjectPath, setCurrentProjectPath] = useState(null);
     const needsScheduling = useRef(true);
 
-    // Undo/Redo History for Pattern Notes
-    const [notesHistory, setNotesHistory] = useState([]);
-    const [notesHistoryIndex, setNotesHistoryIndex] = useState(-1);
-    const isUndoRedoAction = useRef(false);
+    // --- Global Undo/Redo History ---
+    // Unified history capturing all major state: patterns, channels, playlistTracks, mixerInserts, automations
+    const [globalHistory, setGlobalHistory] = useState([]);
+    const [globalHistoryIndex, setGlobalHistoryIndex] = useState(-1);
+    const isGlobalUndoRedoAction = useRef(false);
+
+    // Ref-based push so mutation callbacks (defined early) can call it without stale closures
+    const pushGlobalHistoryRef = useRef(null);
+
+    // Legacy aliases (kept so old refs don't break)
+    const isUndoRedoAction = isGlobalUndoRedoAction;
+    const isTrackUndoRedoAction = isGlobalUndoRedoAction;
+
+    // Track Clipboard (for Cut/Copy/Paste of track clips)
+    const [trackClipboard, setTrackClipboard] = useState(null); // { clips: [...], isCut: bool }
+
+    // Selected clips in the track area (lifted from TrackList for global access)
+    const [selectedTrackClips, setSelectedTrackClips] = useState([]); // Array of { trackId, clipIndex }
+    const [selectedTrackClip, setSelectedTrackClip] = useState(null); // Single { trackId, clipIndex }
 
     // Audio Recording Refs
     const mediaRecorderRef = useRef(null);
@@ -320,6 +335,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const toggleStepInActivePattern = useCallback((channelId, stepIndex) => {
+        pushGlobalHistoryRef.current?.();
         setPatterns(prev => prev.map(p => {
             if (p.id === activePatternId) {
                 const currentSteps = p.data.steps[channelId] || Array(p.length).fill(false);
@@ -503,93 +519,213 @@ export const ProjectProvider = ({ children }) => {
         }));
     }, [activePatternId]);
 
-    // Push current notes state to history (for undo/redo)
-    const pushNotesHistory = useCallback(() => {
-        const activePattern = patterns.find(p => p.id === activePatternId);
-        if (!activePattern || isUndoRedoAction.current) return;
+    // --- Global Undo/Redo Implementation ---
+    // Captures a snapshot of ALL major project state before a change
+    const pushGlobalHistory = useCallback(() => {
+        if (isGlobalUndoRedoAction.current) return;
 
-        const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
+        // Deep-clone only serialisable state (exclude audioBuffer, file etc.)
+        const snapshot = {
+            patterns: JSON.parse(JSON.stringify(patterns)),
+            channels: JSON.parse(JSON.stringify(channels)),
+            playlistTracks: JSON.parse(JSON.stringify(playlistTracks)),
+            mixerInserts: JSON.parse(JSON.stringify(mixerInserts)),
+            automations: JSON.parse(JSON.stringify(automations)),
+        };
 
-        setNotesHistory(prev => {
-            // Trim any future history if we're not at the end
-            const newHistory = prev.slice(0, notesHistoryIndex + 1);
-            // Add current state
-            newHistory.push({ patternId: activePatternId, notes: currentNotes });
-            // Limit history size to 50 entries
-            if (newHistory.length > 50) {
-                newHistory.shift();
-            }
+        setGlobalHistory(prev => {
+            const newHistory = prev.slice(0, globalHistoryIndex + 1);
+            newHistory.push(snapshot);
+            if (newHistory.length > 50) newHistory.shift();
             return newHistory;
         });
-        setNotesHistoryIndex(prev => Math.min(prev + 1, 49));
-    }, [patterns, activePatternId, notesHistoryIndex]);
+        setGlobalHistoryIndex(prev => Math.min(prev + 1, 49));
+    }, [patterns, channels, playlistTracks, mixerInserts, automations, globalHistoryIndex]);
 
-    // Undo action
-    const undoNotes = useCallback(() => {
-        if (notesHistoryIndex < 0) return;
+    // Keep ref in sync so early-defined callbacks can call it
+    useEffect(() => {
+        pushGlobalHistoryRef.current = pushGlobalHistory;
+    }, [pushGlobalHistory]);
 
-        const historyEntry = notesHistory[notesHistoryIndex];
+    // Helper: re-sync audio engine after restoring channels state
+    const syncAudioEngineChannels = useCallback((restoredChannels) => {
+        restoredChannels.forEach(ch => {
+            audioEngine.updateChannelVolume(ch.id, ch.vol);
+            audioEngine.updateChannelPan(ch.id, ch.pan);
+            // Effects are managed via the effect chain in the audio engine;
+            // for now re-sync volume/pan which are the primary knob states.
+        });
+    }, []);
+
+    // Global Undo
+    const globalUndo = useCallback(() => {
+        if (globalHistoryIndex < 0) return;
+        const historyEntry = globalHistory[globalHistoryIndex];
         if (!historyEntry) return;
 
-        isUndoRedoAction.current = true;
+        isGlobalUndoRedoAction.current = true;
 
-        // First, save current state to enable redo
-        const activePattern = patterns.find(p => p.id === activePatternId);
-        if (activePattern) {
-            const currentNotes = JSON.parse(JSON.stringify(activePattern.data.notes));
-            setNotesHistory(prev => {
-                const newHistory = [...prev];
-                // Store current state at next position for redo
-                newHistory[notesHistoryIndex + 1] = { patternId: activePatternId, notes: currentNotes };
-                return newHistory;
-            });
-        }
+        // Save current state at the next slot for redo
+        const currentSnapshot = {
+            patterns: JSON.parse(JSON.stringify(patterns)),
+            channels: JSON.parse(JSON.stringify(channels)),
+            playlistTracks: JSON.parse(JSON.stringify(playlistTracks)),
+            mixerInserts: JSON.parse(JSON.stringify(mixerInserts)),
+            automations: JSON.parse(JSON.stringify(automations)),
+        };
+        setGlobalHistory(prev => {
+            const newHistory = [...prev];
+            newHistory[globalHistoryIndex + 1] = currentSnapshot;
+            return newHistory;
+        });
 
-        // Restore previous state
-        setPatterns(prev => prev.map(p => {
-            if (p.id === historyEntry.patternId) {
-                return {
-                    ...p,
-                    data: {
-                        ...p.data,
-                        notes: historyEntry.notes
-                    }
-                };
-            }
-            return p;
-        }));
+        // Restore state
+        setPatterns(historyEntry.patterns);
+        setChannels(historyEntry.channels);
+        setPlaylistTracks(historyEntry.playlistTracks);
+        setMixerInserts(historyEntry.mixerInserts);
+        setAutomations(historyEntry.automations);
 
-        setNotesHistoryIndex(prev => prev - 1);
+        // Re-sync audio engine
+        syncAudioEngineChannels(historyEntry.channels);
 
-        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
-    }, [notesHistory, notesHistoryIndex, patterns, activePatternId]);
+        setGlobalHistoryIndex(prev => prev - 1);
+        setTimeout(() => { isGlobalUndoRedoAction.current = false; }, 0);
+    }, [globalHistory, globalHistoryIndex, patterns, channels, playlistTracks, mixerInserts, automations, syncAudioEngineChannels]);
 
-    // Redo action
-    const redoNotes = useCallback(() => {
-        if (notesHistoryIndex >= notesHistory.length - 1) return;
-
-        const nextEntry = notesHistory[notesHistoryIndex + 1];
+    // Global Redo
+    const globalRedo = useCallback(() => {
+        if (globalHistoryIndex >= globalHistory.length - 1) return;
+        const nextEntry = globalHistory[globalHistoryIndex + 1];
         if (!nextEntry) return;
 
-        isUndoRedoAction.current = true;
+        isGlobalUndoRedoAction.current = true;
 
-        setPatterns(prev => prev.map(p => {
-            if (p.id === nextEntry.patternId) {
-                return {
-                    ...p,
-                    data: {
-                        ...p.data,
-                        notes: nextEntry.notes
-                    }
-                };
+        setPatterns(nextEntry.patterns);
+        setChannels(nextEntry.channels);
+        setPlaylistTracks(nextEntry.playlistTracks);
+        setMixerInserts(nextEntry.mixerInserts);
+        setAutomations(nextEntry.automations);
+
+        syncAudioEngineChannels(nextEntry.channels);
+
+        setGlobalHistoryIndex(prev => prev + 1);
+        setTimeout(() => { isGlobalUndoRedoAction.current = false; }, 0);
+    }, [globalHistory, globalHistoryIndex, syncAudioEngineChannels]);
+
+    // Backward-compatible aliases so existing call-sites keep working
+    const pushNotesHistory = pushGlobalHistory;
+    const undoNotes = globalUndo;
+    const redoNotes = globalRedo;
+    const pushTrackHistory = pushGlobalHistory;
+    const undoTrack = globalUndo;
+    const redoTrack = globalRedo;
+
+    // --- Track Clipboard: Cut / Copy / Paste ---
+    const copyTrackClips = useCallback(() => {
+        // Gather clips to copy from selected state
+        const allSelected = [...(selectedTrackClips || [])];
+        if (selectedTrackClip && !allSelected.some(s => s.trackId === selectedTrackClip.trackId && s.clipIndex === selectedTrackClip.clipIndex)) {
+            allSelected.push(selectedTrackClip);
+        }
+        if (allSelected.length === 0) return;
+
+        const copiedClips = [];
+        for (const sel of allSelected) {
+            const track = playlistTracks.find(t => t.id === sel.trackId);
+            if (track && track.clips[sel.clipIndex]) {
+                copiedClips.push({
+                    trackId: sel.trackId,
+                    clip: JSON.parse(JSON.stringify(track.clips[sel.clipIndex]))
+                });
             }
-            return p;
+        }
+        if (copiedClips.length === 0) return;
+
+        setTrackClipboard({ clips: copiedClips, isCut: false });
+    }, [playlistTracks, selectedTrackClips, selectedTrackClip]);
+
+    const cutTrackClips = useCallback(() => {
+        // Gather clips to cut
+        const allSelected = [...(selectedTrackClips || [])];
+        if (selectedTrackClip && !allSelected.some(s => s.trackId === selectedTrackClip.trackId && s.clipIndex === selectedTrackClip.clipIndex)) {
+            allSelected.push(selectedTrackClip);
+        }
+        if (allSelected.length === 0) return;
+
+        // Push to history before cutting
+        pushTrackHistory();
+
+        const copiedClips = [];
+        for (const sel of allSelected) {
+            const track = playlistTracks.find(t => t.id === sel.trackId);
+            if (track && track.clips[sel.clipIndex]) {
+                copiedClips.push({
+                    trackId: sel.trackId,
+                    clip: JSON.parse(JSON.stringify(track.clips[sel.clipIndex]))
+                });
+            }
+        }
+        if (copiedClips.length === 0) return;
+
+        setTrackClipboard({ clips: copiedClips, isCut: true });
+
+        // Remove clips from tracks (process in reverse clipIndex order per track to maintain indices)
+        const removeMap = {};
+        for (const sel of allSelected) {
+            if (!removeMap[sel.trackId]) removeMap[sel.trackId] = [];
+            removeMap[sel.trackId].push(sel.clipIndex);
+        }
+        // Sort indices in descending order per track
+        for (const trackId of Object.keys(removeMap)) {
+            removeMap[trackId].sort((a, b) => b - a);
+        }
+
+        setPlaylistTracks(prev => prev.map(t => {
+            const indices = removeMap[t.id];
+            if (!indices) return t;
+            const newClips = [...t.clips];
+            for (const idx of indices) {
+                newClips.splice(idx, 1);
+            }
+            return { ...t, clips: newClips };
         }));
 
-        setNotesHistoryIndex(prev => prev + 1);
+        // Clear selection
+        setSelectedTrackClips([]);
+        setSelectedTrackClip(null);
+    }, [playlistTracks, selectedTrackClips, selectedTrackClip, pushTrackHistory]);
 
-        setTimeout(() => { isUndoRedoAction.current = false; }, 0);
-    }, [notesHistory, notesHistoryIndex]);
+    const pasteTrackClips = useCallback(() => {
+        if (!trackClipboard || !trackClipboard.clips || trackClipboard.clips.length === 0) return;
+
+        // Push to history before pasting
+        pushTrackHistory();
+
+        // Find the earliest offset among copied clips to use as relative base
+        const minOffset = Math.min(...trackClipboard.clips.map(c => c.clip.offset));
+
+        // Paste at the current playhead position, preserving relative offsets
+        const pasteBase = playheadPosition;
+
+        setPlaylistTracks(prev => {
+            const newTracks = prev.map(t => ({ ...t, clips: [...t.clips] }));
+
+            for (const entry of trackClipboard.clips) {
+                const targetTrack = newTracks.find(t => t.id === entry.trackId);
+                if (!targetTrack) continue;
+
+                const newClip = {
+                    ...entry.clip,
+                    id: Date.now() + Math.random(), // unique ID
+                    offset: pasteBase + (entry.clip.offset - minOffset)
+                };
+                targetTrack.clips.push(newClip);
+            }
+
+            return newTracks;
+        });
+    }, [trackClipboard, playheadPosition, pushTrackHistory]);
 
     // Track Actions
     const toggleTrackMute = useCallback((trackId) => {
@@ -934,6 +1070,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const addChannel = useCallback((plugin) => {
+        pushGlobalHistoryRef.current?.();
         // Drum Machine: expand into 4 named drum rows so AudioEngine matchers work correctly
         if (plugin.type === 'drums') {
             const drumRows = [
@@ -999,6 +1136,7 @@ export const ProjectProvider = ({ children }) => {
 
 
     const addEffect = useCallback((channelId, plugin, slotIndex = null) => {
+        pushGlobalHistoryRef.current?.();
         setChannels(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const currentEffects = ch.effects || [];
@@ -1035,6 +1173,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const removeEffect = useCallback((channelId, slotIndex) => {
+        pushGlobalHistoryRef.current?.();
         setChannels(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const newEffects = [...(ch.effects || [])];
@@ -1081,6 +1220,7 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const reorderEffect = useCallback((channelId, fromSlot, toSlot) => {
+        pushGlobalHistoryRef.current?.();
         setChannels(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const newEffects = [...(ch.effects || [])];
@@ -1822,6 +1962,27 @@ export const ProjectProvider = ({ children }) => {
         pushNotesHistory,
         undoNotes,
         redoNotes,
+
+        // Track Undo/Redo
+        pushTrackHistory,
+        undoTrack,
+        redoTrack,
+
+        // Global Undo/Redo
+        pushGlobalHistory,
+        globalUndo,
+        globalRedo,
+
+        // Track Clipboard
+        cutTrackClips,
+        copyTrackClips,
+        pasteTrackClips,
+        trackClipboard,
+
+        // Track Selection (lifted for global access)
+        selectedTrackClips, setSelectedTrackClips,
+        selectedTrackClip, setSelectedTrackClip,
+
         addChannel,
         addEffect,
         removeEffect,

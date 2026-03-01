@@ -137,7 +137,7 @@ export default function AutomationClip({
             }}
             onClick={(e) => {
                 e.stopPropagation();
-                onSelect(clip);
+                onSelect(clip, e);
             }}
             onContextMenu={(e) => {
                 e.preventDefault();

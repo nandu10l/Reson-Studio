@@ -26,6 +26,16 @@ export const tourSteps = {
             selector: '.transport-views-cluster'
         },
         {
+            title: 'AI Studio',
+            content: 'Generate full audio tracks using Lyria, or compose MIDI using the AI assistant.',
+            selector: 'button[title*="AI Studio"]'
+        },
+        {
+            title: 'Midify Tool',
+            content: 'Convert your recorded audio or samples directly into MIDI notes.',
+            selector: '.transport-midify-btn'
+        },
+        {
             title: 'Session Browser',
             content: 'Find your projects, samples, and presets here. Drag and drop to use them.',
             selector: '.session-browser'
@@ -56,6 +66,11 @@ export const tourSteps = {
             title: 'Tools',
             content: 'Pencil to draw notes, Eraser to remove them, Select to move multiple notes.',
             selector: '.piano-toolbar'
+        },
+        {
+            title: 'Chord Generator',
+            content: 'Instantly construct and preview chord progressions for your track.',
+            selector: 'button[title="Generate chord progression"]'
         },
         {
             title: 'Piano Keys',

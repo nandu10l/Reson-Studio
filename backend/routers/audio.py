@@ -93,6 +93,75 @@ async def convert_wav_to_mp3(
         raise HTTPException(status_code=500, detail=f"Audio conversion failed: {str(e)}")
 
 
+@router.post("/convert-video-to-mp4")
+async def convert_video_to_mp4(file: UploadFile = File(...)):
+    """
+    Convert a WebM video file to MP4 (H.264 + AAC) using ffmpeg.
+    """
+    tmp_in = None
+    tmp_out = None
+    try:
+        webm_data = await file.read()
+
+        # Write incoming WebM to a temp file
+        tmp_in = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+        tmp_in.write(webm_data)
+        tmp_in.close()
+
+        # Output MP4 temp path
+        tmp_out_path = tmp_in.name.replace(".webm", ".mp4")
+
+        # Use ffmpeg to re-encode: H.264 video + AAC audio
+        ffmpeg_path = shutil.which("ffmpeg") or "ffmpeg"
+        result = subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",               # overwrite
+                "-i", tmp_in.name,   # input
+                "-c:v", "libx264",   # H.264 video codec
+                "-preset", "fast",
+                "-crf", "23",
+                "-c:a", "aac",       # AAC audio codec
+                "-b:a", "192k",
+                "-movflags", "+faststart",  # Web-friendly MP4
+                "-pix_fmt", "yuv420p",
+                tmp_out_path
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 min max
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {result.stderr[-500:]}")
+
+        with open(tmp_out_path, "rb") as f:
+            mp4_data = f.read()
+
+        base_name = (file.filename or "video").rsplit(".", 1)[0]
+
+        return Response(
+            content=mp4_data,
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": f'attachment; filename="{base_name}.mp4"'
+            }
+        )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Video conversion timed out")
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Video conversion failed: {str(e)}")
+    finally:
+        # Cleanup temp files
+        if tmp_in and os.path.exists(tmp_in.name):
+            os.unlink(tmp_in.name)
+        tmp_out_path = (tmp_in.name if tmp_in else "").replace(".webm", ".mp4")
+        if tmp_out_path and os.path.exists(tmp_out_path):
+            os.unlink(tmp_out_path)
+
+
 @router.post("/separate-stems")
 async def separate_stems(file: UploadFile = File(...)):
     """

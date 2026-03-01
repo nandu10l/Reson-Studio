@@ -16,7 +16,8 @@ export default function AudioClip({
   onOpenMenu,
   isSelected = false,
   activeTool,
-  onSlice
+  onSlice,
+  automation // Optional: volume automation data { points: [{x, y}] } linked to this clip
 }) {
   const canvasRef = useRef(null);
   const clipRef = useRef(null);
@@ -170,7 +171,7 @@ export default function AudioClip({
           const splitPoint = clip.offset + beatOffset;
           onSlice(splitPoint);
         } else {
-          onSelect(clip);
+          onSelect(clip, e);
         }
       }}
       onContextMenu={(e) => {
@@ -276,6 +277,58 @@ export default function AudioClip({
             opacity: 0.9
           }}
         />
+        {/* Volume Automation Curve Overlay (FL Studio-style) */}
+        {automation && automation.points && automation.points.length > 0 && (() => {
+          const sortedPoints = [...automation.points].sort((a, b) => a.x - b.x);
+          const svgHeight = 44;
+          return (
+            <svg
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none'
+              }}
+              viewBox={`0 0 ${clipWidth} ${svgHeight}`}
+              preserveAspectRatio="none"
+            >
+              {/* Filled area under the curve */}
+              <polygon
+                points={[
+                  `0,${svgHeight}`,
+                  ...sortedPoints.map(p => `${p.x * clipWidth},${svgHeight - (p.y * svgHeight)}`),
+                  `${clipWidth},${svgHeight}`
+                ].join(' ')}
+                fill="rgba(251, 146, 60, 0.12)"
+              />
+              {/* The curve line */}
+              <polyline
+                points={sortedPoints
+                  .map(p => `${p.x * clipWidth},${svgHeight - (p.y * svgHeight)}`)
+                  .join(' ')}
+                fill="none"
+                stroke="rgba(251, 146, 60, 0.7)"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
+              {/* Small dots at automation points */}
+              {sortedPoints.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x * clipWidth}
+                  cy={svgHeight - (p.y * svgHeight)}
+                  r="2.5"
+                  fill="#fb923c"
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth="0.5"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </svg>
+          );
+        })()}
       </div>
 
       {/* Left Resize Handle Indicator */}

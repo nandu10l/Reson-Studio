@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import GuideBox from './GuideBox';
 import NewProjectModal from './NewProjectModal';
+import VideoExportDialog from './VideoExportDialog';
 import { useProject } from '../contexts/ProjectContext';
 import { audioEngine } from '../audio/AudioEngine';
-import { exportWav, exportMp3, saveAudioBlob, getLastExportFormat, setLastExportFormat } from '../services/ExportService';
+import { exportWav, exportMp3, saveAudioBlob, getLastExportFormat, setLastExportFormat, calculateProjectDuration } from '../services/ExportService';
 import { audioBufferToWav } from '../utils/audioImport';
 import '../styles/blender-icons.css';
 import './Navbar.css';
@@ -34,10 +35,15 @@ function Navbar({
     findFirstEmptyPattern,
     activePatternId,
     revertToLastBackup,
-    undoNotes,
-    redoNotes
+    globalUndo,
+    globalRedo,
+    cutTrackClips,
+    copyTrackClips,
+    pasteTrackClips
   } = useProject();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [showVideoExport, setShowVideoExport] = useState(false);
+  const [videoExportBlob, setVideoExportBlob] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const menuRef = useRef(null);
@@ -307,7 +313,7 @@ function Navbar({
       }
     }
     if (action === 'export_video') {
-      alert('Video export is coming soon!');
+      handleVideoExport();
     }
     if (action === 'export_midi') {
       alert('MIDI export is coming soon!');
@@ -327,8 +333,15 @@ function Navbar({
     if (action === 'clone_pattern') clonePattern?.(activePatternId);
 
     // Edit Actions
-    if (action === 'undo') undoNotes?.();
-    if (action === 'redo') redoNotes?.();
+    if (action === 'undo') {
+      globalUndo?.();
+    }
+    if (action === 'redo') {
+      globalRedo?.();
+    }
+    if (action === 'cut') cutTrackClips?.();
+    if (action === 'copy') copyTrackClips?.();
+    if (action === 'paste') pasteTrackClips?.();
 
     // Misc
     if (action === 'revert_backup') revertToLastBackup?.();
@@ -385,6 +398,50 @@ function Navbar({
     }
   };
 
+  const handleVideoExport = async () => {
+    try {
+      const duration = calculateProjectDuration(playlistTracks, patterns, audioClips);
+      if (duration <= 0.5) {
+        alert('Project is empty. Add some clips before exporting video.');
+        return;
+      }
+
+      // Show rendering overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'exporting-overlay';
+      overlay.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 99999;">
+          <div style="background: #2a2a2a; padding: 30px; border-radius: 8px; text-align: center;">
+            <div style="color: #60a5fa; font-size: 18px; margin-bottom: 10px;">Rendering audio for video...</div>
+            <div style="color: #999;">Please wait while rendering project audio</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      // Render project audio as WAV blob
+      const wavBlob = await exportWav(
+        audioEngine,
+        playlistTracks,
+        patterns,
+        channels,
+        audioClips || [],
+        automations || []
+      );
+
+      document.getElementById('exporting-overlay')?.remove();
+
+      if (wavBlob) {
+        setVideoExportBlob(wavBlob);
+        setShowVideoExport(true);
+      }
+    } catch (error) {
+      document.getElementById('exporting-overlay')?.remove();
+      console.error('Video export error:', error);
+      alert('Failed to render audio for video export: ' + error.message);
+    }
+  };
+
   const SUBMENUS = {
     import: [
       { label: "MIDI File...", action: "import_midi", shortcut: "Ctrl+Shift+I" },
@@ -423,12 +480,12 @@ function Navbar({
       { label: "Exit", action: "exit" },
     ],
     Edit: [
-      { label: "Undo", action: "undo" },
-      { label: "Redo", action: "redo" },
+      { label: "Undo", action: "undo", shortcut: "Ctrl+Z" },
+      { label: "Redo", action: "redo", shortcut: "Ctrl+Y" },
       { type: "divider" },
-      { label: "Cut", action: "cut" },
-      { label: "Copy", action: "copy" },
-      { label: "Paste", action: "paste" },
+      { label: "Cut", action: "cut", shortcut: "Ctrl+X" },
+      { label: "Copy", action: "copy", shortcut: "Ctrl+C" },
+      { label: "Paste", action: "paste", shortcut: "Ctrl+V" },
     ],
     Add: [
       { label: "Channel", action: "add_channel" },
@@ -538,6 +595,15 @@ function Navbar({
         isOpen={showNewProjectModal}
         onClose={() => setShowNewProjectModal(false)}
         onCreateProject={onCreateProject}
+      />
+
+      <VideoExportDialog
+        isOpen={showVideoExport}
+        onClose={() => {
+          setShowVideoExport(false);
+          setVideoExportBlob(null);
+        }}
+        audioBlob={videoExportBlob}
       />
     </nav>
   );

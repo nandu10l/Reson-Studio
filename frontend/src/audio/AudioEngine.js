@@ -7,6 +7,7 @@ class AudioEngine {
         this.sources = new Map(); // id -> Tone.Player or Tone.Synth
         this.channelNames = new Map(); // id -> channel name string (for instrument-aware behaviour)
         this.audioPlayers = new Map(); // audioClipId -> Tone.Player
+        this.automationGains = new Map(); // clip instance ID -> raw GainNode for volume automation
         this.channelEffects = new Map(); // channelId -> [effectNode, ...] (10 slots)
         this.channelMeters = new Map(); // id -> Tone.Meter for level monitoring
         this.masterMeter = null; // Master channel meter
@@ -220,6 +221,14 @@ class AudioEngine {
                 console.warn("Error stopping player:", e);
             }
         });
+
+        // Reset automation gain nodes to default (gain = 1.0)
+        this.automationGains.forEach(gainNode => {
+            try {
+                gainNode.gain.cancelScheduledValues(0);
+                gainNode.gain.value = 1.0;
+            } catch (e) { }
+        });
     }
 
     setBpm(bpm) {
@@ -339,6 +348,12 @@ class AudioEngine {
         });
         this.audioPlayers.clear();
 
+        // Cleanup automation gain nodes
+        this.automationGains.forEach(gainNode => {
+            try { gainNode.disconnect(); } catch (e) { }
+        });
+        this.automationGains.clear();
+
         const isAnySolo = tracks.some(t => t.solo);
         const automationClipsToSchedule = [];
         const instanceToSourceMap = new Map();
@@ -397,15 +412,23 @@ class AudioEngine {
                         const panVal = (clipPan - 50) / 50;
                         const panner = new Tone.Panner(Math.max(-1, Math.min(1, panVal)));
 
+                        // Create a dedicated GainNode for volume automation (acts as multiplier)
+                        // Routing: Player → automationGainNode → Panner → MasterGain
+                        const automationGainNode = Tone.context.createGain();
+                        automationGainNode.gain.value = 1.0; // Default: no modification
+
                         if (this.masterGain) {
-                            player.connect(panner);
+                            player.connect(automationGainNode);
+                            automationGainNode.connect(panner.input);
                             panner.connect(this.masterGain);
                         } else {
-                            player.connect(panner);
+                            player.connect(automationGainNode);
+                            automationGainNode.connect(panner.input);
                             panner.toDestination();
                         }
                         // Store by Instance ID (clip.id) for unique player per clip placement
                         this.audioPlayers.set(clip.id, player);
+                        this.automationGains.set(clip.id, automationGainNode);
                     }
 
                     if (player && player.loaded) {
@@ -550,53 +573,84 @@ class AudioEngine {
             });
         });
 
-        // Pass 2: Schedule Automation (now that all Players are initialized)
+        // Pass 2: Schedule Volume Automation (now that all Players are initialized)
+        // FL Studio-style: automation acts as a gain multiplier via separate GainNode,
+        // preserving the base volume set on the player itself.
         automationClipsToSchedule.forEach(clip => {
             const automation = automations.find(a => a.id === clip.automationId);
-            if (automation && automation.points) {
-                // Resolve Target Player ID
-                // Players are now keyed by clip instance ID (clip.id), not source ID
-                // Try to find the player using the targetClipId which should be an instance ID
-                let player = this.audioPlayers.get(automation.targetClipId);
+            if (!automation || !automation.points || automation.points.length === 0) return;
 
-                // Fallback: search through instanceToSourceMap for matching source
-                if (!player) {
-                    for (const [instanceId, sourceId] of instanceToSourceMap.entries()) {
-                        if (sourceId === automation.targetClipId) {
-                            player = this.audioPlayers.get(instanceId);
-                            if (player) break;
-                        }
+            // Only handle volume automation on the gain node
+            if (automation.type !== 'volume') return;
+
+            // Resolve target: find the automation GainNode for the target clip
+            let targetGainNode = this.automationGains.get(automation.targetClipId);
+
+            // Fallback: search through instanceToSourceMap for matching source ID
+            if (!targetGainNode) {
+                for (const [instanceId, sourceId] of instanceToSourceMap.entries()) {
+                    if (sourceId === automation.targetClipId) {
+                        targetGainNode = this.automationGains.get(instanceId);
+                        if (targetGainNode) break;
                     }
                 }
-
-                if (player) {
-                    const clipStartTime = this._beatsToSeconds(clip.offset);
-                    const clipDuration = this._beatsToSeconds(clip.length);
-
-                    const points = [...automation.points].sort((a, b) => a.x - b.x);
-
-                    // Filter points within clip range if needed? No, points are relative 0-1.
-
-                    points.forEach((p, idx) => {
-                        const pointTime = clipStartTime + (p.x * clipDuration);
-                        const gain = Math.max(0.001, p.y);
-                        const db = Tone.gainToDb(gain);
-
-                        // Only schedule if point is in future relative to Transport start? 
-                        // Tone.js handles scheduling in past (it executes immediately).
-                        // But rampTo in past throws?
-                        // We are scheduling on the PARAMETER, using transport time.
-
-                        if (idx === 0) {
-                            player.volume.setValueAtTime(db, pointTime);
-                        } else {
-                            player.volume.linearRampToValueAtTime(db, pointTime);
-                        }
-                    });
-                } else {
-                    console.warn(`Target Player for Automation ${automation.name} not found. TargetID: ${automation.targetClipId}`);
-                }
             }
+
+            if (!targetGainNode) {
+                console.warn(`Target GainNode for Automation "${automation.name}" not found. TargetID: ${automation.targetClipId}`);
+                return;
+            }
+
+            const clipStartTime = this._beatsToSeconds(clip.offset);
+            const clipDuration = this._beatsToSeconds(clip.length);
+            const points = [...automation.points].sort((a, b) => a.x - b.x);
+
+            if (points.length === 0) return;
+
+            // Compute transport times for all points
+            const scheduledPoints = points.map(p => ({
+                transportTime: clipStartTime + (p.x * clipDuration),
+                gain: Math.max(0.001, p.y)
+            }));
+
+            // Use Transport.schedule at the first point's time to get the audio context
+            // time reference, then schedule ALL AudioParam events at once.
+            // This ensures proper linearRamp chaining and correct timing.
+            const firstTransportTime = Math.max(0, scheduledPoints[0].transportTime);
+
+            Tone.Transport.schedule((audioContextTime) => {
+                // audioContextTime is the audio context time when the transport
+                // reaches firstTransportTime. Compute the constant offset.
+                const timeOffset = audioContextTime - firstTransportTime;
+
+                // Access the raw AudioParam for direct Web Audio API scheduling
+                const rawGainParam = targetGainNode.gain;
+
+                // Cancel any previous automation on this param
+                rawGainParam.cancelScheduledValues(0);
+
+                // If we're seeking past the start, find the interpolated value at
+                // the current position and set it immediately, then schedule future ramps
+                const currentTransportTime = Tone.Transport.seconds;
+
+                scheduledPoints.forEach((sp, idx) => {
+                    const pointAudioTime = sp.transportTime + timeOffset;
+
+                    if (idx === 0) {
+                        // Set the initial automation value
+                        rawGainParam.setValueAtTime(sp.gain, pointAudioTime);
+                    } else {
+                        // Linear ramp from previous point to this point
+                        rawGainParam.linearRampToValueAtTime(sp.gain, pointAudioTime);
+                    }
+                });
+
+                // Hold the last value indefinitely
+                const lastPoint = scheduledPoints[scheduledPoints.length - 1];
+                const lastAudioTime = lastPoint.transportTime + timeOffset;
+                rawGainParam.setValueAtTime(lastPoint.gain, lastAudioTime + 0.001);
+
+            }, firstTransportTime);
         });
     }
 
@@ -2366,6 +2420,12 @@ class AudioEngine {
         // Wait for all audio to load
         await Promise.all(audioPlayerPromises);
 
+        // Build a map from audio clip instance IDs to offline players and gain nodes
+        const offlineInstancePlayers = new Map(); // clip instance ID -> player
+        const offlineAutomationGains = new Map(); // clip instance ID -> raw GainNode
+        const offlineInstanceToSourceMap = new Map(); // instance ID -> source audio clip ID
+        const offlineAutomationClips = []; // deferred automation clips
+
         // Helper function for triggering sounds
         const triggerSound = (id, time) => {
             const source = offlineSources.get(id);
@@ -2400,16 +2460,36 @@ class AudioEngine {
             track.clips.forEach(clip => {
                 // Handle audio clips
                 if (clip.type === 'audio') {
-                    const player = offlineAudioPlayers.get(clip.audioClipId);
-                    if (player && player.loaded) {
+                    const templatePlayer = offlineAudioPlayers.get(clip.audioClipId);
+                    if (templatePlayer && templatePlayer.loaded) {
                         const clipStartTime = this._beatsToSeconds(clip.offset);
                         const clipDuration = this._beatsToSeconds(clip.length);
                         const startOffset = clip.startOffset ? this._beatsToSeconds(clip.startOffset) : 0;
 
+                        // Create a per-instance player so multiple clips sharing
+                        // the same audioClipId each get their own audio graph.
+                        const instancePlayer = new Tone.Player(templatePlayer.buffer);
+                        instancePlayer.volume.value = -6;
+
+                        // Use Tone.Gain (not raw createGain) to stay in the
+                        // correct AudioContext during Tone.Offline rendering.
+                        const autoGain = new Tone.Gain(1.0).toDestination();
+                        instancePlayer.connect(autoGain);
+
+                        offlineInstancePlayers.set(clip.id, instancePlayer);
+                        offlineAutomationGains.set(clip.id, autoGain);
+                        offlineInstanceToSourceMap.set(clip.id, clip.audioClipId);
+
                         transport.schedule((time) => {
-                            player.start(time, startOffset, clipDuration);
+                            instancePlayer.start(time, startOffset, clipDuration);
                         }, clipStartTime);
                     }
+                    return;
+                }
+
+                // Defer automation clips
+                if (clip.type === 'automation') {
+                    offlineAutomationClips.push(clip);
                     return;
                 }
 
@@ -2477,6 +2557,57 @@ class AudioEngine {
                     }
                 });
             });
+        });
+
+        // Schedule automation for offline rendering
+        offlineAutomationClips.forEach(clip => {
+            const automation = automations.find(a => a.id === clip.automationId);
+            if (!automation || !automation.points || automation.points.length === 0) return;
+            if (automation.type !== 'volume') return;
+
+            let targetGainNode = offlineAutomationGains.get(automation.targetClipId);
+            if (!targetGainNode) {
+                for (const [instanceId, sourceId] of offlineInstanceToSourceMap.entries()) {
+                    if (sourceId === automation.targetClipId) {
+                        targetGainNode = offlineAutomationGains.get(instanceId);
+                        if (targetGainNode) break;
+                    }
+                }
+            }
+            if (!targetGainNode) return;
+
+            const clipStartTime = this._beatsToSeconds(clip.offset);
+            const clipDuration = this._beatsToSeconds(clip.length);
+            const points = [...automation.points].sort((a, b) => a.x - b.x);
+
+            const scheduledPoints = points.map(p => ({
+                transportTime: clipStartTime + (p.x * clipDuration),
+                gain: Math.max(0.001, p.y)
+            }));
+
+            const firstTransportTime = Math.max(0, scheduledPoints[0].transportTime);
+
+            transport.schedule((audioContextTime) => {
+                const timeOffset = audioContextTime - firstTransportTime;
+                // targetGainNode is a Tone.Gain; access the underlying
+                // AudioParam via ._param (Tone.Param wrapper) for native
+                // scheduling, falling back to the Tone.Param itself.
+                const gainParam = targetGainNode.gain;
+                const rawParam = gainParam._param || gainParam;
+                rawParam.cancelScheduledValues(0);
+
+                scheduledPoints.forEach((sp, idx) => {
+                    const pointAudioTime = sp.transportTime + timeOffset;
+                    if (idx === 0) {
+                        rawParam.setValueAtTime(sp.gain, pointAudioTime);
+                    } else {
+                        rawParam.linearRampToValueAtTime(sp.gain, pointAudioTime);
+                    }
+                });
+
+                const lastPoint = scheduledPoints[scheduledPoints.length - 1];
+                rawParam.setValueAtTime(lastPoint.gain, lastPoint.transportTime + timeOffset + 0.001);
+            }, firstTransportTime);
         });
 
         // Start transport

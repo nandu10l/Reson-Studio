@@ -12,7 +12,7 @@ import audioPackSynth from '../audio/AudioPackSynth';
 import { audioEngine } from '../audio/AudioEngine';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample, onMultiSelect }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
@@ -549,7 +549,13 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 key={clip.id || idx}
                 clip={mergedClip}
                 pixelsPerBeat={pixelsPerBeat}
-                onSelect={(c) => onSelect({ ...c, trackId: track.id, clipIndex: idx })}
+                onSelect={(c, e) => {
+                  if (e && (e.ctrlKey || e.metaKey)) {
+                    onMultiSelect && onMultiSelect({ ...c, trackId: track.id, clipIndex: idx }, e);
+                  } else {
+                    onSelect({ ...c, trackId: track.id, clipIndex: idx });
+                  }
+                }}
                 onRemove={(c) => onRemoveClip(track.id, idx)}
                 onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
@@ -578,7 +584,13 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 clip={clip}
                 automation={automationData}
                 pixelsPerBeat={pixelsPerBeat}
-                onSelect={(c) => onSelect({ ...c, trackId: track.id, clipIndex: idx })}
+                onSelect={(c, e) => {
+                  if (e && (e.ctrlKey || e.metaKey)) {
+                    onMultiSelect && onMultiSelect({ ...c, trackId: track.id, clipIndex: idx }, e);
+                  } else {
+                    onSelect({ ...c, trackId: track.id, clipIndex: idx });
+                  }
+                }}
                 onRemove={(c) => onRemoveClip(track.id, idx)}
                 onStartDrag={(e, c) => onStartDrag(e, track.id, idx)}
                 onResizeStart={(e, c, side) => onResizeStart(e, track.id, idx, side)}
@@ -640,6 +652,9 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                   const beatOffset = x / pixelsPerBeat; // Relative beats
                   const splitPoint = clip.offset + beatOffset;
                   onSlice(track.id, idx, splitPoint);
+                } else if (e.ctrlKey || e.metaKey) {
+                  // Multi-select with Ctrl/Cmd+Click
+                  onMultiSelect && onMultiSelect({ ...clip, trackId: track.id, clipIndex: idx }, e);
                 } else {
                   onSelect(clip);
                 }
@@ -741,9 +756,12 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
 });
 
 const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor, onOpenPianoRoll }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab } = useProject();
-  const [selected, setSelected] = useState(null);
-  const [selectedClips, setSelectedClips] = useState([]); // Array of {trackId, clipIndex} for multi-selection
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab, pushTrackHistory, selectedTrackClips, setSelectedTrackClips, selectedTrackClip, setSelectedTrackClip } = useProject();
+  // Use context-level selection state (aliases for backward compat within this component)
+  const selected = selectedTrackClip;
+  const setSelected = setSelectedTrackClip;
+  const selectedClips = selectedTrackClips;
+  const setSelectedClips = setSelectedTrackClips;
 
   // Menu State
   const [menu, setMenu] = useState(null); // { trackId, clipIndex, x, y, patternId }
@@ -774,6 +792,23 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [menu]);
+
+  // Delete key handler for removing selected clips
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Don't interfere with input elements
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+        const allSelected = getAllSelectedClips();
+        if (allSelected.length > 0) {
+          e.preventDefault();
+          removeSelectedClips();
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  });
 
   // Menu Handlers
   // Helper function to generate random color
@@ -1009,6 +1044,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
 
 
   const addClip = (trackId, offset, specificPatternId = null, specificType = null) => {
+    pushTrackHistory();
     // If painting (no specific ID/Type), use active context
     if (!specificPatternId && !specificType) {
       if (activeClipType === 'audio' && activeAudioClipId) {
@@ -1109,6 +1145,14 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   };
 
   const removeClip = (trackId, clipIndex) => {
+    // Check if this clip is part of a multi-selection
+    const allSelected = getAllSelectedClips();
+    if (allSelected.length > 1 && allSelected.some(s => s.trackId === trackId && s.clipIndex === clipIndex)) {
+      // Remove all selected clips as a group
+      removeSelectedClips();
+      return;
+    }
+    pushTrackHistory();
     setPlaylistTracks(prev => prev.map(t => {
       if (t.id !== trackId) return t;
       const newClips = t.clips.slice();
@@ -1117,7 +1161,47 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     }));
   };
 
+  // Helper: get all selected clips (merging single + multi selection)
+  const getAllSelectedClips = () => {
+    const all = [...(selectedClips || [])];
+    if (selected && !all.some(s => s.trackId === selected.trackId && s.clipIndex === selected.clipIndex)) {
+      all.push(selected);
+    }
+    return all;
+  };
+
+  // Remove all selected clips
+  const removeSelectedClips = () => {
+    const allSelected = getAllSelectedClips();
+    if (allSelected.length === 0) return;
+    pushTrackHistory();
+
+    // Build map of trackId -> sorted descending clip indices
+    const removeMap = {};
+    for (const sel of allSelected) {
+      if (!removeMap[sel.trackId]) removeMap[sel.trackId] = [];
+      removeMap[sel.trackId].push(sel.clipIndex);
+    }
+    for (const trackId of Object.keys(removeMap)) {
+      removeMap[trackId].sort((a, b) => b - a);
+    }
+
+    setPlaylistTracks(prev => prev.map(t => {
+      const indices = removeMap[t.id];
+      if (!indices) return t;
+      const newClips = [...t.clips];
+      for (const idx of indices) {
+        newClips.splice(idx, 1);
+      }
+      return { ...t, clips: newClips };
+    }));
+
+    setSelected(null);
+    setSelectedClips([]);
+  };
+
   const handleSlice = (trackId, clipIndex, splitPointBeats) => {
+    pushTrackHistory();
     setPlaylistTracks(prev => prev.map(t => {
       if (t.id !== trackId) return t;
 
@@ -1163,6 +1247,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   };
 
   const deleteTrack = (trackId) => {
+    pushTrackHistory();
     setPlaylistTracks(prev => prev.filter(t => t.id !== trackId));
   };
 
@@ -1270,16 +1355,54 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     if (!clip) return;
 
     e.preventDefault();
-    dragState.current = {
-      dragging: true,
-      trackId,
-      clipIndex,
-      startX: e.clientX,
-      origOffset: clip.offset
-    };
+
+    // Check if this clip is part of a multi-selection for group drag
+    const allSelected = getAllSelectedClips();
+    const isPartOfSelection = allSelected.length > 1 && allSelected.some(s => s.trackId === trackId && s.clipIndex === clipIndex);
+
+    if (isPartOfSelection) {
+      // Group drag: store all selected clips with their relative offsets and track positions
+      const anchorClip = clip;
+      const anchorTrackId = trackId;
+      const groupClips = allSelected.map(sel => {
+        const t = playlistTracks.find(t => t.id === sel.trackId);
+        const c = t ? t.clips[sel.clipIndex] : null;
+        return c ? {
+          trackId: sel.trackId,
+          clipIndex: sel.clipIndex,
+          clip: { ...c },
+          relativeOffset: c.offset - anchorClip.offset, // offset relative to anchor
+          relativeTrackId: sel.trackId - anchorTrackId // track distance from anchor
+        } : null;
+      }).filter(Boolean);
+
+      dragState.current = {
+        dragging: true,
+        isGroupDrag: true,
+        trackId,
+        clipIndex,
+        startX: e.clientX,
+        startY: e.clientY,
+        origOffset: clip.offset,
+        anchorTrackId,
+        groupClips
+      };
+    } else {
+      dragState.current = {
+        dragging: true,
+        isGroupDrag: false,
+        trackId,
+        clipIndex,
+        startX: e.clientX,
+        origOffset: clip.offset
+      };
+    }
 
     const pattern = patterns.find(p => p.id === clip.patternId);
-    const clipName = pattern ? pattern.name : 'Pattern';
+    let clipName = pattern ? pattern.name : (clip.name || 'Clip');
+    if (isPartOfSelection) {
+      clipName = `${allSelected.length} clips`;
+    }
 
     const clone = document.createElement('div');
     clone.className = 'drag-clone';
@@ -1288,10 +1411,11 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     clone.style.top = `${e.clientY}px`;
     clone.style.pointerEvents = 'none';
     clone.style.zIndex = 9999;
-    clone.style.padding = '4px';
-    clone.style.background = '#444';
+    clone.style.padding = '4px 8px';
+    clone.style.background = isPartOfSelection ? '#7c3aed' : '#444';
     clone.style.color = '#fff';
     clone.style.borderRadius = '6px';
+    clone.style.fontSize = '11px';
     clone.innerHTML = clipName;
     document.body.appendChild(clone);
     dragClone.current = clone;
@@ -1406,28 +1530,108 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
       newOffset = relativeX / pixelsPerBeat;
     }
 
-    setPlaylistTracks(prev => {
-      let movingClip = null;
-      let originalTrack = null;
+    pushTrackHistory();
 
-      // Remove from source
-      const afterRemove = prev.map(t => {
-        if (t.id !== ds.trackId) return t;
-        originalTrack = t;
-        const newClips = t.clips.slice();
-        movingClip = newClips.splice(ds.clipIndex, 1)[0];
-        return { ...t, clips: newClips };
+    if (ds.isGroupDrag && ds.groupClips && ds.groupClips.length > 1) {
+      // Group drag: move all selected clips together
+      const offsetDelta = newOffset - ds.origOffset;
+      const trackDelta = targetTrackId - ds.anchorTrackId;
+
+      setPlaylistTracks(prev => {
+        // Build a set of clips to remove, keyed by "trackId:clipIndex"
+        const removeSet = new Set();
+        for (const gc of ds.groupClips) {
+          removeSet.add(`${gc.trackId}:${gc.clipIndex}`);
+        }
+
+        // Collect the clip data before removing (using original indices)
+        const clipsToMove = [];
+        for (const gc of ds.groupClips) {
+          const t = prev.find(t => t.id === gc.trackId);
+          if (t && t.clips[gc.clipIndex]) {
+            clipsToMove.push({
+              clip: { ...t.clips[gc.clipIndex] },
+              newOffset: Math.max(0, gc.clip.offset + offsetDelta),
+              newTrackId: gc.trackId + trackDelta
+            });
+          }
+        }
+
+        // Remove all group clips from their source tracks (process in reverse index order per track)
+        const removeMap = {};
+        for (const gc of ds.groupClips) {
+          if (!removeMap[gc.trackId]) removeMap[gc.trackId] = [];
+          removeMap[gc.trackId].push(gc.clipIndex);
+        }
+        for (const tid of Object.keys(removeMap)) {
+          removeMap[tid].sort((a, b) => b - a);
+        }
+
+        let result = prev.map(t => {
+          const indices = removeMap[t.id];
+          if (!indices) return t;
+          const newClips = [...t.clips];
+          for (const idx of indices) {
+            newClips.splice(idx, 1);
+          }
+          return { ...t, clips: newClips };
+        });
+
+        // Add clips to their new target tracks
+        for (const cm of clipsToMove) {
+          const targetTid = cm.newTrackId;
+          // Ensure target track exists
+          const targetTrack = result.find(t => t.id === targetTid);
+          if (targetTrack) {
+            cm.clip.offset = cm.newOffset;
+            result = result.map(t => {
+              if (t.id !== targetTid) return t;
+              return { ...t, clips: [...t.clips, cm.clip] };
+            });
+          } else {
+            // If target track doesn't exist, keep clip on original track with new offset
+            const origTrack = result.find(t => t.id === (targetTid - trackDelta));
+            if (origTrack) {
+              cm.clip.offset = cm.newOffset;
+              result = result.map(t => {
+                if (t.id !== origTrack.id) return t;
+                return { ...t, clips: [...t.clips, cm.clip] };
+              });
+            }
+          }
+        }
+
+        return result;
       });
 
-      if (!movingClip) return prev;
-      movingClip.offset = newOffset;
+      // Clear selection after group move
+      setSelected(null);
+      setSelectedClips([]);
+    } else {
+      // Single clip drag (original behavior)
+      setPlaylistTracks(prev => {
+        let movingClip = null;
+        let originalTrack = null;
 
-      // Add to target
-      return afterRemove.map(t => {
-        if (t.id !== targetTrackId) return t;
-        return { ...t, clips: [...t.clips, movingClip] };
+        // Remove from source
+        const afterRemove = prev.map(t => {
+          if (t.id !== ds.trackId) return t;
+          originalTrack = t;
+          const newClips = t.clips.slice();
+          movingClip = newClips.splice(ds.clipIndex, 1)[0];
+          return { ...t, clips: newClips };
+        });
+
+        if (!movingClip) return prev;
+        movingClip.offset = newOffset;
+
+        // Add to target
+        return afterRemove.map(t => {
+          if (t.id !== targetTrackId) return t;
+          return { ...t, clips: [...t.clips, movingClip] };
+        });
       });
-    });
+    }
 
     dragState.current = { dragging: false, trackId: null, clipIndex: null };
     if (dragClone.current) { document.body.removeChild(dragClone.current); dragClone.current = null; }
@@ -1457,6 +1661,31 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
             setSelected(clip);
             setSelectedClips([]); // Clear multi-selection
             if (onSelectClip) onSelectClip(clip);
+          }}
+          onMultiSelect={(clip, e) => {
+            // Ctrl/Cmd+Click: toggle clip in multi-selection
+            const clipRef = { trackId: clip.trackId, clipIndex: clip.clipIndex };
+            const isAlreadySelected = selectedClips.some(sc => sc.trackId === clipRef.trackId && sc.clipIndex === clipRef.clipIndex)
+              || (selected?.trackId === clipRef.trackId && selected?.clipIndex === clipRef.clipIndex);
+
+            if (isAlreadySelected) {
+              // Deselect this clip
+              const newMulti = selectedClips.filter(sc => !(sc.trackId === clipRef.trackId && sc.clipIndex === clipRef.clipIndex));
+              if (selected?.trackId === clipRef.trackId && selected?.clipIndex === clipRef.clipIndex) {
+                setSelected(newMulti.length > 0 ? newMulti[0] : null);
+              }
+              setSelectedClips(newMulti);
+            } else {
+              // Add to selection
+              let newMulti = [...selectedClips];
+              // If there's a single selected clip not yet in multi array, add it
+              if (selected && !newMulti.some(sc => sc.trackId === selected.trackId && sc.clipIndex === selected.clipIndex)) {
+                newMulti.push({ trackId: selected.trackId, clipIndex: selected.clipIndex });
+              }
+              newMulti.push(clipRef);
+              setSelectedClips(newMulti);
+              setSelected(clipRef);
+            }
           }}
           pixelsPerBeat={pixelsPerBeat}
           measures={measures}
