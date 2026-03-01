@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import './VideoExportDialog.css';
 
 const BACKEND_URL = 'http://localhost:8000';
@@ -185,7 +186,7 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
 
   const isBusy = status === 'recording' || status === 'converting';
 
-  return (
+  const dialog = (
     <div className="video-export-overlay">
       <div className="video-export-header">
         <h2>Video Export</h2>
@@ -255,6 +256,8 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(dialog, document.body);
 }
 
 export default VideoExportDialog;
