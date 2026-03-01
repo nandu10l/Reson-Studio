@@ -25,9 +25,7 @@ import SampleEditor from '../components/SampleEditor';
 import WelcomeModal from '../components/WelcomeModal';
 import TourOverlay from '../components/TourOverlay';
 import { tourSteps } from '../config/tourSteps';
-import AIComposer from '../components/AIComposer/AIComposer';
-import AIMusicGenerator from '../components/MusicGen/AIMusicGenerator';
-import MidiLLMGenerator from '../components/MidiLLM/MidiLLMGenerator';
+import AIStudio from '../components/AIStudio/AIStudio';
 
 function Dashboard() {
   const { playheadPosition, setPlayheadPosition, isPlaying, bpm, playlistTracks, setPlaylistTracks, seek, createTemplateProject, setAudioClips } = useProject();
@@ -40,9 +38,7 @@ function Dashboard() {
     pianoRoll: false,
     channelRack: false,
     sampleEditor: false,
-    aiComposer: false,
-    musicGenerator: false,
-    midiLlm: false,
+    aiStudio: false,
     playlist: true, // Default view
     browser: true
   });
@@ -541,42 +537,16 @@ function Dashboard() {
         </DraggableWindow>
       )}
 
-      {/* AI Composer Panel */}
-      {activeWindows.aiComposer && (
+      {/* AI Studio — Unified AI panel with Chrome-style tabs */}
+      {activeWindows.aiStudio && (
         <DraggableWindow
-          title="✨ AI Composer"
-          onClose={() => toggleWindow('aiComposer')}
-          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 420), y: 130 }}
+          title="🤖 AI Studio"
+          onClose={() => toggleWindow('aiStudio')}
+          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 430), y: 100 }}
           width={860}
           height={480}
         >
-          <AIComposer />
-        </DraggableWindow>
-      )}
-
-      {/* AI Music Generator (Lyria RealTime) */}
-      {activeWindows.musicGenerator && (
-        <DraggableWindow
-          title="🎵 AI Music Generator"
-          onClose={() => toggleWindow('musicGenerator')}
-          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 380), y: 100 }}
-          width={760}
-          height={440}
-        >
-          <AIMusicGenerator />
-        </DraggableWindow>
-      )}
-
-      {/* MIDI-LLM Generator */}
-      {activeWindows.midiLlm && (
-        <DraggableWindow
-          title="🎹 MIDI-LLM Generator"
-          onClose={() => toggleWindow('midiLlm')}
-          initialPosition={{ x: Math.max(0, window.innerWidth / 2 - 360), y: 120 }}
-          width={720}
-          height={400}
-        >
-          <MidiLLMGenerator />
+          <AIStudio />
         </DraggableWindow>
       )}
 

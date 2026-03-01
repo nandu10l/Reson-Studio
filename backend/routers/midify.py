@@ -51,10 +51,18 @@ min_note_len = float(sys.argv[5])
 output_path = sys.argv[6]
 
 from basic_pitch.inference import predict
-from basic_pitch import ICASSP_2022_MODEL_PATH
+from basic_pitch import ICASSP_2022_MODEL_PATH, FilenameSuffix, build_icassp_2022_model_path
+
+# basic-pitch 0.4.0 defaults to TF SavedModel when TF is installed, but TF 2.20
+# cannot load the model saved with older TF. Force ONNX which works with onnxruntime.
+try:
+    onnx_model_path = build_icassp_2022_model_path(FilenameSuffix.onnx)
+except Exception:
+    onnx_model_path = ICASSP_2022_MODEL_PATH
 
 model_output, midi_data, note_events = predict(
     audio_path,
+    onnx_model_path,
     onset_threshold=onset_threshold,
     frame_threshold=frame_threshold,
     minimum_note_length=min_note_len,

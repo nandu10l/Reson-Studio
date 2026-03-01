@@ -171,18 +171,57 @@
     background: #111;
 }
 
+.mg-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 4px;
+    flex-shrink: 0;
+}
+
+.mg-history-clear {
+    background: none;
+    border: none;
+    color: #444;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+    line-height: 1;
+}
+
+.mg-history-clear:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
 .mg-history-list {
     flex: 1;
     overflow-y: auto;
-    padding: 8px;
+    padding: 4px 8px 8px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
 }
 
 .mg-history-empty {
-    padding: 20px;
+    padding: 28px 16px;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.mg-history-empty-icon {
+    font-size: 22px;
+    opacity: 0.3;
+}
+
+.mg-history-empty-text {
     font-size: 10px;
     color: #444;
 }
@@ -190,30 +229,35 @@
 .mg-history-item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
+    gap: 8px;
+    padding: 7px 8px;
     background: #181818;
     border: 1px solid #2a2a2a;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
-    transition: all 0.1s;
+    transition: all 0.12s;
 }
 
 .mg-history-item:hover {
-    background: #222;
-    border-color: #7c3aed66;
+    background: #1e1e1e;
+    border-color: #7c3aed44;
+}
+
+.mg-history-item:hover .mg-history-item-del {
+    opacity: 1;
 }
 
 .mg-history-item.active {
     background: #1d1228;
     border-color: #7c3aed;
-    box-shadow: 0 0 10px rgba(124, 58, 237, 0.15);
+    box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
 }
 
 .mg-history-item-icon {
-    font-size: 14px;
-    color: #555;
-    transition: color 0.1s;
+    font-size: 13px;
+    color: #444;
+    flex-shrink: 0;
+    transition: color 0.12s;
 }
 
 .mg-history-item:hover .mg-history-item-icon,
@@ -239,10 +283,46 @@
     color: #c4b5fd;
 }
 
-.mg-history-item-date {
+.mg-history-item-meta {
     font-size: 8px;
-    color: #444;
+    color: #555;
     margin-top: 2px;
+    letter-spacing: 0.02em;
+}
+
+.mg-history-item.active .mg-history-item-meta {
+    color: #7c3aed88;
+}
+
+.mg-history-item-prompt {
+    font-size: 9px;
+    color: #555;
+    margin-top: 2px;
+    line-height: 1.3;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.mg-history-item-del {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: 0;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.mg-history-item-del:hover {
+    color: #ef4444;
+    opacity: 1 !important;
 }
 
 /* Middle column: Prompt + Presets */

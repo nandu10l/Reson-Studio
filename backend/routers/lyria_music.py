@@ -318,3 +318,22 @@ async def get_lyria_history_item(filename: str):
         "audio_base64": b64_data,
         "meta": meta
     }
+
+
+@router.delete("/lyria-history/{filename}")
+async def delete_lyria_history_item(filename: str):
+    if not filename.endswith(".wav") or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    history_dir = os.path.join(os.path.dirname(__file__), '..', 'lyria_history')
+
+    wav_path = os.path.join(history_dir, filename)
+    json_path = wav_path.replace(".wav", ".json")
+
+    deleted = []
+    for path in [wav_path, json_path]:
+        if os.path.exists(path):
+            os.remove(path)
+            deleted.append(os.path.basename(path))
+
+    return {"deleted": deleted}

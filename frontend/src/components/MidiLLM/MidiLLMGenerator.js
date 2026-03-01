@@ -14,6 +14,8 @@ const GENRE_PRESETS = [
 ];
 
 const API_BASE = `http://${window.location.hostname || 'localhost'}:8000`;
+const HISTORY_STORAGE_KEY = 'midiLLMHistory';
+const MAX_HISTORY = 20;
 
 // ── Prompt Validator ──────────────────────────────────────────────────────
 function validateMusicPrompt(prompt) {
@@ -39,6 +41,27 @@ function validateMusicPrompt(prompt) {
     return null;
 }
 
+// ── History helpers ───────────────────────────────────────────────────────
+function loadHistory() {
+    try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveHistory(items) {
+    try {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items.slice(0, MAX_HISTORY)));
+    } catch { }
+}
+
+function formatTime(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MidiLLMGenerator() {
     const {
@@ -57,7 +80,16 @@ export default function MidiLLMGenerator() {
     const [isAddingToTrack, setIsAddingToTrack] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
 
+    // History state
+    const [history, setHistory] = useState(() => loadHistory());
+    const [selectedHistIdx, setSelectedHistIdx] = useState(null);
+
     const abortRef = useRef(null);
+
+    // ── Persist history ─────────────────────────────────────────────────
+    useEffect(() => {
+        saveHistory(history);
+    }, [history]);
 
     // ── Check model health on mount ─────────────────────────────────────
     useEffect(() => {
@@ -101,6 +133,7 @@ export default function MidiLLMGenerator() {
         setStatus('generating');
         setErrorMessage('');
         setLastResult(null);
+        setSelectedHistIdx(null);
 
         const controller = new AbortController();
         abortRef.current = controller;
@@ -131,6 +164,20 @@ export default function MidiLLMGenerator() {
 
             setLastResult(data);
             setStatus('done');
+
+            // Save to history
+            const histItem = {
+                id: Date.now(),
+                timestamp: Date.now(),
+                prompt: prompt.trim(),
+                temperature,
+                maxTokens,
+                totalNotes: data.total_notes,
+                generationTime: data.generation_time_seconds,
+                notes: data.notes,
+            };
+            setHistory(prev => [histItem, ...prev.slice(0, MAX_HISTORY - 1)]);
+            setSelectedHistIdx(0);
         } catch (err) {
             if (err.name === 'AbortError') {
                 setStatus('available');
@@ -140,6 +187,39 @@ export default function MidiLLMGenerator() {
             }
         }
     }, [prompt, temperature, maxTokens]);
+
+    // ── Select history item ──────────────────────────────────────────────
+    const handleSelectHistory = useCallback((item, idx) => {
+        setSelectedHistIdx(idx);
+        setPrompt(item.prompt);
+        setTemperature(item.temperature);
+        setMaxTokens(item.maxTokens);
+        setLastResult({ notes: item.notes, total_notes: item.totalNotes, generation_time_seconds: item.generationTime });
+        setStatus('done');
+        setErrorMessage('');
+    }, []);
+
+    // ── Delete history item ──────────────────────────────────────────────
+    const handleDeleteHistory = useCallback((e, idx) => {
+        e.stopPropagation();
+        setHistory(prev => {
+            const next = prev.filter((_, i) => i !== idx);
+            return next;
+        });
+        if (selectedHistIdx === idx) {
+            setSelectedHistIdx(null);
+            setLastResult(null);
+            setStatus('available');
+        } else if (selectedHistIdx !== null && selectedHistIdx > idx) {
+            setSelectedHistIdx(prev => prev - 1);
+        }
+    }, [selectedHistIdx]);
+
+    // ── Clear all history ────────────────────────────────────────────────
+    const handleClearHistory = useCallback(() => {
+        setHistory([]);
+        setSelectedHistIdx(null);
+    }, []);
 
     // ── Stop generation ─────────────────────────────────────────────────
     const handleStop = useCallback(() => {
@@ -347,7 +427,7 @@ export default function MidiLLMGenerator() {
                 </div>
             </div>
 
-            {/* Body */}
+            {/* Body — 3 columns: History | Prompt | Controls */}
             <div className="midi-llm-body" style={{ position: 'relative' }}>
                 {/* Loading model overlay */}
                 {status === 'loading' && (
@@ -358,7 +438,60 @@ export default function MidiLLMGenerator() {
                     </div>
                 )}
 
-                {/* Left: Prompt + Presets */}
+                {/* ── History Workspace (left column) ─────────────────── */}
+                <div className="mll-history-workspace">
+                    <div className="mll-history-header">
+                        <span className="mll-section-label">History</span>
+                        {history.length > 0 && (
+                            <button
+                                className="mll-history-clear"
+                                onClick={handleClearHistory}
+                                title="Clear all history"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+                    <div className="mll-history-list">
+                        {history.length === 0 ? (
+                            <div className="mll-history-empty">
+                                <div className="mll-history-empty-icon">🎵</div>
+                                <div className="mll-history-empty-text">No generations yet</div>
+                            </div>
+                        ) : (
+                            history.map((item, idx) => (
+                                <div
+                                    key={item.id}
+                                    className={`mll-history-item ${selectedHistIdx === idx ? 'active' : ''}`}
+                                    onClick={() => handleSelectHistory(item, idx)}
+                                    title={item.prompt}
+                                >
+                                    <div className="mll-history-item-icon">⚡</div>
+                                    <div className="mll-history-item-info">
+                                        <div className="mll-history-item-name">
+                                            Gen {history.length - idx}
+                                        </div>
+                                        <div className="mll-history-item-meta">
+                                            {item.totalNotes} notes · {formatTime(item.timestamp)}
+                                        </div>
+                                        <div className="mll-history-item-prompt">
+                                            {item.prompt.slice(0, 40)}{item.prompt.length > 40 ? '…' : ''}
+                                        </div>
+                                    </div>
+                                    <button
+                                        className="mll-history-item-del"
+                                        onClick={(e) => handleDeleteHistory(e, idx)}
+                                        title="Remove"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* ── Prompt + Presets (middle column) ─────────────────── */}
                 <div className="midi-llm-left">
                     <div className="mll-section-label">Prompt</div>
                     <div className="mll-prompt-wrapper">
@@ -398,7 +531,7 @@ export default function MidiLLMGenerator() {
                     )}
                 </div>
 
-                {/* Right: Controls */}
+                {/* ── Controls (right column) ────────────────────────── */}
                 <div className="midi-llm-right">
                     <div className="mll-section-label">Controls</div>
                     <div className="mll-slider-group">

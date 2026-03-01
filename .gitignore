@@ -148,6 +148,14 @@ backend/generated_audio/
 backend/processed_audio/
 backend/musicgen_debug.log
 
+# AI-generated music history (Lyria recordings — local only)
+backend/lyria_history/
+
+# MIDI conversion temp files
+backend/temp/
+*.mid
+*.midi
+
 # AI models (large files)
 ai_models/*.pth
 ai_models/*.pt

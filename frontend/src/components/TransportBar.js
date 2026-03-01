@@ -296,31 +296,13 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             <span className="transport-view-label">Mixer</span>
           </button>
           <button
-            className={`transport-view-btn ${activeWindows?.aiComposer ? 'active' : ''}`}
-            onClick={() => onToggleWindow && onToggleWindow('aiComposer')}
-            title="AI Composer — Generate MIDI with the trained model"
-            style={activeWindows?.aiComposer ? { borderColor: '#7c3aed', color: '#c4b5fd' } : {}}
+            className={`transport-view-btn ${activeWindows?.aiStudio ? 'active' : ''}`}
+            onClick={() => onToggleWindow && onToggleWindow('aiStudio')}
+            title="AI Studio — Lyria music generator & MIDI-LLM"
+            style={activeWindows?.aiStudio ? { borderColor: '#8b5cf6', color: '#c4b5fd' } : {}}
           >
             <span style={{ fontSize: 14 }}>✨</span>
             <span className="transport-view-label">AI</span>
-          </button>
-          <button
-            className={`transport-view-btn ${activeWindows?.musicGenerator ? 'active' : ''}`}
-            onClick={() => onToggleWindow && onToggleWindow('musicGenerator')}
-            title="AI Music Generator — Real-time music with Lyria"
-            style={activeWindows?.musicGenerator ? { borderColor: '#7c3aed', color: '#c4b5fd' } : {}}
-          >
-            <span style={{ fontSize: 14 }}>🎵</span>
-            <span className="transport-view-label">Music</span>
-          </button>
-          <button
-            className={`transport-view-btn ${activeWindows?.midiLlm ? 'active' : ''}`}
-            onClick={() => onToggleWindow && onToggleWindow('midiLlm')}
-            title="MIDI-LLM — Text to MIDI"
-            style={activeWindows?.midiLlm ? { borderColor: '#8b5cf6', color: '#c4b5fd' } : {}}
-          >
-            <span style={{ fontSize: 14 }}>🎹</span>
-            <span className="transport-view-label">MIDI</span>
           </button>
         </div>
       </div>

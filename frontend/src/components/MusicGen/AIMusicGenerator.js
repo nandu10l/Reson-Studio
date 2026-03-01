@@ -159,6 +159,30 @@ export default function AIMusicGenerator() {
         }
     };
 
+    const handleDeleteHistoryItem = async (e, filename) => {
+        e.stopPropagation();
+        try {
+            await fetch(`${API_BASE}/lyria-history/${filename}`, { method: 'DELETE' });
+        } catch (_) { }
+        setHistory(prev => prev.filter(i => i.filename !== filename));
+        if (selectedHistoryItem === filename) {
+            setSelectedHistoryItem(null);
+            accumulatedChunksRef.current = [];
+            setStatus('idle');
+        }
+    };
+
+    const handleClearAllHistory = async () => {
+        // Fire-and-forget deletes for all items
+        history.forEach(item => {
+            fetch(`${API_BASE}/lyria-history/${item.filename}`, { method: 'DELETE' }).catch(() => { });
+        });
+        setHistory([]);
+        setSelectedHistoryItem(null);
+        accumulatedChunksRef.current = [];
+        setStatus('idle');
+    };
+
     // Refs
     const wsRef = useRef(null);
     const audioCtxRef = useRef(null);
@@ -649,24 +673,49 @@ export default function AIMusicGenerator() {
             <div className="music-gen-body">
                 {/* Left column: History Workspace */}
                 <div className="music-gen-workspace">
-                    <div className="mg-section-label">History Workspace</div>
+                    <div className="mg-history-header">
+                        <span className="mg-section-label">History</span>
+                        {history.length > 0 && (
+                            <button
+                                className="mg-history-clear"
+                                onClick={handleClearAllHistory}
+                                title="Clear all history"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
                     <div className="mg-history-list">
                         {history.length === 0 ? (
-                            <div className="mg-history-empty">No history yet</div>
+                            <div className="mg-history-empty">
+                                <div className="mg-history-empty-icon">🎵</div>
+                                <div className="mg-history-empty-text">No generations yet</div>
+                            </div>
                         ) : (
                             history.map((item, idx) => (
                                 <div
                                     key={item.filename}
                                     className={`mg-history-item ${selectedHistoryItem === item.filename ? 'active' : ''}`}
                                     onClick={() => handleSelectHistoryItem(item)}
+                                    title={item.prompt}
                                 >
                                     <div className="mg-history-item-icon">⚡</div>
                                     <div className="mg-history-item-info">
-                                        <div className="mg-history-item-name">Generation {history.length - idx}</div>
-                                        <div className="mg-history-item-date">
-                                            {new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        <div className="mg-history-item-name">Gen {history.length - idx}</div>
+                                        <div className="mg-history-item-meta">
+                                            {item.bpm} BPM · {new Date(item.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                        <div className="mg-history-item-prompt">
+                                            {(item.prompt || '').slice(0, 40)}{(item.prompt || '').length > 40 ? '…' : ''}
                                         </div>
                                     </div>
+                                    <button
+                                        className="mg-history-item-del"
+                                        onClick={(e) => handleDeleteHistoryItem(e, item.filename)}
+                                        title="Remove"
+                                    >
+                                        ×
+                                    </button>
                                 </div>
                             ))
                         )}
