@@ -21,12 +21,17 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
   const [iframeReady, setIframeReady] = useState(false);
   const [progress, setProgress] = useState('');
 
+  // Refs to abort an in-flight conversion and ignore stale callbacks
+  const abortControllerRef = useRef(null);
+  const cancelledRef = useRef(false);
+
   // Reset state when dialog opens
   useEffect(() => {
     if (isOpen) {
       setStatus('loading');
       setIframeReady(false);
       setProgress('');
+      cancelledRef.current = false;
     }
   }, [isOpen]);
 
@@ -57,8 +62,12 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
     }
   }, []);
 
-  /** Send WebM to backend → get MP4 back → save */
+  /** Send WebM to backend → get MP4 back → save (abortable) */
   const convertAndSave = useCallback(async (webmBlob) => {
+    // Create a fresh AbortController for this conversion
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // Check if backend is available
     let backendAvailable = false;
     try {
@@ -71,8 +80,10 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
       backendAvailable = false;
     }
 
+    // If cancelled during health check, bail out
+    if (cancelledRef.current) return;
+
     if (!backendAvailable) {
-      // Fallback: save as WebM directly
       console.warn('Backend unavailable, saving as WebM');
       await saveBlob(webmBlob, 'reson_studio_export.webm');
       return;
@@ -83,8 +94,12 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
 
     const response = await fetch(`${BACKEND_URL}/audio/convert-video-to-mp4`, {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal   // ← abort signal wired here
     });
+
+    // If cancelled mid-response, bail out silently
+    if (cancelledRef.current) return;
 
     if (!response.ok) {
       const errText = await response.text();
@@ -92,6 +107,10 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
     }
 
     const mp4Blob = await response.blob();
+
+    // Final guard — don't save if user cancelled while blob was streaming
+    if (cancelledRef.current) return;
+
     await saveBlob(mp4Blob, 'reson_studio_export.mp4');
   }, [saveBlob]);
 
@@ -107,17 +126,25 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
           setIframeReady(true);
           break;
         case 'recording-started':
+          cancelledRef.current = false;
           setStatus('recording');
           setProgress('Recording visualizer... (plays through entire track)');
           break;
         case 'recording-stopped':
           break;
         case 'recording-complete': {
+          // If user already cancelled during recording phase, ignore the blob
+          if (cancelledRef.current) break;
+
           setStatus('converting');
           setProgress('Converting to MP4...');
           try {
             const webmBlob = new Blob([e.data.videoData], { type: 'video/webm' });
             await convertAndSave(webmBlob);
+
+            // Check once more — user may have cancelled while fetching
+            if (cancelledRef.current) break;
+
             setStatus('done');
             setProgress('Export complete!');
             setTimeout(() => {
@@ -125,6 +152,10 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
               setProgress('');
             }, 3000);
           } catch (err) {
+            if (cancelledRef.current || err.name === 'AbortError') {
+              // Cancelled — abort error is expected, stay on ready
+              break;
+            }
             console.error('MP4 conversion error:', err);
             setStatus('ready');
             setProgress('');
@@ -165,9 +196,24 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
     iframeRef.current.contentWindow.postMessage({ type: 'export-video' }, '*');
   }, []);
 
-  const handlePlayPause = useCallback(() => {
-    if (!iframeRef.current) return;
-    iframeRef.current.contentWindow.postMessage({ type: 'toggle-play' }, '*');
+  /** Cancel: abort the fetch, stop the iframe MediaRecorder, reset state */
+  const handleCancel = useCallback(() => {
+    // Mark as cancelled so all in-flight async guards bail out
+    cancelledRef.current = true;
+
+    // Abort the backend fetch if it is in-flight
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Tell the iframe to stop the MediaRecorder if still recording
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow.postMessage({ type: 'cancel-recording' }, '*');
+    }
+
+    setStatus('ready');
+    setProgress('');
   }, []);
 
   // Close on Escape key (only when not busy)
@@ -199,12 +245,12 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
             </span>
           )}
           <button
-            className="video-export-btn preview"
-            onClick={handlePlayPause}
-            disabled={status !== 'ready'}
-            title="Preview: Play / Pause"
+            className={`video-export-btn cancel-export ${isBusy ? 'active-cancel' : ''}`}
+            onClick={handleCancel}
+            disabled={!isBusy}
+            title="Cancel the current recording or conversion"
           >
-            ▶ Preview
+            ✕ Cancel
           </button>
           <button
             className={`video-export-btn export-mp4 ${isBusy ? 'busy' : ''}`}
@@ -251,7 +297,6 @@ function VideoExportDialog({ isOpen, onClose, audioBlob }) {
       <div className="video-export-footer">
         <span className="video-export-hint">
           Customize the visualizer settings above, then click <b>Export MP4</b> to record the full track as video.
-          Use <b>Preview</b> to audition before exporting.
         </span>
       </div>
     </div>
