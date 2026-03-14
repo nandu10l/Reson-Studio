@@ -2,14 +2,8 @@ import React, { useState } from 'react';
 import '../styles/welcome.css';
 import {
   X, FilePlus, Music, Mic, Compass, Sparkles,
-  Clock, ChevronRight, Zap, Layers, Cpu
+  ChevronRight, Zap, Layers, Cpu
 } from 'lucide-react';
-
-const RECENT_PROJECTS = [
-  { name: 'Untitled Project', time: 'Just now', color: '#a855f7' },
-  { name: 'Beat Session 01', time: '2 hours ago', color: '#3b82f6' },
-  { name: 'Chord Exploration', time: 'Yesterday', color: '#10b981' },
-];
 
 const TEMPLATES = [
   {
@@ -115,26 +109,6 @@ const WelcomeModal = ({ onClose, onNewProject, onStartTour }) => {
                   <div className="welcome-card-desc">{t.desc}</div>
                 </div>
                 <ChevronRight size={15} className="welcome-card-arrow" />
-              </button>
-            ))}
-          </div>
-
-          {/* Recent projects */}
-          <div className="welcome-section-label" style={{ marginTop: 24 }}>
-            <Clock size={11} style={{ display: 'inline', marginRight: 5 }} />
-            Recent
-          </div>
-          <div className="welcome-recents">
-            {RECENT_PROJECTS.map((p, i) => (
-              <button
-                key={i}
-                className="welcome-recent-row"
-                onClick={() => onClose()}
-              >
-                <div className="welcome-recent-dot" style={{ background: p.color }} />
-                <span className="welcome-recent-name">{p.name}</span>
-                <span className="welcome-recent-time">{p.time}</span>
-                <ChevronRight size={13} className="welcome-recent-arrow" />
               </button>
             ))}
           </div>

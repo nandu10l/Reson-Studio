@@ -12,13 +12,15 @@ import audioPackSynth from '../audio/AudioPackSynth';
 import { audioEngine } from '../audio/AudioEngine';
 
 // Update Track signature to include onResizeStart
-const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample, onMultiSelect }) => {
+const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddClip, onRemoveClip, onStartDrag, onResizeStart, pixelsPerBeat, measures, beatsPerBar, patterns, audioClips, automations, selected, selectedClips, onOpenMenu, onRenameTrack, onDeleteTrack, activeTool, onSlice, onAddAudioClip, onAddAutomationClip, updateAutomationPoints, onAddChannel, onAddEffect, onAddAudioPackSample, onMultiSelect, onToggleClipMute, onSlipStart, onZoom, onScrubClick, snapEnabled }) => {
   const TrackIcon = track.icon || Grid;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(track.name);
   const [hoveredClipIndex, setHoveredClipIndex] = useState(null);
   const [showActions, setShowActions] = useState(false);
   const inputRef = useRef(null);
+  const brushRef = useRef({ painting: false, lastBeat: -1 });
+  const clipAreaRef = useRef(null);
 
   const handleRename = () => {
     setIsEditing(true);
@@ -506,8 +508,63 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
           if (e.button !== 0) return;
           const rect = e.currentTarget.getBoundingClientRect();
           const x = e.clientX - rect.left;
-          const offset = x / pixelsPerBeat;
+          let offset = x / pixelsPerBeat;
+          if (snapEnabled) offset = Math.round(offset);
+
+          // Select tool: rubber-band is handled on the TrackList container — do nothing here
+          if (activeTool === 'select') return;
+
+          // Playback/scrub tool: set playhead instead of adding clip
+          if (activeTool === 'playback') {
+            if (onScrubClick) onScrubClick(offset);
+            return;
+          }
+          // Zoom tool: zoom in on left-click, zoom out on alt/right-click
+          if (activeTool === 'zoom') {
+            if (onZoom) onZoom(e.altKey ? 'out' : 'in');
+            return;
+          }
+
+          // Brush: start painting and track which beats we've placed clips on
+          if (activeTool === 'brush') {
+            brushRef.current = { painting: true, lastBeat: Math.floor(offset) };
+            e.currentTarget.setPointerCapture(e.pointerId);
+            onAddClip(track.id, offset);
+            return;
+          }
+
           onAddClip(track.id, offset);
+        }}
+        onPointerMove={(e) => {
+          if (activeTool !== 'brush' || !brushRef.current.painting) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = Math.max(0, e.clientX - rect.left);
+          let offset = x / pixelsPerBeat;
+          if (snapEnabled) offset = Math.round(offset);
+          const currentBeat = Math.floor(offset);
+
+          // Only paint new clip if we've moved to a different beat
+          if (currentBeat !== brushRef.current.lastBeat) {
+            // Check if there's already a clip at this beat
+            const hasClip = track.clips.some(c => {
+              const start = c.offset;
+              const end = c.offset + (c.length || 4);
+              return offset >= start && offset < end;
+            });
+            if (!hasClip) {
+              onAddClip(track.id, offset);
+            }
+            brushRef.current.lastBeat = currentBeat;
+          }
+        }}
+        onPointerUp={(e) => {
+          if (activeTool === 'brush') {
+            brushRef.current.painting = false;
+            try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) { }
+          }
+        }}
+        onPointerCancel={(e) => {
+          brushRef.current.painting = false;
         }}
       >
         <div className="track-grid">
@@ -613,6 +670,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
             <div
               key={idx}
               className="track-clip"
+              data-clip-index={idx}
               onMouseEnter={() => setHoveredClipIndex(idx)}
               onMouseLeave={() => setHoveredClipIndex(null)}
               style={{
@@ -628,13 +686,13 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                opacity: clip.muted ? 0.4 : (isClipSelected ? 1 : isClipHovered ? 1 : 0.95),
                 boxShadow: isClipSelected
                   ? `inset 0 1px 2px rgba(255, 255, 255, 0.25), 0 0 16px ${clipColor}80, 0 4px 8px rgba(0, 0, 0, 0.4)`
                   : isClipHovered
                     ? `inset 0 1px 2px rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.3)`
                     : `inset 0 1px 2px rgba(255, 255, 255, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2)`,
                 minHeight: '52px',
-                opacity: isClipSelected ? 1 : isClipHovered ? 1 : 0.95,
                 transition: 'all 0.2s ease',
                 filter: isClipHovered && !isClipSelected ? 'brightness(1.15)' : 'brightness(1)',
                 position: 'absolute',
@@ -642,10 +700,31 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 transform: 'translateY(-50%)',
                 height: '52px',
                 zIndex: isClipSelected ? 10 : 1,
-                cursor: activeTool === 'slice' ? 'url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTggNiAyMiAzIDIyIDMgMTkgNyAxNSI+PC9wb2x5bGluZT48cGF0aCBkPSJNMjEgNGwtOSA5Ij48L3BhdGg+PHBhdGggZD0iTTE1IDdsNiA2Ij48L3BhdGg+PC9zdmc+") 12 12, crosshair' : 'default'
+                textDecoration: clip.muted ? 'line-through' : 'none',
+                cursor: activeTool === 'mute' ? 'pointer'
+                  : activeTool === 'slip' ? 'ew-resize'
+                    : activeTool === 'zoom' ? (window.event?.altKey ? 'zoom-out' : 'zoom-in')
+                      : activeTool === 'playback' ? 'col-resize'
+                        : activeTool === 'slice' ? 'url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTAgMTggNiAyMiAzIDIyIDMgMTkgNyAxNSI+PC9wb2x5bGluZT48cGF0aCBkPSJNMjEgNGwtOSA5Ij48L3BhdGg+PHBhdGggZD0iTTE1IDdsNiA2Ij48L3BhdGg+PC9zdmc+") 12 12, crosshair'
+                          : 'default'
               }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (activeTool === 'mute') {
+                  onToggleClipMute && onToggleClipMute(track.id, idx);
+                  return;
+                }
+                if (activeTool === 'playback') {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const beatOffset = clip.offset + x / pixelsPerBeat;
+                  if (onScrubClick) onScrubClick(beatOffset);
+                  return;
+                }
+                if (activeTool === 'zoom') {
+                  if (onZoom) onZoom(e.altKey ? 'out' : 'in');
+                  return;
+                }
                 if (activeTool === 'slice') {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -666,7 +745,15 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
               }}
               onPointerDown={(e) => {
                 e.stopPropagation();
-                onStartDrag(e, track.id, idx);
+                // Slip edit: drag to shift clip content without moving clip boundaries
+                if (activeTool === 'slip') {
+                  if (onSlipStart) onSlipStart(e, track.id, idx);
+                  return;
+                }
+                // Compute how far inside the clip the user clicked (anchor offset)
+                const clipRect = e.currentTarget.getBoundingClientRect();
+                const clickXInClip = e.clientX - clipRect.left; // px from clip start
+                onStartDrag(e, track.id, idx, clickXInClip);
               }}
             >
               <div className="clip-header" style={{
@@ -755,8 +842,12 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
   );
 });
 
-const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor, onOpenPianoRoll }) => {
-  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab, pushTrackHistory, selectedTrackClips, setSelectedTrackClips, selectedTrackClip, setSelectedTrackClip } = useProject();
+const TrackList = React.memo(({ onSelectClip, pixelsPerBeat: pixelsPerBeatProp = 60, measures = 16, beatsPerBar = 4, playheadPosition = 0, onOpenSampleEditor, onOpenPianoRoll }) => {
+  const { playlistTracks, setPlaylistTracks, activePatternId, patterns, setActivePatternId, setPatterns, createPattern, audioClips, setAudioClips, activeClipType, setActiveClipType, activeAudioClipId, setActiveAudioClipId, activeTool, toggleTrackMute, toggleTrackSolo, createAutomation, automations, activeAutomationId, updateAutomationPoints, addChannel, addEffect, addStemsAsAudioClips, bpm, pickerTab, setPickerTab, pushTrackHistory, selectedTrackClips, setSelectedTrackClips, selectedTrackClip, setSelectedTrackClip, snapEnabled, setPlayheadPosition, seek } = useProject();
+
+  // Local zoom state — zoom tool modifies this
+  const [zoomLevel, setZoomLevel] = useState(pixelsPerBeatProp);
+  const pixelsPerBeat = zoomLevel;
   // Use context-level selection state (aliases for backward compat within this component)
   const selected = selectedTrackClip;
   const setSelected = setSelectedTrackClip;
@@ -767,6 +858,11 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
   const [menu, setMenu] = useState(null); // { trackId, clipIndex, x, y, patternId }
   const [activeSubmenu, setActiveSubmenu] = useState(null);
   const menuRef = useRef(null);
+
+  // Rubber-band selection box state (for 'select' tool)
+  const [selBox, setSelBox] = useState(null); // { startX, startY, x, y, w, h } in px relative to tracklist
+  const selBoxState = useRef({ active: false, startX: 0, startY: 0 });
+  const tracklistRef = useRef(null);
 
   // Modal states for dialogs (replacing prompt())
   const [renameModal, setRenameModal] = useState({ open: false, trackId: null, clipIndex: null, currentName: '' });
@@ -1239,6 +1335,86 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     }));
   };
 
+  // ── Mute Tool: toggle clip.muted ──
+  const toggleClipMute = (trackId, clipIndex) => {
+    pushTrackHistory();
+    setPlaylistTracks(prev => prev.map(t => {
+      if (t.id !== trackId) return t;
+      const newClips = [...t.clips];
+      if (newClips[clipIndex]) {
+        newClips[clipIndex] = { ...newClips[clipIndex], muted: !newClips[clipIndex].muted };
+      }
+      return { ...t, clips: newClips };
+    }));
+  };
+
+  // ── Slip Edit Tool: shift content inside clip ──
+  const slipState = useRef({ slipping: false, trackId: null, clipIndex: null, startX: 0, origStartOffset: 0 });
+
+  const handleSlipStart = (e, trackId, clipIndex) => {
+    if (e.button && e.button !== 0) return;
+    const track = playlistTracks.find(t => t.id === trackId);
+    if (!track) return;
+    const clip = track.clips[clipIndex];
+    if (!clip) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    slipState.current = {
+      slipping: true,
+      trackId,
+      clipIndex,
+      startX: e.clientX,
+      origStartOffset: clip.startOffset || 0
+    };
+
+    const onSlipMove = (ev) => {
+      const ss = slipState.current;
+      if (!ss.slipping) return;
+      const deltaX = ev.clientX - ss.startX;
+      const deltaBeats = deltaX / pixelsPerBeat;
+      const newStartOffset = Math.max(0, ss.origStartOffset - deltaBeats);
+
+      setPlaylistTracks(prev => prev.map(t => {
+        if (t.id !== ss.trackId) return t;
+        const newClips = [...t.clips];
+        if (newClips[ss.clipIndex]) {
+          newClips[ss.clipIndex] = { ...newClips[ss.clipIndex], startOffset: newStartOffset };
+        }
+        return { ...t, clips: newClips };
+      }));
+    };
+
+    const onSlipUp = () => {
+      slipState.current = { slipping: false };
+      window.removeEventListener('pointermove', onSlipMove);
+      window.removeEventListener('pointerup', onSlipUp);
+    };
+
+    window.addEventListener('pointermove', onSlipMove);
+    window.addEventListener('pointerup', onSlipUp);
+  };
+
+  // ── Zoom Tool: adjust pixelsPerBeat ──
+  const handleZoom = (direction) => {
+    setZoomLevel(prev => {
+      const step = 20;
+      if (direction === 'in') return Math.min(200, prev + step);
+      if (direction === 'out') return Math.max(20, prev - step);
+      return prev;
+    });
+  };
+
+  // ── Playback/Scrub Tool: move playhead using seek() so Transport is also updated ──
+  const handleScrubClick = (beatPosition) => {
+    if (seek) {
+      seek(Math.max(0, beatPosition));
+    } else if (setPlayheadPosition) {
+      setPlayheadPosition(Math.max(0, beatPosition));
+    }
+  };
+
   const renameTrack = (trackId, newName) => {
     setPlaylistTracks(prev => prev.map(t => {
       if (t.id !== trackId) return t;
@@ -1347,7 +1523,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     };
   }, []);
 
-  const onStartDrag = (e, trackId, clipIndex) => {
+  const onStartDrag = (e, trackId, clipIndex, clickXInClip = 0) => {
     if (e.button && e.button !== 0) return;
     const track = playlistTracks.find(t => t.id === trackId);
     if (!track) return;
@@ -1355,6 +1531,9 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     if (!clip) return;
 
     e.preventDefault();
+
+    // How many beats from the clip's start was the mouse clicked?
+    const clickOffsetBeats = clickXInClip / pixelsPerBeat;
 
     // Check if this clip is part of a multi-selection for group drag
     const allSelected = getAllSelectedClips();
@@ -1384,6 +1563,7 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         startX: e.clientX,
         startY: e.clientY,
         origOffset: clip.offset,
+        clickOffsetBeats,   // anchor offset within the clip
         anchorTrackId,
         groupClips
       };
@@ -1394,7 +1574,8 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
         trackId,
         clipIndex,
         startX: e.clientX,
-        origOffset: clip.offset
+        origOffset: clip.offset,
+        clickOffsetBeats   // anchor offset within the clip
       };
     }
 
@@ -1462,13 +1643,15 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
 
       if (rs.side === 'left') {
         // Resizing from left - adjust offset, length, AND startOffset
-        // deltaBeats > 0 means dragging right (trimming start), < 0 means dragging left (extending start)
-        const newOffset = Math.max(0, rs.origOffset + deltaBeats);
-        const newLength = Math.max(0.25, rs.startLength - deltaBeats);
-        // startOffset tracks how far into the source buffer we've trimmed
-        // Can't go below 0 (can't reveal audio before the buffer start)
-        const newStartOffset = Math.max(0, rs.origStartOffset + deltaBeats);
-
+        let newOffset = Math.max(0, rs.origOffset + deltaBeats);
+        let newLength = Math.max(0.25, rs.startLength - deltaBeats);
+        let newStartOffset = Math.max(0, rs.origStartOffset + deltaBeats);
+        // Apply snap-to-grid
+        if (snapEnabled) {
+          newOffset = Math.round(newOffset);
+          newLength = Math.max(1, Math.round(newLength));
+          newStartOffset = Math.max(0, Math.round(newStartOffset));
+        }
         setPlaylistTracks(prev => prev.map(t => {
           if (t.id !== rs.trackId) return t;
           const newClips = [...t.clips];
@@ -1483,9 +1666,9 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           return { ...t, clips: newClips };
         }));
       } else {
-        // Resizing from right - adjust length only (free movement, no snap)
-        const newLength = Math.max(0.25, rs.startLength + deltaBeats);
-
+        // Resizing from right - adjust length only
+        let newLength = Math.max(0.25, rs.startLength + deltaBeats);
+        if (snapEnabled) newLength = Math.max(1, Math.round(newLength));
         setPlaylistTracks(prev => prev.map(t => {
           if (t.id !== rs.trackId) return t;
           const newClips = [...t.clips];
@@ -1527,7 +1710,10 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
     if (clipArea) {
       const rect = clipArea.getBoundingClientRect();
       const relativeX = Math.max(0, e.clientX - rect.left);
-      newOffset = relativeX / pixelsPerBeat;
+      // Subtract the click-offset so the anchor point (where user clicked) follows the pointer
+      newOffset = relativeX / pixelsPerBeat - (ds.clickOffsetBeats || 0);
+      newOffset = Math.max(0, newOffset);
+      if (snapEnabled) newOffset = Math.round(newOffset);
     }
 
     pushTrackHistory();
@@ -1642,7 +1828,77 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
 
 
   return (
-    <div className="tracklist">
+    <div
+      className="tracklist"
+      ref={tracklistRef}
+      style={{ position: 'relative' }}
+      onPointerDown={(e) => {
+        // Only start rubber-band on select tool, left button, on bare tracklist background
+        if (activeTool !== 'select' || e.button !== 0) return;
+        const target = e.target;
+        // Only start if clicking on tracklist background or grid (not on a clip)
+        if (target.closest('.track-clip') || target.closest('.track-header') || target.closest('.clip-menu')) return;
+        const rect = tracklistRef.current.getBoundingClientRect();
+        const startX = e.clientX - rect.left;
+        const startY = e.clientY - rect.top;
+        selBoxState.current = { active: true, startX, startY };
+        setSelBox({ startX, startY, x: startX, y: startY, w: 0, h: 0 });
+        tracklistRef.current.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        if (!selBoxState.current.active) return;
+        const rect = tracklistRef.current.getBoundingClientRect();
+        const curX = e.clientX - rect.left;
+        const curY = e.clientY - rect.top;
+        const { startX, startY } = selBoxState.current;
+        setSelBox({
+          startX, startY,
+          x: Math.min(startX, curX),
+          y: Math.min(startY, curY),
+          w: Math.abs(curX - startX),
+          h: Math.abs(curY - startY),
+        });
+      }}
+      onPointerUp={(e) => {
+        if (!selBoxState.current.active) return;
+        selBoxState.current.active = false;
+
+        // Compute the final box in page coords
+        const tRect = tracklistRef.current.getBoundingClientRect();
+        setSelBox(prev => {
+          if (!prev || prev.w < 4 || prev.h < 4) return null;
+
+          // Find all clips that overlap the selection box
+          const boxLeft = tRect.left + prev.x;
+          const boxRight = boxLeft + prev.w;
+          const boxTop = tRect.top + prev.y;
+          const boxBottom = boxTop + prev.h;
+
+          const matched = [];
+          // Query all clip elements inside this tracklist
+          const clipEls = tracklistRef.current.querySelectorAll('.track-clip');
+          clipEls.forEach(el => {
+            const cr = el.getBoundingClientRect();
+            const overlaps = cr.left < boxRight && cr.right > boxLeft && cr.top < boxBottom && cr.bottom > boxTop;
+            if (overlaps) {
+              const trackEl = el.closest('[data-track-id]');
+              const trackId = trackEl ? Number(trackEl.getAttribute('data-track-id')) : null;
+              const clipIndex = parseInt(el.getAttribute('data-clip-index'), 10);
+              if (trackId !== null && !isNaN(clipIndex)) {
+                matched.push({ trackId, clipIndex });
+              }
+            }
+          });
+
+          if (matched.length > 0) {
+            setSelectedClips(matched);
+            setSelected(matched[0]);
+          }
+          return null;
+        });
+        try { tracklistRef.current.releasePointerCapture(e.pointerId); } catch (_) { }
+      }}
+    >
       {playlistTracks.map((track) => (
         <Track
           key={track.id}
@@ -1702,11 +1958,35 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat = 60, measures = 16,
           onSlice={handleSlice}
           onAddChannel={addChannel}
           onAddEffect={addEffect}
+          onToggleClipMute={toggleClipMute}
+          onSlipStart={handleSlipStart}
+          onZoom={handleZoom}
+          onScrubClick={handleScrubClick}
+          snapEnabled={snapEnabled}
         />
       ))}
 
+      {/* Rubber-band selection box overlay */}
+      {selBox && (
+        <div
+          style={{
+            position: 'absolute',
+            left: selBox.x,
+            top: selBox.y,
+            width: selBox.w,
+            height: selBox.h,
+            border: '1px solid #a855f7',
+            background: 'rgba(168, 85, 247, 0.12)',
+            pointerEvents: 'none',
+            zIndex: 999,
+            borderRadius: '2px',
+          }}
+        />
+      )}
+
       {/* Stem Extraction Loading Overlay */}
       {isExtractingStems && (
+
         <div style={{
           position: 'fixed',
           top: 0,

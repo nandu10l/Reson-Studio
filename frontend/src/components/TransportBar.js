@@ -16,7 +16,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
   const {
     isPlaying, togglePlayback, bpm, updateBpm, stopPlayback, playheadPosition,
     playbackMode, setPlaybackMode, isRecording, setIsRecording,
-    activeTool, setActiveTool
+    activeTool, setActiveTool,
+    snapEnabled, setSnapEnabled
   } = useProject();
 
   const { useGuideHandlers } = useGuide();
@@ -90,8 +91,8 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
         {/* Tools Toolbar */}
         <div className="transport-tools">
           <button
-            className={`transport-tool-btn ${activeTool === 'magnet' ? 'active' : ''}`}
-            onClick={() => setActiveTool(activeTool === 'magnet' ? 'pencil' : 'magnet')}
+            className={`transport-tool-btn ${snapEnabled ? 'active' : ''}`}
+            onClick={() => setSnapEnabled(prev => !prev)}
             title="Snap to Grid"
           >
             <Magnet size={20} className="blender-icon" />

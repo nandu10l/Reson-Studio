@@ -79,6 +79,7 @@ export const ProjectProvider = ({ children }) => {
     const [isImportingAudio, setIsImportingAudio] = useState(false);
 
     const [activeTool, setActiveTool] = useState('pencil');
+    const [snapEnabled, setSnapEnabled] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [bpm, setBpm] = useState(120);
     const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
@@ -2028,6 +2029,7 @@ export const ProjectProvider = ({ children }) => {
 
         // Tools
         activeTool, setActiveTool,
+        snapEnabled, setSnapEnabled,
 
         // Persistence
         loadProject

@@ -1015,10 +1015,10 @@ const PianoRoll = () => {
     return (
         <div className="piano-roll-window">
             {/* Header - Blender-style context area */}
-            <div className="piano-header" style={{ backgroundColor: '#1e1e1e', background: '#1e1e1e' }}>
-                <div className="piano-header-left">
+            <div className="piano-header" style={{ backgroundColor: '#1e1e1e', background: '#1e1e1e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="piano-header-left" style={{ overflow: 'hidden', flex: 1, display: 'flex', gap: '16px', alignItems: 'center' }}>
                     {/* Pattern name - inline editable capsule */}
-                    <div className="pattern-name-capsule">
+                    <div className="pattern-name-capsule" style={{ flexShrink: 1, minWidth: '0', maxWidth: '120px' }}>
                         {isEditingName ? (
                             <input
                                 ref={nameInputRef}
@@ -1028,12 +1028,20 @@ const PianoRoll = () => {
                                 onBlur={handleNameBlur}
                                 onKeyDown={handleNameKeyDown}
                                 className="pattern-name-input"
+                                style={{ width: '100%', minWidth: '40px' }}
                             />
                         ) : (
                             <span
                                 className="pattern-name-text"
                                 onClick={handleNameClick}
                                 title="Click to rename"
+                                style={{
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    display: 'block',
+                                    width: '100%'
+                                }}
                             >
                                 {activePattern.name}
                             </span>
@@ -1041,8 +1049,8 @@ const PianoRoll = () => {
                     </div>
 
                     {/* Channel Selector */}
-                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', marginLeft: '24px', gap: '12px' }}>
-                        <span style={{ fontSize: '11px', color: '#888' }}>Channel:</span>
+                    <div className="channel-selector" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <span style={{ fontSize: '11px', color: '#888', whiteSpace: 'nowrap' }}>Channel:</span>
                         <select
                             value={selectedChannelId}
                             onChange={(e) => {
@@ -1058,7 +1066,9 @@ const PianoRoll = () => {
                                 fontSize: '11px',
                                 padding: '2px 4px',
                                 outline: 'none',
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                maxWidth: '150px'
                             }}
                         >
                             {channels.map(ch => (
@@ -1066,26 +1076,26 @@ const PianoRoll = () => {
                             ))}
                         </select>
                     </div>
+                </div>
 
-                    {/* Context indicators */}
-                    <div className="context-indicators">
-                        {snapEnabled && (
-                            <div className="context-badge" title={`Snap: 1/${snapStrength}`}>
-                                <Target size={12} className="blender-icon" />
-                                <span>{snapStrength}</span>
-                            </div>
-                        )}
-                        {velocityEditMode && (
-                            <div className="context-badge" title="Velocity Edit Mode">
-                                <Sliders size={12} className="blender-icon" />
-                            </div>
-                        )}
-                        {previewNoteOnDraw && (
-                            <div className="context-badge" title="Preview Note on Draw">
-                                <Volume2 size={12} className="blender-icon" />
-                            </div>
-                        )}
-                    </div>
+                {/* Context indicators - Moved out of the left section to be right-aligned */}
+                <div className="context-indicators" style={{ flexShrink: 0, display: 'flex', gap: '6px', marginLeft: 'auto' }}>
+                    {snapEnabled && (
+                        <div className="context-badge" title={`Snap: 1/${snapStrength}`}>
+                            <Target size={12} className="blender-icon" />
+                            <span>{snapStrength}</span>
+                        </div>
+                    )}
+                    {velocityEditMode && (
+                        <div className="context-badge" title="Velocity Edit Mode">
+                            <Sliders size={12} className="blender-icon" />
+                        </div>
+                    )}
+                    {previewNoteOnDraw && (
+                        <div className="context-badge" title="Preview Note on Draw">
+                            <Volume2 size={12} className="blender-icon" />
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -1439,172 +1449,178 @@ const PianoRoll = () => {
             </div>
 
             {/* Velocity Lane */}
-            {!velocityLaneCollapsed && (
-                <div className="velocity-lane" style={{
-                    height: '120px',
-                    background: '#1a1a1a',
-                    borderTop: '1px solid #333',
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}>
-                    {/* Lane Header */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px 8px',
-                        background: '#252525',
-                        borderBottom: '1px solid #333',
-                        fontSize: '11px',
-                        color: '#888'
-                    }}>
-                        <button
-                            onClick={() => setVelocityLaneCollapsed(true)}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#666',
-                                cursor: 'pointer',
-                                padding: '2px 6px',
-                                marginRight: '8px'
-                            }}
-                        >
-                            ▼
-                        </button>
-                        <span style={{ color: '#4ade80' }}>Control ▸</span>
-                        <span style={{ marginLeft: '8px', color: '#aaa' }}>Velocity</span>
-                    </div>
-                    {/* Velocity Bars Area - FL Studio Style */}
-                    <div style={{
-                        flex: 1,
-                        position: 'relative',
-                        overflowX: 'hidden',
-                        overflowY: 'hidden',
-                        marginLeft: `${KEYS_WIDTH}px`
-                    }}>
-                        {/* Grid background */}
-                        <div style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'repeating-linear-gradient(90deg, transparent 0, transparent 63px, #333 63px, #333 64px)',
-                            opacity: 0.3
-                        }} />
-                        {/* FL Studio-style Step Velocity */}
-                        <svg style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
-                            height: '100%',
-                            pointerEvents: 'none'
-                        }}>
-                            {(() => {
-                                const filteredNotes = activePattern.data.notes
-                                    .filter(note => {
-                                        const noteChannelId = note.channelId !== undefined ? note.channelId : 0;
-                                        return noteChannelId === selectedChannelId;
-                                    })
-                                    .sort((a, b) => a.startStep - b.startStep);
-
-                                const laneHeight = 80;
-                                const baseY = 85;
-
-                                return filteredNotes.map((note, index) => {
-                                    const velocity = note.velocity !== undefined ? note.velocity : 100;
-                                    const barHeight = (velocity / 127) * laneHeight;
-                                    const x = note.startStep * pixelsPerStep + (note.length * pixelsPerStep / 2);
-                                    const topY = baseY - barHeight;
-                                    const isSelected = selection.includes(note.id);
-                                    const color = isSelected ? '#60a5fa' : '#4ade80';
-
-                                    // Get next note for horizontal connector
-                                    const nextNote = filteredNotes[index + 1];
-                                    const nextX = nextNote
-                                        ? nextNote.startStep * pixelsPerStep + (nextNote.length * pixelsPerStep / 2)
-                                        : null;
-
-                                    return (
-                                        <g key={note.id}>
-                                            {/* Vertical line from baseline */}
-                                            <line
-                                                x1={x} y1={baseY} x2={x} y2={topY}
-                                                stroke={color} strokeWidth="2"
-                                            />
-                                            {/* Horizontal line to next note (step pattern) */}
-                                            {nextX !== null && (
-                                                <line
-                                                    x1={x} y1={topY} x2={nextX} y2={topY}
-                                                    stroke={color} strokeWidth="2"
-                                                />
-                                            )}
-                                            {/* Drag handle circle */}
-                                            <circle
-                                                cx={x} cy={topY} r="4"
-                                                fill={color} stroke="#222" strokeWidth="1"
-                                                style={{ pointerEvents: 'auto', cursor: 'ns-resize' }}
-                                                onMouseDown={(e) => {
-                                                    e.stopPropagation();
-                                                    setVelocityDragState({
-                                                        noteId: note.id,
-                                                        startY: e.clientY,
-                                                        initialVelocity: velocity
-                                                    });
-                                                }}
-                                            />
-                                        </g>
-                                    );
-                                });
-                            })()}
-                        </svg>
-                    </div>
-                </div>
-            )}
-
-            {/* Collapsed Velocity Lane Toggle */}
-            {velocityLaneCollapsed && (
-                <div
-                    onClick={() => setVelocityLaneCollapsed(false)}
-                    style={{
-                        height: '24px',
-                        background: '#252525',
+            {
+                !velocityLaneCollapsed && (
+                    <div className="velocity-lane" style={{
+                        height: '120px',
+                        background: '#1a1a1a',
                         borderTop: '1px solid #333',
                         display: 'flex',
-                        alignItems: 'center',
-                        padding: '0 8px',
-                        cursor: 'pointer',
-                        fontSize: '11px',
-                        color: '#666'
-                    }}
-                >
-                    ▶ Control
-                </div>
-            )}
+                        flexDirection: 'column'
+                    }}>
+                        {/* Lane Header */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '4px 8px',
+                            background: '#252525',
+                            borderBottom: '1px solid #333',
+                            fontSize: '11px',
+                            color: '#888'
+                        }}>
+                            <button
+                                onClick={() => setVelocityLaneCollapsed(true)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#666',
+                                    cursor: 'pointer',
+                                    padding: '2px 6px',
+                                    marginRight: '8px'
+                                }}
+                            >
+                                ▼
+                            </button>
+                            <span style={{ color: '#4ade80' }}>Control ▸</span>
+                            <span style={{ marginLeft: '8px', color: '#aaa' }}>Velocity</span>
+                        </div>
+                        {/* Velocity Bars Area - FL Studio Style */}
+                        <div style={{
+                            flex: 1,
+                            position: 'relative',
+                            overflowX: 'hidden',
+                            overflowY: 'hidden',
+                            marginLeft: `${KEYS_WIDTH}px`
+                        }}>
+                            {/* Grid background */}
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'repeating-linear-gradient(90deg, transparent 0, transparent 63px, #333 63px, #333 64px)',
+                                opacity: 0.3
+                            }} />
+                            {/* FL Studio-style Step Velocity */}
+                            <svg style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
+                                height: '100%',
+                                pointerEvents: 'none'
+                            }}>
+                                {(() => {
+                                    const filteredNotes = activePattern.data.notes
+                                        .filter(note => {
+                                            const noteChannelId = note.channelId !== undefined ? note.channelId : 0;
+                                            return noteChannelId === selectedChannelId;
+                                        })
+                                        .sort((a, b) => a.startStep - b.startStep);
+
+                                    const laneHeight = 80;
+                                    const baseY = 85;
+
+                                    return filteredNotes.map((note, index) => {
+                                        const velocity = note.velocity !== undefined ? note.velocity : 100;
+                                        const barHeight = (velocity / 127) * laneHeight;
+                                        const x = note.startStep * pixelsPerStep + (note.length * pixelsPerStep / 2);
+                                        const topY = baseY - barHeight;
+                                        const isSelected = selection.includes(note.id);
+                                        const color = isSelected ? '#60a5fa' : '#4ade80';
+
+                                        // Get next note for horizontal connector
+                                        const nextNote = filteredNotes[index + 1];
+                                        const nextX = nextNote
+                                            ? nextNote.startStep * pixelsPerStep + (nextNote.length * pixelsPerStep / 2)
+                                            : null;
+
+                                        return (
+                                            <g key={note.id}>
+                                                {/* Vertical line from baseline */}
+                                                <line
+                                                    x1={x} y1={baseY} x2={x} y2={topY}
+                                                    stroke={color} strokeWidth="2"
+                                                />
+                                                {/* Horizontal line to next note (step pattern) */}
+                                                {nextX !== null && (
+                                                    <line
+                                                        x1={x} y1={topY} x2={nextX} y2={topY}
+                                                        stroke={color} strokeWidth="2"
+                                                    />
+                                                )}
+                                                {/* Drag handle circle */}
+                                                <circle
+                                                    cx={x} cy={topY} r="4"
+                                                    fill={color} stroke="#222" strokeWidth="1"
+                                                    style={{ pointerEvents: 'auto', cursor: 'ns-resize' }}
+                                                    onMouseDown={(e) => {
+                                                        e.stopPropagation();
+                                                        setVelocityDragState({
+                                                            noteId: note.id,
+                                                            startY: e.clientY,
+                                                            initialVelocity: velocity
+                                                        });
+                                                    }}
+                                                />
+                                            </g>
+                                        );
+                                    });
+                                })()}
+                            </svg>
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Collapsed Velocity Lane Toggle */}
+            {
+                velocityLaneCollapsed && (
+                    <div
+                        onClick={() => setVelocityLaneCollapsed(false)}
+                        style={{
+                            height: '24px',
+                            background: '#252525',
+                            borderTop: '1px solid #333',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '0 8px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            color: '#666'
+                        }}
+                    >
+                        ▶ Control
+                    </div>
+                )
+            }
 
             {/* Chord Progression Generator Modal */}
-            {isChordGeneratorOpen && (
-                <ChordProgressionGenerator
-                    channelId={selectedChannelId}
-                    onClose={() => setIsChordGeneratorOpen(false)}
-                    onAccept={(notes) => {
-                        pushNotesHistory();
-                        // Replace existing notes for this channel
-                        const otherNotes = activePattern.data.notes.filter(n => {
-                            const nId = n.channelId !== undefined ? n.channelId : 0;
-                            return nId !== selectedChannelId;
-                        });
+            {
+                isChordGeneratorOpen && (
+                    <ChordProgressionGenerator
+                        channelId={selectedChannelId}
+                        onClose={() => setIsChordGeneratorOpen(false)}
+                        onAccept={(notes) => {
+                            pushNotesHistory();
+                            // Replace existing notes for this channel
+                            const otherNotes = activePattern.data.notes.filter(n => {
+                                const nId = n.channelId !== undefined ? n.channelId : 0;
+                                return nId !== selectedChannelId;
+                            });
 
-                        updatePattern(activePatternId, {
-                            data: {
-                                ...activePattern.data,
-                                notes: [...otherNotes, ...notes]
-                            }
-                        });
-                    }}
-                />
-            )}
-        </div>
+                            updatePattern(activePatternId, {
+                                data: {
+                                    ...activePattern.data,
+                                    notes: [...otherNotes, ...notes]
+                                }
+                            });
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 };
 
