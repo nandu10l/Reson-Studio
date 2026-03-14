@@ -131,7 +131,12 @@ export const ProjectProvider = ({ children }) => {
             if (data.automations) setAutomations(data.automations);
 
             // Restore mixer inserts
-            if (data.mixerInserts) setMixerInserts(data.mixerInserts);
+            if (data.mixerInserts) {
+                setMixerInserts(data.mixerInserts);
+                data.mixerInserts.forEach(ins => {
+                    audioEngine.createMixerInsertChannel(ins.id, ins.vol, ins.pan);
+                });
+            }
 
             // Always clear audio clips first so stale state doesn't persist
             setAudioClips([]);
@@ -589,6 +594,15 @@ export const ProjectProvider = ({ children }) => {
 
         // Re-sync audio engine
         syncAudioEngineChannels(historyEntry.channels);
+        // Re-sync mixer insert channels
+        historyEntry.mixerInserts.forEach(ins => {
+            if (!audioEngine.mixerInsertChannels?.has(ins.id)) {
+                audioEngine.createMixerInsertChannel(ins.id, ins.vol, ins.pan);
+            } else {
+                audioEngine.updateMixerInsertVolume(ins.id, ins.vol);
+                audioEngine.updateMixerInsertPan(ins.id, ins.pan);
+            }
+        });
 
         setGlobalHistoryIndex(prev => prev - 1);
         setTimeout(() => { isGlobalUndoRedoAction.current = false; }, 0);
@@ -609,6 +623,15 @@ export const ProjectProvider = ({ children }) => {
         setAutomations(nextEntry.automations);
 
         syncAudioEngineChannels(nextEntry.channels);
+        // Re-sync mixer insert channels
+        nextEntry.mixerInserts.forEach(ins => {
+            if (!audioEngine.mixerInsertChannels?.has(ins.id)) {
+                audioEngine.createMixerInsertChannel(ins.id, ins.vol, ins.pan);
+            } else {
+                audioEngine.updateMixerInsertVolume(ins.id, ins.vol);
+                audioEngine.updateMixerInsertPan(ins.id, ins.pan);
+            }
+        });
 
         setGlobalHistoryIndex(prev => prev + 1);
         setTimeout(() => { isGlobalUndoRedoAction.current = false; }, 0);
@@ -767,10 +790,11 @@ export const ProjectProvider = ({ children }) => {
         if (clips.length === 0) return;
 
         const groupName = clips.length === 1 ? clips[0].name : `Audio Group`;
+        const insertId = `mixer-insert-${Date.now()}`;
         setMixerInserts(prev => {
             const nextNum = prev.length + 1;
             return [...prev, {
-                id: `mixer-insert-${Date.now()}`,
+                id: insertId,
                 name: clips.length === 1 ? groupName : `${groupName} ${nextNum}`,
                 type: 'group',
                 clipIds: clips.map(c => c.id),
@@ -780,6 +804,7 @@ export const ProjectProvider = ({ children }) => {
                 effects: []
             }];
         });
+        audioEngine.createMixerInsertChannel(insertId, 80, 0);
     }, [audioClips]);
 
     // Add selected audio clips each to their own mixer insert
@@ -791,19 +816,21 @@ export const ProjectProvider = ({ children }) => {
         }).filter(Boolean);
         if (clips.length === 0) return;
 
-        setMixerInserts(prev => [
-            ...prev,
-            ...clips.map(clip => ({
-                id: `mixer-insert-${clip.id}-${Date.now()}`,
-                name: clip.name,
-                type: 'audio',
-                clipIds: [clip.id],
-                clipNames: [clip.name],
-                vol: 80,
-                pan: 0,
-                effects: []
-            }))
-        ]);
+        const newInserts = clips.map(clip => ({
+            id: `mixer-insert-${clip.id}-${Date.now()}`,
+            name: clip.name,
+            type: 'audio',
+            clipIds: [clip.id],
+            clipNames: [clip.name],
+            vol: 80,
+            pan: 0,
+            effects: []
+        }));
+
+        setMixerInserts(prev => [...prev, ...newInserts]);
+        newInserts.forEach(ins => {
+            audioEngine.createMixerInsertChannel(ins.id, 80, 0);
+        });
     }, [audioClips]);
 
     // Optimization: Track if scheduling is needed
@@ -847,7 +874,7 @@ export const ProjectProvider = ({ children }) => {
             // Always reschedule to ensure audio (which is un-synced) restarts correctly
             // even after a Pause. 
             if (playbackMode === 'SONG') {
-                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, currentTimeSeconds);
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, currentTimeSeconds, mixerInserts);
             } else if (playbackMode === 'PAT') {
                 const activePattern = patterns.find(p => p.id === activePatternId);
                 if (activePattern) {
@@ -859,7 +886,7 @@ export const ProjectProvider = ({ children }) => {
             audioEngine.start();
             setIsPlaying(true);
         }
-    }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm, automations]);
+    }, [isPlaying, playbackMode, playlistTracks, patterns, audioClips, activePatternId, playheadPosition, bpm, automations, mixerInserts]);
 
     const seek = useCallback((beats) => {
         const safeBeats = Math.max(0, beats);
@@ -879,7 +906,7 @@ export const ProjectProvider = ({ children }) => {
 
             Tone.Transport.seconds = seconds;
             if (playbackMode === 'SONG') {
-                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, seconds);
+                audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, seconds, mixerInserts);
             } else if (playbackMode === 'PAT') {
                 // In Pattern mode, we just ensure the pattern is scheduled and loop is active
                 // We don't need manual audio clip handling, but we should ensure synth scheduling
@@ -900,7 +927,7 @@ export const ProjectProvider = ({ children }) => {
             // THEN set the correct position
             Tone.Transport.seconds = seconds;
         }
-    }, [bpm, isPlaying, playlistTracks, patterns, audioClips, playbackMode, activePatternId, automations]);
+    }, [bpm, isPlaying, playlistTracks, patterns, audioClips, playbackMode, activePatternId, automations, mixerInserts]);
 
     const stopPlayback = useCallback(() => {
         audioEngine.stop();
@@ -1049,6 +1076,21 @@ export const ProjectProvider = ({ children }) => {
         ));
     }, []);
 
+    // Mixer Insert Volume/Pan
+    const updateMixerInsertVolume = useCallback((insertId, volume) => {
+        audioEngine.updateMixerInsertVolume(insertId, volume);
+        setMixerInserts(prev => prev.map(ins =>
+            ins.id === insertId ? { ...ins, vol: volume } : ins
+        ));
+    }, []);
+
+    const updateMixerInsertPan = useCallback((insertId, pan) => {
+        audioEngine.updateMixerInsertPan(insertId, pan);
+        setMixerInserts(prev => prev.map(ins =>
+            ins.id === insertId ? { ...ins, pan: pan } : ins
+        ));
+    }, []);
+
     // Audio Clip Volume/Pan
     const updateAudioClipVolume = useCallback((clipId, volume) => {
         // Update any active audio players for this clip
@@ -1138,7 +1180,9 @@ export const ProjectProvider = ({ children }) => {
 
     const addEffect = useCallback((channelId, plugin, slotIndex = null) => {
         pushGlobalHistoryRef.current?.();
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const currentEffects = ch.effects || [];
                 const slot = slotIndex !== null ? slotIndex : currentEffects.length;
@@ -1175,7 +1219,9 @@ export const ProjectProvider = ({ children }) => {
 
     const removeEffect = useCallback((channelId, slotIndex) => {
         pushGlobalHistoryRef.current?.();
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const newEffects = [...(ch.effects || [])];
                 newEffects[slotIndex] = null;
@@ -1191,7 +1237,9 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const updateEffectMix = useCallback((channelId, slotIndex, mix) => {
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId && ch.effects?.[slotIndex]) {
                 const newEffects = [...ch.effects];
                 newEffects[slotIndex] = { ...newEffects[slotIndex], mix };
@@ -1206,7 +1254,9 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     const updateEffectEnabled = useCallback((channelId, slotIndex, enabled) => {
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId && ch.effects?.[slotIndex]) {
                 const newEffects = [...ch.effects];
                 newEffects[slotIndex] = { ...newEffects[slotIndex], enabled };
@@ -1222,7 +1272,9 @@ export const ProjectProvider = ({ children }) => {
 
     const reorderEffect = useCallback((channelId, fromSlot, toSlot) => {
         pushGlobalHistoryRef.current?.();
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId) {
                 const newEffects = [...(ch.effects || [])];
                 const temp = newEffects[fromSlot];
@@ -1245,7 +1297,9 @@ export const ProjectProvider = ({ children }) => {
 
     // Update effect params (e.g., reverb decay, delay time, etc.)
     const updateEffectParams = useCallback((channelId, slotIndex, params) => {
-        setChannels(prev => prev.map(ch => {
+        const isMixerInsert = typeof channelId === 'string' && channelId.startsWith('mixer-insert-');
+        const setter = isMixerInsert ? setMixerInserts : setChannels;
+        setter(prev => prev.map(ch => {
             if (ch.id === channelId && ch.effects?.[slotIndex]) {
                 const newEffects = [...ch.effects];
                 newEffects[slotIndex] = {
@@ -1733,9 +1787,9 @@ export const ProjectProvider = ({ children }) => {
             }
         } else {
             // SONG mode
-            audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations);
+            audioEngine.schedulePlaylist(playlistTracks, patterns, audioClips, automations, 0, mixerInserts);
         }
-    }, [activePattern, playbackMode, patterns, playlistTracks, audioClips]);
+    }, [activePattern, playbackMode, patterns, playlistTracks, audioClips, mixerInserts]);
 
     // Template Creation
     const createTemplateProject = useCallback((templateType) => {
@@ -2011,6 +2065,7 @@ export const ProjectProvider = ({ children }) => {
 
         // Mixer Inserts
         mixerInserts, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
+        updateMixerInsertVolume, updateMixerInsertPan,
 
         // Audio Clips
         audioClips,

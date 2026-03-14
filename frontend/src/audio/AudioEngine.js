@@ -10,6 +10,9 @@ class AudioEngine {
         this.automationGains = new Map(); // clip instance ID -> raw GainNode for volume automation
         this.channelEffects = new Map(); // channelId -> [effectNode, ...] (10 slots)
         this.channelMeters = new Map(); // id -> Tone.Meter for level monitoring
+        this.mixerInsertChannels = new Map(); // mixerInsertId -> Tone.Channel
+        this.mixerInsertInputGains = new Map(); // mixerInsertId -> Tone.Gain (stable input node for players)
+        this.mixerInsertEffects = new Map(); // mixerInsertId -> Array(10) of effect slots
         this.masterMeter = null; // Master channel meter
         this.isInitialized = false;
         this.previewSynth = null; // Dedicated synth for Piano Roll
@@ -332,7 +335,7 @@ class AudioEngine {
         console.log('Scheduled pattern:', pattern.id);
     }
 
-    schedulePlaylist(tracks, patterns, audioClips = [], automations = [], startTime = 0) {
+    schedulePlaylist(tracks, patterns, audioClips = [], automations = [], startTime = 0, mixerInserts = []) {
         Tone.Transport.cancel(0);
         console.log(`Scheduling Playlist (Song Mode) from ${startTime}s...`);
 
@@ -413,17 +416,30 @@ class AudioEngine {
                         const panner = new Tone.Panner(Math.max(-1, Math.min(1, panVal)));
 
                         // Create a dedicated GainNode for volume automation (acts as multiplier)
-                        // Routing: Player → automationGainNode → Panner → MasterGain
                         const automationGainNode = Tone.context.createGain();
                         automationGainNode.gain.value = 1.0; // Default: no modification
 
-                        if (this.masterGain) {
-                            player.connect(automationGainNode);
-                            automationGainNode.connect(panner.input);
+                        // Check if this audio clip belongs to a mixer insert
+                        const ownerInsert = mixerInserts.find(ins =>
+                            ins.clipIds && ins.clipIds.includes(clip.audioClipId)
+                        );
+
+                        player.connect(automationGainNode);
+                        automationGainNode.connect(panner.input);
+
+                        if (ownerInsert) {
+                            // Route through mixer insert channel
+                            const inputGain = this.mixerInsertInputGains.get(ownerInsert.id);
+                            if (inputGain) {
+                                panner.connect(inputGain);
+                            } else if (this.masterGain) {
+                                panner.connect(this.masterGain);
+                            } else {
+                                panner.toDestination();
+                            }
+                        } else if (this.masterGain) {
                             panner.connect(this.masterGain);
                         } else {
-                            player.connect(automationGainNode);
-                            automationGainNode.connect(panner.input);
                             panner.toDestination();
                         }
                         // Store by Instance ID (clip.id) for unique player per clip placement
@@ -967,6 +983,68 @@ class AudioEngine {
         }
     }
 
+    // --- Mixer Insert Channel Management ---
+
+    createMixerInsertChannel(insertId, vol = 80, pan = 0) {
+        if (this.mixerInsertChannels.has(insertId)) return;
+
+        const channel = new Tone.Channel({ volume: -6, pan: 0 });
+
+        // Apply initial volume
+        if (vol === 0) {
+            channel.mute = true;
+        } else {
+            channel.mute = false;
+            const db = Tone.gainToDb(vol / 100 * 1.2);
+            channel.volume.value = db;
+        }
+
+        // Apply initial pan (-50..+50 where 0=center)
+        const panVal = pan / 50;
+        channel.pan.value = Math.max(-1, Math.min(1, panVal));
+
+        // Connect to master gain
+        if (this.masterGain) {
+            channel.connect(this.masterGain);
+        } else {
+            channel.toDestination();
+        }
+
+        // Create meter (stored in the shared channelMeters map so getChannelLevel works)
+        const meter = new Tone.Meter({ smoothing: 0.8 });
+        channel.connect(meter);
+        this.channelMeters.set(insertId, meter);
+
+        // Create stable input gain node (players connect here)
+        const inputGain = new Tone.Gain(1);
+        inputGain.connect(channel);
+
+        this.mixerInsertChannels.set(insertId, channel);
+        this.mixerInsertInputGains.set(insertId, inputGain);
+        this.mixerInsertEffects.set(insertId, Array(10).fill(null));
+
+        console.log(`Created mixer insert channel: ${insertId}`);
+    }
+
+    updateMixerInsertVolume(insertId, volume0to100) {
+        const channel = this.mixerInsertChannels.get(insertId);
+        if (!channel) return;
+        if (volume0to100 === 0) {
+            channel.mute = true;
+        } else {
+            channel.mute = false;
+            const db = Tone.gainToDb(volume0to100 / 100 * 1.2);
+            channel.volume.rampTo(db, 0.1);
+        }
+    }
+
+    updateMixerInsertPan(insertId, panNeg50to50) {
+        const channel = this.mixerInsertChannels.get(insertId);
+        if (!channel) return;
+        const panVal = panNeg50to50 / 50;
+        channel.pan.rampTo(Math.max(-1, Math.min(1, panVal)), 0.1);
+    }
+
     // --- Audio Clip Volume/Pan Management ---
 
     /**
@@ -1058,21 +1136,34 @@ class AudioEngine {
     }
 
     /**
+     * Resolve channel and effects map for either regular channels or mixer inserts
+     */
+    _resolveChannelAndEffects(channelId) {
+        let channel = this.channels.get(channelId);
+        let effectsMap = this.channelEffects;
+        if (!channel) {
+            channel = this.mixerInsertChannels.get(channelId);
+            effectsMap = this.mixerInsertEffects;
+        }
+        return { channel, effectsMap };
+    }
+
+    /**
      * Add effect to channel at specific slot
      */
     addChannelEffect(channelId, effectType, slotIndex) {
-        const channel = this.channels.get(channelId);
+        const { channel, effectsMap } = this._resolveChannelAndEffects(channelId);
         if (!channel) {
             console.warn(`Channel ${channelId} not found`);
             return;
         }
 
         // Initialize effects array for this channel if needed
-        if (!this.channelEffects.has(channelId)) {
-            this.channelEffects.set(channelId, Array(10).fill(null));
+        if (!effectsMap.has(channelId)) {
+            effectsMap.set(channelId, Array(10).fill(null));
         }
 
-        const effects = this.channelEffects.get(channelId);
+        const effects = effectsMap.get(channelId);
 
         // Create the effect
         const effectNode = this.createEffect(effectType);
@@ -1091,7 +1182,8 @@ class AudioEngine {
      * Remove effect from channel slot
      */
     removeChannelEffect(channelId, slotIndex) {
-        const effects = this.channelEffects.get(channelId);
+        const { effectsMap } = this._resolveChannelAndEffects(channelId);
+        const effects = effectsMap.get(channelId);
         if (!effects || !effects[slotIndex]) return;
 
         // Dispose the effect node
@@ -1110,7 +1202,8 @@ class AudioEngine {
      * Update effect wet/dry mix (0-1)
      */
     updateEffectMix(channelId, slotIndex, mix) {
-        const effects = this.channelEffects.get(channelId);
+        const { effectsMap } = this._resolveChannelAndEffects(channelId);
+        const effects = effectsMap.get(channelId);
         if (!effects || !effects[slotIndex]) return;
 
         effects[slotIndex].mix = mix; // Store current mix
@@ -1125,7 +1218,8 @@ class AudioEngine {
      * Toggle effect bypass
      */
     updateEffectEnabled(channelId, slotIndex, enabled) {
-        const effects = this.channelEffects.get(channelId);
+        const { effectsMap } = this._resolveChannelAndEffects(channelId);
+        const effects = effectsMap.get(channelId);
         if (!effects || !effects[slotIndex]) return;
 
         effects[slotIndex].enabled = enabled;
@@ -1142,7 +1236,8 @@ class AudioEngine {
      * Reorder effects in channel (after swap)
      */
     reorderChannelEffects(channelId, newEffectsArray) {
-        const effects = this.channelEffects.get(channelId);
+        const { effectsMap } = this._resolveChannelAndEffects(channelId);
+        const effects = effectsMap.get(channelId);
         if (!effects) return;
 
         // Update the internal effects array to match UI order
@@ -1852,7 +1947,8 @@ class AudioEngine {
      * Update effect parameters (e.g., reverb decay, delay time, etc.)
      */
     updateEffectParams(channelId, slotIndex, params) {
-        const effects = this.channelEffects.get(channelId);
+        const { effectsMap } = this._resolveChannelAndEffects(channelId);
+        const effects = effectsMap.get(channelId);
         if (!effects || !effects[slotIndex]) return;
 
         const effect = effects[slotIndex].node;
@@ -2078,9 +2174,16 @@ class AudioEngine {
      * Rebuild the audio routing chain for a channel with effects
      */
     rebuildEffectChain(channelId) {
-        const channel = this.channels.get(channelId);
-        const source = this.sources.get(channelId);
-        const effects = this.channelEffects.get(channelId);
+        let channel = this.channels.get(channelId);
+        let source = this.sources.get(channelId);
+        let effects = this.channelEffects.get(channelId);
+
+        // Check if this is a mixer insert
+        if (!channel && this.mixerInsertChannels.has(channelId)) {
+            channel = this.mixerInsertChannels.get(channelId);
+            source = this.mixerInsertInputGains.get(channelId);
+            effects = this.mixerInsertEffects.get(channelId);
+        }
 
         if (!channel || !source) return;
 

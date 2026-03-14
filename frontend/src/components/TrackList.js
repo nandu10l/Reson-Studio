@@ -863,7 +863,6 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat: pixelsPerBeatProp =
   const [selBox, setSelBox] = useState(null); // { startX, startY, x, y, w, h } in px relative to tracklist
   const selBoxState = useRef({ active: false, startX: 0, startY: 0 });
   const tracklistRef = useRef(null);
-  const [stemNotification, setStemNotification] = useState(null);
 
   // Modal states for dialogs (replacing prompt())
   const [renameModal, setRenameModal] = useState({ open: false, trackId: null, clipIndex: null, currentName: '' });
@@ -1083,13 +1082,11 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat: pixelsPerBeatProp =
             if (data.success && data.stems) {
               const originalName = audioClip.name.replace(/\.[^/.]+$/, '');
               await addStemsAsAudioClips(data.stems, originalName);
-              setStemNotification({ message: `Successfully extracted ${Object.keys(data.stems).length} stems!`, type: 'success' });
-              setTimeout(() => setStemNotification(null), 3000);
+              alert(`Successfully extracted ${Object.keys(data.stems).length} stems!`);
             }
           } catch (error) {
             console.error('Stem extraction failed:', error);
-            setStemNotification({ message: 'Stem extraction failed: ' + error.message, type: 'error' });
-            setTimeout(() => setStemNotification(null), 3500);
+            alert('Stem extraction failed: ' + error.message);
           } finally {
             setIsExtractingStems(false);
           }
@@ -2570,45 +2567,6 @@ const TrackList = React.memo(({ onSelectClip, pixelsPerBeat: pixelsPerBeatProp =
           </div>
         )
       }
-
-      {/* Stem Notification Toast */}
-      {stemNotification && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: stemNotification.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(139, 92, 246, 0.95)',
-          color: '#fff',
-          padding: '12px 24px',
-          borderRadius: '8px',
-          boxShadow: '0 8px 16px rgba(0, 0, 0, 0.4)',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          fontWeight: 500,
-          fontSize: '14px',
-          letterSpacing: '0.01em',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          pointerEvents: 'none',
-          animation: 'toastFadeInOut 3s forwards'
-        }}>
-          <span style={{ fontSize: '18px' }}>
-            {stemNotification.type === 'error' ? '❌' : '✨'}
-          </span>
-          {stemNotification.message}
-          <style>{`
-            @keyframes toastFadeInOut {
-              0% { opacity: 0; transform: translate(-50%, 20px); }
-              10% { opacity: 1; transform: translate(-50%, 0); }
-              90% { opacity: 1; transform: translate(-50%, 0); }
-              100% { opacity: 0; transform: translate(-50%, -20px); }
-            }
-          `}</style>
-        </div>
-      )}
     </div>
   );
 });

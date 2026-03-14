@@ -664,7 +664,9 @@ function Mixer() {
     selectedChannelIds,
     audioClips,
     addAudioClipsToMixerAsGroup,
-    addAudioClipsToMixerSeparately
+    addAudioClipsToMixerSeparately,
+    updateMixerInsertVolume,
+    updateMixerInsertPan
   } = useProject();
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [mutedChannels, setMutedChannels] = useState({});
@@ -706,6 +708,16 @@ function Mixer() {
       }
     }
   }, [channels, selectedChannel?.id]);
+
+  // Keep selectedChannel in sync with mixerInserts state
+  useEffect(() => {
+    if (selectedChannel && typeof selectedChannel.id === 'string' && selectedChannel.id.startsWith('mixer-insert-')) {
+      const updatedInsert = mixerInserts.find(ins => ins.id === selectedChannel.id);
+      if (updatedInsert) {
+        setSelectedChannel(prev => ({ ...prev, ...updatedInsert }));
+      }
+    }
+  }, [mixerInserts, selectedChannel?.id]);
 
   const handleMuteToggle = useCallback((id) => {
     setMutedChannels(prev => ({ ...prev, [id]: !prev[id] }));
@@ -819,8 +831,8 @@ function Mixer() {
               vol={ins.vol}
               pan={ins.pan}
               effects={ins.effects}
-              onVolChange={() => { }}
-              onPanChange={() => { }}
+              onVolChange={(v) => updateMixerInsertVolume(ins.id, v)}
+              onPanChange={(p) => updateMixerInsertPan(ins.id, p)}
               isSelected={selectedChannel?.id === ins.id}
               onSelect={handleChannelSelect}
               muted={mutedChannels[ins.id]}

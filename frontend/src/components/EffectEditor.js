@@ -341,8 +341,192 @@ const EffectMode = memo(({ param, value, onChange }) => {
     );
 });
 
+// --- EQ Presets ---
+const EQ_PRESETS = [
+    {
+        name: 'Default',
+        bands: [
+            { freq: 60, gain: 0, bw: 1, type: 'lowshelf' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: '20Hz + 18kHz cut',
+        bands: [
+            { freq: 20, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 18000, gain: -18, bw: 1.5, type: 'lowpass' },
+        ]
+    },
+    {
+        name: '30Hz cut',
+        bands: [
+            { freq: 30, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: '40Hz cut',
+        bands: [
+            { freq: 40, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: '100Hz cut',
+        bands: [
+            { freq: 100, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: '150Hz cut',
+        bands: [
+            { freq: 150, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 200, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: '250Hz cut',
+        bands: [
+            { freq: 250, gain: -18, bw: 1.5, type: 'highpass' },
+            { freq: 350, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 500, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Telephone',
+        bands: [
+            { freq: 300, gain: -18, bw: 2, type: 'highpass' },
+            { freq: 500, gain: 3, bw: 0.8, type: 'peaking' },
+            { freq: 1000, gain: 5, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 4, bw: 1, type: 'peaking' },
+            { freq: 3000, gain: 2, bw: 1, type: 'peaking' },
+            { freq: 3400, gain: -18, bw: 2, type: 'lowpass' },
+            { freq: 12000, gain: -18, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Old radio',
+        bands: [
+            { freq: 200, gain: -18, bw: 2, type: 'highpass' },
+            { freq: 400, gain: 4, bw: 0.8, type: 'peaking' },
+            { freq: 800, gain: 6, bw: 0.7, type: 'peaking' },
+            { freq: 1500, gain: 5, bw: 1, type: 'peaking' },
+            { freq: 2500, gain: 3, bw: 1, type: 'peaking' },
+            { freq: 4000, gain: -12, bw: 1.5, type: 'lowpass' },
+            { freq: 8000, gain: -18, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Treble boost',
+        bands: [
+            { freq: 60, gain: 0, bw: 1, type: 'lowshelf' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 2, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 4, bw: 0.8, type: 'peaking' },
+            { freq: 10000, gain: 6, bw: 0.8, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Treble cut',
+        bands: [
+            { freq: 60, gain: 0, bw: 1, type: 'lowshelf' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: -2, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: -4, bw: 0.8, type: 'peaking' },
+            { freq: 10000, gain: -6, bw: 0.8, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Bass boost',
+        bands: [
+            { freq: 80, gain: 6, bw: 0.8, type: 'lowshelf' },
+            { freq: 150, gain: 4, bw: 0.8, type: 'peaking' },
+            { freq: 300, gain: 2, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Bass cut',
+        bands: [
+            { freq: 80, gain: -6, bw: 0.8, type: 'lowshelf' },
+            { freq: 150, gain: -4, bw: 0.8, type: 'peaking' },
+            { freq: 300, gain: -2, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Mastering – gentle high shelf',
+        bands: [
+            { freq: 60, gain: 0, bw: 1, type: 'lowshelf' },
+            { freq: 130, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 1.5, bw: 0.7, type: 'peaking' },
+            { freq: 10000, gain: 3, bw: 0.7, type: 'highshelf' },
+        ]
+    },
+    {
+        name: 'Mastering – gentle low shelf',
+        bands: [
+            { freq: 80, gain: 3, bw: 0.7, type: 'lowshelf' },
+            { freq: 150, gain: 1.5, bw: 0.7, type: 'peaking' },
+            { freq: 300, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 800, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 2000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 5000, gain: 0, bw: 1, type: 'peaking' },
+            { freq: 12000, gain: 0, bw: 1, type: 'highshelf' },
+        ]
+    },
+];
+
 // --- EQ Component ---
-const ParametricEQEditor = ({ bands, onBandChange }) => {
+const ParametricEQEditor = ({ bands, onBandChange, onApplyPreset }) => {
     const canvasRef = useRef(null);
     const [dragging, setDragging] = useState(null);
     const [hoverBand, setHoverBand] = useState(null);
@@ -506,59 +690,147 @@ const ParametricEQEditor = ({ bands, onBandChange }) => {
         }
     }, [hoverBand]);
 
+    const [presetIndex, setPresetIndex] = useState(0);
+
+    const handlePresetPrev = () => {
+        const newIdx = (presetIndex - 1 + EQ_PRESETS.length) % EQ_PRESETS.length;
+        setPresetIndex(newIdx);
+        if (onApplyPreset) onApplyPreset(EQ_PRESETS[newIdx]);
+    };
+
+    const handlePresetNext = () => {
+        const newIdx = (presetIndex + 1) % EQ_PRESETS.length;
+        setPresetIndex(newIdx);
+        if (onApplyPreset) onApplyPreset(EQ_PRESETS[newIdx]);
+    };
+
     return (
-        <div className="eq-editor-container" style={{ display: 'flex', gap: '10px', height: '320px', padding: '10px' }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-                <canvas
-                    ref={canvasRef}
-                    width={500}
-                    height={300}
+        <div className="eq-editor-container" style={{ display: 'flex', flexDirection: 'column', height: '340px', padding: '10px', gap: '6px' }}>
+            {/* Preset Selector */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '4px',
+                height: '26px',
+                flexShrink: 0,
+            }}>
+                <span style={{ fontSize: '11px', color: '#888', marginRight: '4px', letterSpacing: '0.02em', textTransform: 'uppercase' }}>Preset</span>
+                <button
+                    onClick={handlePresetPrev}
                     style={{
-                        background: '#222', borderRadius: '4px',
-                        cursor: dragging ? 'grabbing' : (hoverBand !== null ? 'grab' : 'default'),
-                        width: '100%', height: '100%'
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '3px 0 0 3px',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                        fontSize: '12px',
+                        lineHeight: '18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
                     }}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onWheel={handleWheel}
-                />
+                    onMouseEnter={e => { e.currentTarget.style.background = '#3a3a3a'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#2a2a2a'; e.currentTarget.style.color = '#aaa'; }}
+                    title="Previous preset"
+                >◀</button>
+                <div style={{
+                    background: '#1e1e1e',
+                    border: '1px solid #444',
+                    borderLeft: 'none',
+                    borderRight: 'none',
+                    padding: '2px 12px',
+                    minWidth: '160px',
+                    textAlign: 'center',
+                    fontSize: '11px',
+                    color: '#ccc',
+                    lineHeight: '18px',
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                    userSelect: 'none',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                }}>
+                    {EQ_PRESETS[presetIndex].name}
+                </div>
+                <button
+                    onClick={handlePresetNext}
+                    style={{
+                        background: '#2a2a2a',
+                        border: '1px solid #444',
+                        borderRadius: '0 3px 3px 0',
+                        color: '#aaa',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                        fontSize: '12px',
+                        lineHeight: '18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#3a3a3a'; e.currentTarget.style.color = '#fff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#2a2a2a'; e.currentTarget.style.color = '#aaa'; }}
+                    title="Next preset"
+                >▶</button>
             </div>
-            <div className="eq-faders" style={{ display: 'flex', gap: '4px', padding: '4px', background: '#1a1a1a', borderRadius: '4px', border: '1px solid #333' }}>
-                {Array(7).fill(0).map((_, i) => {
-                    const b = getBand(i);
-                    const percent = ((b.gain + 18) / 36) * 100;
-                    return (
-                        <div key={i} className="eq-fader-col" style={{ width: '30px', position: 'relative', height: '100%', background: '#222', borderRadius: '2px', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ height: '4px', background: `hsla(${i * 50}, 70%, 50%, 0.8)`, marginBottom: '2px' }} />
-                            <div style={{ flex: 1, position: 'relative', margin: '0 8px' }}>
-                                <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#444' }}></div>
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: `${Math.max(0, Math.min(100, percent))}%`,
-                                    left: '-4px', right: '-4px', height: '8px', marginTop: '-4px',
-                                    background: '#888', borderRadius: '2px',
-                                    pointerEvents: 'none',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
-                                }} />
-                                <input
-                                    type="range"
-                                    min="-18" max="18" step="0.1"
-                                    value={b.gain}
-                                    onChange={(e) => onBandChange(i, { gain: parseFloat(e.target.value) })}
-                                    style={{
-                                        position: 'absolute', width: '300px', height: '30px',
-                                        top: '50%', left: '50%',
-                                        transform: 'translate(-50%, -50%) rotate(-90deg)',
-                                        opacity: 0, cursor: 'ns-resize', margin: 0
-                                    }}
-                                />
+            {/* EQ Canvas + Faders */}
+            <div style={{ display: 'flex', gap: '10px', flex: 1, minHeight: 0 }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                    <canvas
+                        ref={canvasRef}
+                        width={500}
+                        height={300}
+                        style={{
+                            background: '#222', borderRadius: '4px',
+                            cursor: dragging ? 'grabbing' : (hoverBand !== null ? 'grab' : 'default'),
+                            width: '100%', height: '100%'
+                        }}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        onWheel={handleWheel}
+                    />
+                </div>
+                <div className="eq-faders" style={{ display: 'flex', gap: '4px', padding: '4px', background: '#1a1a1a', borderRadius: '4px', border: '1px solid #333' }}>
+                    {Array(7).fill(0).map((_, i) => {
+                        const b = getBand(i);
+                        const percent = ((b.gain + 18) / 36) * 100;
+                        return (
+                            <div key={i} className="eq-fader-col" style={{ width: '30px', position: 'relative', height: '100%', background: '#222', borderRadius: '2px', display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ height: '4px', background: `hsla(${i * 50}, 70%, 50%, 0.8)`, marginBottom: '2px' }} />
+                                <div style={{ flex: 1, position: 'relative', margin: '0 8px' }}>
+                                    <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: '#444' }}></div>
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: `${Math.max(0, Math.min(100, percent))}%`,
+                                        left: '-4px', right: '-4px', height: '8px', marginTop: '-4px',
+                                        background: '#888', borderRadius: '2px',
+                                        pointerEvents: 'none',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.5)'
+                                    }} />
+                                    <input
+                                        type="range"
+                                        min="-18" max="18" step="0.1"
+                                        value={b.gain}
+                                        onChange={(e) => onBandChange(i, { gain: parseFloat(e.target.value) })}
+                                        style={{
+                                            position: 'absolute', width: '300px', height: '30px',
+                                            top: '50%', left: '50%',
+                                            transform: 'translate(-50%, -50%) rotate(-90deg)',
+                                            opacity: 0, cursor: 'ns-resize', margin: 0
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ height: '16px', fontSize: '9px', textAlign: 'center', color: '#666' }}>{i + 1}</div>
                             </div>
-                            <div style={{ height: '16px', fontSize: '9px', textAlign: 'center', color: '#666' }}>{i + 1}</div>
-                        </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -754,6 +1026,20 @@ const EffectEditor = React.memo(({
                                 setParams(prev => {
                                     const newP = { ...prev, ...updates };
                                     if (onUpdateParams) onUpdateParams(updates);
+                                    return newP;
+                                });
+                            }}
+                            onApplyPreset={(preset) => {
+                                const allUpdates = {};
+                                preset.bands.forEach((b, i) => {
+                                    allUpdates[`b${i}Freq`] = b.freq;
+                                    allUpdates[`b${i}Gain`] = b.gain;
+                                    allUpdates[`b${i}BW`] = b.bw;
+                                    allUpdates[`b${i}Type`] = b.type;
+                                });
+                                setParams(prev => {
+                                    const newP = { ...prev, ...allUpdates };
+                                    if (onUpdateParams) onUpdateParams(allUpdates);
                                     return newP;
                                 });
                             }}
