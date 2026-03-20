@@ -151,7 +151,7 @@ export function calculateProjectDuration(playlistTracks, patterns, audioClips = 
 /**
  * Export project as WAV file
  */
-export async function exportWav(audioEngine, playlistTracks, patterns, channels, audioClips = [], automations = []) {
+export async function exportWav(audioEngine, playlistTracks, patterns, channels, audioClips = [], automations = [], mixerInserts = []) {
     lastExportFormat = 'wav';
 
     const duration = calculateProjectDuration(playlistTracks, patterns, audioClips);
@@ -165,7 +165,7 @@ export async function exportWav(audioEngine, playlistTracks, patterns, channels,
     // Use Tone.Offline to render
     const buffer = await Tone.Offline(async ({ transport }) => {
         // Re-initialize channels and schedule in offline context
-        await audioEngine.renderOffline(transport, playlistTracks, patterns, channels, audioClips, automations, duration);
+        await audioEngine.renderOffline(transport, playlistTracks, patterns, channels, audioClips, automations, duration, mixerInserts);
     }, duration);
 
     // Convert to WAV blob
@@ -178,7 +178,7 @@ export async function exportWav(audioEngine, playlistTracks, patterns, channels,
 /**
  * Export project as MP3 file
  */
-export async function exportMp3(audioEngine, playlistTracks, patterns, channels, audioClips = [], automations = []) {
+export async function exportMp3(audioEngine, playlistTracks, patterns, channels, audioClips = [], automations = [], mixerInserts = []) {
     lastExportFormat = 'mp3';
 
     const duration = calculateProjectDuration(playlistTracks, patterns, audioClips);
@@ -191,7 +191,7 @@ export async function exportMp3(audioEngine, playlistTracks, patterns, channels,
 
     // Use Tone.Offline to render
     const buffer = await Tone.Offline(async ({ transport }) => {
-        await audioEngine.renderOffline(transport, playlistTracks, patterns, channels, audioClips, automations, duration);
+        await audioEngine.renderOffline(transport, playlistTracks, patterns, channels, audioClips, automations, duration, mixerInserts);
     }, duration);
 
     // Convert to MP3 blob (may fall back to WAV)

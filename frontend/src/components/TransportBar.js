@@ -16,6 +16,9 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
   const {
     isPlaying, togglePlayback, bpm, updateBpm, stopPlayback, playheadPosition,
     playbackMode, setPlaybackMode, isRecording, setIsRecording,
+    recordingNoiseRemovalEnabled, setRecordingNoiseRemovalEnabled,
+    recordingVocalEnhanceEnabled, setRecordingVocalEnhanceEnabled,
+    isProcessingRecording,
     activeTool, setActiveTool,
     snapEnabled, setSnapEnabled
   } = useProject();
@@ -202,9 +205,32 @@ function TransportBar({ onResetTime, activeWindows, onToggleWindow }) {
             className={`transport-btn transport-btn-record ${isRecording ? 'recording' : ''}`}
             onClick={() => setIsRecording(prev => !prev)}
             title="Record"
+            disabled={isProcessingRecording}
           >
             <Circle size={18} className="blender-icon" />
           </button>
+
+          <button
+            className={`transport-recopt-btn ${recordingNoiseRemovalEnabled ? 'active' : ''}`}
+            onClick={() => setRecordingNoiseRemovalEnabled(prev => !prev)}
+            title="Recorded clip noise removal"
+            disabled={isRecording}
+          >
+            Denoise
+          </button>
+
+          <button
+            className={`transport-recopt-btn ${recordingVocalEnhanceEnabled ? 'active' : ''}`}
+            onClick={() => setRecordingVocalEnhanceEnabled(prev => !prev)}
+            title="Recorded clip vocal enhancement"
+            disabled={isRecording}
+          >
+            Vocal FX
+          </button>
+
+          {isProcessingRecording && (
+            <span className="transport-recopt-status">Processing...</span>
+          )}
         </div>
 
         {/* Time Position - Prominent */}

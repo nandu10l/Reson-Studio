@@ -60,6 +60,26 @@ AVAILABLE_EFFECTS = {
         "parameters": {
             "headroom_db": {"type": "float", "min": 0, "max": 6, "default": 0.1}
         }
+    },
+    "denoise": {
+        "name": "Noise Removal",
+        "type": "restoration",
+        "description": "Reduces steady noise and background hiss",
+        "parameters": {
+            "strength": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.7},
+            "reduction_db": {"type": "float", "min": 6, "max": 30, "default": 18}
+        }
+    },
+    "vocal_enhance": {
+        "name": "Vocal Enhance",
+        "type": "mastering",
+        "description": "Voice-focused clarity chain (EQ, de-esser, compression)",
+        "parameters": {
+            "presence_db": {"type": "float", "min": 0, "max": 8, "default": 4},
+            "air_db": {"type": "float", "min": 0, "max": 6, "default": 2},
+            "de_ess_strength": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.4},
+            "compression_amount": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.6}
+        }
     }
 }
 
@@ -249,6 +269,149 @@ def apply_eq(audio: AudioSegment, low_gain: float = 0, mid_gain: float = 0, high
     return audio._spawn(output.tobytes())
 
 
+def _audio_to_float_matrix(audio: AudioSegment) -> np.ndarray:
+    """Convert AudioSegment samples to float32 matrix in range [-1, 1]."""
+    samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+    channels = max(1, int(audio.channels))
+    if channels > 1:
+        samples = samples.reshape((-1, channels))
+    else:
+        samples = samples.reshape((-1, 1))
+
+    max_int = float(2 ** (audio.sample_width * 8 - 1))
+    return samples / max_int
+
+
+def _float_matrix_to_audio(audio: AudioSegment, matrix: np.ndarray) -> AudioSegment:
+    """Convert float32 matrix in range [-1, 1] back to AudioSegment format."""
+    matrix = np.asarray(matrix, dtype=np.float32)
+    matrix = np.clip(matrix, -1.0, 1.0)
+    channels = max(1, int(audio.channels))
+
+    if channels == 1:
+        raw_float = matrix[:, 0]
+    else:
+        raw_float = matrix.reshape(-1)
+
+    if audio.sample_width == 1:
+        pcm = (raw_float * 127.0).astype(np.int8)
+    elif audio.sample_width == 2:
+        pcm = (raw_float * 32767.0).astype(np.int16)
+    else:
+        pcm = (raw_float * 2147483647.0).astype(np.int32)
+
+    return AudioSegment(
+        data=pcm.tobytes(),
+        sample_width=audio.sample_width,
+        frame_rate=audio.frame_rate,
+        channels=channels,
+    )
+
+
+def apply_denoise(audio: AudioSegment, strength: float = 0.7, reduction_db: float = 18.0) -> AudioSegment:
+    """Apply spectral-gate denoise tuned for voice recordings."""
+    strength = float(np.clip(strength, 0.0, 1.0))
+    reduction_db = float(np.clip(reduction_db, 6.0, 30.0))
+
+    audio = audio.high_pass_filter(70).low_pass_filter(14000)
+    x = _audio_to_float_matrix(audio)
+    mono = np.mean(x, axis=1)
+
+    nperseg = 1024
+    noverlap = 768
+
+    _, _, z_mono = signal.stft(mono, fs=audio.frame_rate, nperseg=nperseg, noverlap=noverlap, boundary=None)
+    mag_mono = np.abs(z_mono)
+
+    frame_energy = np.mean(mag_mono, axis=0)
+    if frame_energy.size == 0:
+        return audio
+
+    lowest_count = max(4, int(frame_energy.size * 0.2))
+    low_idx = np.argsort(frame_energy)[:lowest_count]
+    noise_profile = np.mean(mag_mono[:, low_idx], axis=1, keepdims=True)
+
+    threshold = noise_profile * (1.0 + 2.5 * strength)
+    attenuation_floor = 10 ** (-reduction_db / 20.0)
+
+    out = np.zeros_like(x)
+    for ch in range(x.shape[1]):
+        _, _, z = signal.stft(x[:, ch], fs=audio.frame_rate, nperseg=nperseg, noverlap=noverlap, boundary=None)
+        mag = np.abs(z)
+        phase = np.angle(z)
+
+        ratio = mag / (threshold + 1e-9)
+        gate = np.clip((ratio - 1.0) / 2.0, 0.0, 1.0)
+        soft_mask = attenuation_floor + (1.0 - attenuation_floor) * gate
+
+        kernel = np.ones((3, 3), dtype=np.float32) / 9.0
+        soft_mask = signal.convolve2d(soft_mask, kernel, mode='same', boundary='symm')
+
+        z_clean = mag * soft_mask * np.exp(1j * phase)
+        _, cleaned = signal.istft(z_clean, fs=audio.frame_rate, nperseg=nperseg, noverlap=noverlap, input_onesided=True)
+        if len(cleaned) < x.shape[0]:
+            cleaned = np.pad(cleaned, (0, x.shape[0] - len(cleaned)))
+        out[:, ch] = cleaned[:x.shape[0]]
+
+    peak = np.max(np.abs(out))
+    if peak > 0.98:
+        out *= (0.98 / peak)
+
+    return _float_matrix_to_audio(audio, out)
+
+
+def apply_vocal_enhance(
+    audio: AudioSegment,
+    presence_db: float = 4.0,
+    air_db: float = 2.0,
+    de_ess_strength: float = 0.4,
+    compression_amount: float = 0.6,
+) -> AudioSegment:
+    """Apply a vocal-focused enhancement chain for improved intelligibility."""
+    presence_db = float(np.clip(presence_db, 0.0, 8.0))
+    air_db = float(np.clip(air_db, 0.0, 6.0))
+    de_ess_strength = float(np.clip(de_ess_strength, 0.0, 1.0))
+    compression_amount = float(np.clip(compression_amount, 0.0, 1.0))
+
+    stage = audio.high_pass_filter(80).low_pass_filter(17000)
+    x = _audio_to_float_matrix(stage)
+    sr = stage.frame_rate
+
+    # Broad vocal shaping: cut mud, add presence and air.
+    b_low, a_low = signal.butter(2, 180 / (sr / 2), btype='low')
+    b_mid, a_mid = signal.butter(2, [180 / (sr / 2), 4200 / (sr / 2)], btype='band')
+    b_high, a_high = signal.butter(2, 4200 / (sr / 2), btype='high')
+
+    low_g = 10 ** (-2.0 / 20)
+    mid_g = 10 ** (presence_db / 20)
+    high_g = 10 ** (air_db / 20)
+
+    y = np.zeros_like(x)
+    for ch in range(x.shape[1]):
+        s = x[:, ch]
+        low = signal.filtfilt(b_low, a_low, s) * low_g
+        mid = signal.filtfilt(b_mid, a_mid, s) * mid_g
+        high = signal.filtfilt(b_high, a_high, s) * high_g
+        shaped = low + mid + high
+
+        # Simple adaptive de-esser for sharp sibilance.
+        b_ess, a_ess = signal.butter(2, 5500 / (sr / 2), btype='high')
+        ess = signal.filtfilt(b_ess, a_ess, shaped)
+        env = np.abs(ess)
+        threshold = max(1e-5, float(np.percentile(env, 75)))
+        reduce = np.clip((env - threshold) / (threshold + 1e-8), 0.0, 1.0) * de_ess_strength
+        shaped = shaped - (ess * reduce)
+
+        # Transparent soft saturation for perceived loudness.
+        y[:, ch] = np.tanh(shaped * 1.1) / 1.1
+
+    staged = _float_matrix_to_audio(stage, y)
+    ratio = 2.0 + compression_amount * 4.0
+    threshold = -24 + (1.0 - compression_amount) * 8.0
+    compressed = compress_dynamic_range(staged, threshold=threshold, ratio=ratio, attack=3.0, release=90.0)
+    return normalize(compressed, headroom=0.8)
+
+
 @router.post("/apply")
 async def apply_effect(
     file: UploadFile = File(...),
@@ -388,6 +551,20 @@ async def apply_effect(
         elif effect_type == "normalize":
             headroom = effect_params.get("headroom_db", 0.1)
             processed = normalize(target_audio, headroom=headroom)
+        elif effect_type == "denoise":
+            processed = apply_denoise(
+                target_audio,
+                strength=effect_params.get("strength", 0.7),
+                reduction_db=effect_params.get("reduction_db", 18),
+            )
+        elif effect_type == "vocal_enhance":
+            processed = apply_vocal_enhance(
+                target_audio,
+                presence_db=effect_params.get("presence_db", 4),
+                air_db=effect_params.get("air_db", 2),
+                de_ess_strength=effect_params.get("de_ess_strength", 0.4),
+                compression_amount=effect_params.get("compression_amount", 0.6),
+            )
         else:
             processed = target_audio
         

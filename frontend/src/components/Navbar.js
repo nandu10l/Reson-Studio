@@ -367,9 +367,9 @@ function Navbar({
       let wasFallback = false;
 
       if (format === 'wav') {
-        blob = await exportWav(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || []);
+        blob = await exportWav(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || [], mixerInserts || []);
       } else if (format === 'mp3') {
-        const result = await exportMp3(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || []);
+        const result = await exportMp3(audioEngine, playlistTracks, patterns, channels, audioClips || [], automations || [], mixerInserts || []);
         blob = result.blob;
         actualFormat = result.format;
         wasFallback = result.fallback;
@@ -426,7 +426,8 @@ function Navbar({
         patterns,
         channels,
         audioClips || [],
-        automations || []
+        automations || [],
+        mixerInserts || []
       );
 
       document.getElementById('exporting-overlay')?.remove();

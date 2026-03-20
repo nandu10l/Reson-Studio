@@ -2323,18 +2323,187 @@ class AudioEngine {
      * Render the project to an offline audio context for export
      * This method is called within Tone.Offline context
      */
-    async renderOffline(transport, playlistTracks, patterns, channels, audioClips = [], automations = [], duration) {
+    async renderOffline(transport, playlistTracks, patterns, channels, audioClips = [], automations = [], duration, mixerInserts = []) {
+        // Create an explicit offline master bus so every source follows one route.
+        const offlineMaster = new Tone.Gain(1).toDestination();
+
         // Create offline versions of channels and sources
         const offlineChannels = new Map();
         const offlineSources = new Map();
         const offlineAudioPlayers = new Map();
+        const offlineMixerInsertChannels = new Map();
+        const offlineMixerInsertInputGains = new Map();
+
+        const toDbFromVolPercent = (value, defaultValue = 78) => {
+            const v = value !== undefined ? value : defaultValue;
+            return Tone.gainToDb((v / 100) * 1.2);
+        };
+
+        const toPanFromUi = (pan0to100) => {
+            const panVal = ((pan0to100 !== undefined ? pan0to100 : 50) - 50) / 50;
+            return Math.max(-1, Math.min(1, panVal));
+        };
+
+        const applyOfflineEffectParams = (effect, type, params = {}) => {
+            if (!effect || !params) return;
+
+            switch (type) {
+                case 'reverb':
+                case 'spatial':
+                    if (effect.setLowCut && params.lowCut !== undefined) effect.setLowCut(params.lowCut);
+                    if (effect.setHighCut && params.highCut !== undefined) effect.setHighCut(params.highCut);
+                    if (effect.setPreDelay && params.preDelay !== undefined) effect.setPreDelay(params.preDelay);
+                    if (effect.setDecay && params.decay !== undefined) effect.setDecay(params.decay);
+                    if (effect.setDamping && params.damping !== undefined) effect.setDamping(params.damping);
+                    if (effect.setDryVol && params.dryVol !== undefined) effect.setDryVol(params.dryVol);
+                    if (effect.setErVol && params.erVol !== undefined) effect.setErVol(params.erVol);
+                    if (effect.setWetVol && params.wet !== undefined) effect.setWetVol(params.wet);
+                    if (effect.setSeparation && params.separation !== undefined) effect.setSeparation(params.separation);
+                    break;
+                case 'delay':
+                case 'temporal':
+                    if (effect.setInputPan && params.inputPan !== undefined) effect.setInputPan(params.inputPan);
+                    if (effect.setInputVol && params.inputVol !== undefined) effect.setInputVol(params.inputVol);
+                    if (effect.setFeedbackMode && params.feedbackMode !== undefined) effect.setFeedbackMode(params.feedbackMode);
+                    if (effect.setFeedbackVol && params.feedbackVol !== undefined) effect.setFeedbackVol(params.feedbackVol);
+                    if (effect.setCut && params.cut !== undefined) effect.setCut(params.cut);
+                    if (effect.setDelayTime && params.delayTime !== undefined) effect.setDelayTime(params.delayTime);
+                    if (effect.setOffset && params.offset !== undefined) effect.setOffset(params.offset);
+                    if (effect.setDryVol && params.dryVol !== undefined) effect.setDryVol(params.dryVol);
+                    break;
+                case 'chorus':
+                    if (effect.setDelayTime && params.delayTime !== undefined) effect.setDelayTime(params.delayTime);
+                    if (effect.setDepth && params.depth !== undefined) effect.setDepth(params.depth);
+                    if (effect.setStereo && params.stereo !== undefined) effect.setStereo(params.stereo);
+                    if (effect.setLfo1Freq && params.lfo1Freq !== undefined) effect.setLfo1Freq(params.lfo1Freq);
+                    if (effect.setLfo1Wave && params.lfo1Wave !== undefined) effect.setLfo1Wave(params.lfo1Wave);
+                    if (effect.setLfo2Freq && params.lfo2Freq !== undefined) effect.setLfo2Freq(params.lfo2Freq);
+                    if (effect.setLfo2Wave && params.lfo2Wave !== undefined) effect.setLfo2Wave(params.lfo2Wave);
+                    if (effect.setLfo3Freq && params.lfo3Freq !== undefined) effect.setLfo3Freq(params.lfo3Freq);
+                    if (effect.setLfo3Wave && params.lfo3Wave !== undefined) effect.setLfo3Wave(params.lfo3Wave);
+                    if (effect.setCrossType && params.crossType !== undefined) effect.setCrossType(params.crossType);
+                    if (effect.setCrossCutoff && params.crossCutoff !== undefined) effect.setCrossCutoff(params.crossCutoff);
+                    if (effect.setWet && params.wet !== undefined) effect.setWet(params.wet);
+                    break;
+                case 'phaser':
+                case 'modulation':
+                    if (effect.setSweepFreq && params.sweepFreq !== undefined) effect.setSweepFreq(params.sweepFreq);
+                    if (effect.setMinDepth && params.minDepth !== undefined) effect.setMinDepth(params.minDepth);
+                    if (effect.setMaxDepth && params.maxDepth !== undefined) effect.setMaxDepth(params.maxDepth);
+                    if (effect.setFreqRange && params.freqRange !== undefined) effect.setFreqRange(params.freqRange);
+                    if (effect.setStereo && params.stereo !== undefined) effect.setStereo(params.stereo);
+                    if (effect.setStages && params.stages !== undefined) effect.setStages(params.stages);
+                    if (effect.setFeedback && params.feedback !== undefined) effect.setFeedback(params.feedback);
+                    if (effect.setWet && params.wet !== undefined) effect.setWet(params.wet);
+                    if (effect.setOutGain && params.outGain !== undefined) effect.setOutGain(params.outGain);
+                    break;
+                case 'distortion':
+                case 'saturation':
+                    if (effect.setPreGain && params.preGain !== undefined) effect.setPreGain(params.preGain);
+                    if (effect.setThreshold && params.threshold !== undefined) effect.setThreshold(params.threshold);
+                    if (effect.setDistType && params.distType !== undefined) effect.setDistType(params.distType);
+                    if (effect.setMix && params.mix !== undefined) effect.setMix(params.mix);
+                    if (effect.setPostGain && params.postGain !== undefined) effect.setPostGain(params.postGain);
+                    break;
+                case 'compressor':
+                case 'dynamics':
+                    if (effect.setThreshold && params.threshold !== undefined) effect.setThreshold(params.threshold);
+                    if (effect.setRatio && params.ratio !== undefined) effect.setRatio(params.ratio);
+                    if (effect.setGain && params.gain !== undefined) effect.setGain(params.gain);
+                    if (effect.setAttack && params.attack !== undefined) effect.setAttack(params.attack);
+                    if (effect.setRelease && params.release !== undefined) effect.setRelease(params.release);
+                    if (effect.setType && params.type !== undefined) effect.setType(params.type);
+                    break;
+                case 'eq':
+                case 'filter':
+                    if (effect.setBand) {
+                        for (let i = 0; i < 7; i++) {
+                            const prefix = `b${i}`;
+                            const update = {};
+                            let hasUpdate = false;
+                            if (params[`${prefix}Freq`] !== undefined) { update.freq = params[`${prefix}Freq`]; hasUpdate = true; }
+                            if (params[`${prefix}Gain`] !== undefined) { update.gain = params[`${prefix}Gain`]; hasUpdate = true; }
+                            if (params[`${prefix}BW`] !== undefined) { update.bw = params[`${prefix}BW`]; hasUpdate = true; }
+                            if (params[`${prefix}Type`] !== undefined) { update.type = params[`${prefix}Type`]; hasUpdate = true; }
+                            if (params[`${prefix}Slope`] !== undefined) { update.slope = params[`${prefix}Slope`]; hasUpdate = true; }
+                            if (hasUpdate) effect.setBand(i, update);
+                        }
+                    }
+                    break;
+                case 'gain':
+                case 'utility':
+                    if (effect.setGain && params.gain !== undefined) effect.setGain(params.gain);
+                    break;
+                case 'pan':
+                case 'panner':
+                    if (effect.setPan && params.pan !== undefined) effect.setPan(params.pan);
+                    break;
+                default:
+                    break;
+            }
+
+            if (params.wet !== undefined && effect.wet) {
+                if (effect.wet.rampTo) effect.wet.rampTo(params.wet, 0.01);
+                else effect.wet.value = params.wet;
+            }
+        };
+
+        const buildOfflineEffectChain = (sourceNode, destinationNode, effectSlots = []) => {
+            try {
+                sourceNode.disconnect();
+            } catch (e) {
+                // no-op
+            }
+
+            const activeEffects = (effectSlots || []).filter((slot) => slot && slot.type && slot.enabled !== false);
+            if (activeEffects.length === 0) {
+                sourceNode.connect(destinationNode);
+                return;
+            }
+
+            let prev = sourceNode;
+            activeEffects.forEach((slot) => {
+                const effectNode = this.createEffect(slot.type);
+                if (!effectNode) return;
+
+                if (effectNode.wet) {
+                    const wet = slot.mix !== undefined ? (slot.mix > 1 ? slot.mix / 100 : slot.mix) : 0.5;
+                    if (effectNode.wet.rampTo) effectNode.wet.rampTo(wet, 0.01);
+                    else effectNode.wet.value = wet;
+                }
+
+                if (slot.params) {
+                    applyOfflineEffectParams(effectNode, slot.type, slot.params);
+                }
+
+                if (effectNode.input) {
+                    prev.connect(effectNode.input);
+                } else {
+                    prev.connect(effectNode);
+                }
+                prev = effectNode;
+            });
+
+            if (prev && prev.connect) prev.connect(destinationNode);
+        };
 
         // Create channels for offline context
         for (const channel of channels) {
             const offlineChannel = new Tone.Channel({
                 volume: -6,
                 pan: 0,
-            }).toDestination();
+            });
+
+            const channelVol = channel.vol !== undefined ? channel.vol : 78;
+            if (channelVol === 0) {
+                offlineChannel.mute = true;
+            } else {
+                offlineChannel.mute = false;
+                offlineChannel.volume.value = toDbFromVolPercent(channelVol, 78);
+            }
+            offlineChannel.pan.value = toPanFromUi(channel.pan);
+            offlineChannel.connect(offlineMaster);
+
             offlineChannels.set(channel.id, offlineChannel);
 
             // Create source based on channel name (synth fallbacks for offline — no CDN)
@@ -2491,6 +2660,31 @@ class AudioEngine {
             }
 
             offlineSources.set(channel.id, source);
+
+            // Rebuild routing so export uses the same insert effect chain as playback.
+            buildOfflineEffectChain(source, offlineChannel, channel.effects || []);
+        }
+
+        // Create offline mixer inserts used by audio clips.
+        for (const insert of mixerInserts || []) {
+            const insertChannel = new Tone.Channel({ volume: -6, pan: 0 });
+            const insertVol = insert.vol !== undefined ? insert.vol : 80;
+            if (insertVol === 0) {
+                insertChannel.mute = true;
+            } else {
+                insertChannel.mute = false;
+                insertChannel.volume.value = toDbFromVolPercent(insertVol, 80);
+            }
+
+            const insertPanVal = insert.pan !== undefined ? insert.pan / 50 : 0;
+            insertChannel.pan.value = Math.max(-1, Math.min(1, insertPanVal));
+            insertChannel.connect(offlineMaster);
+
+            const inputGain = new Tone.Gain(1);
+            buildOfflineEffectChain(inputGain, insertChannel, insert.effects || []);
+
+            offlineMixerInsertChannels.set(insert.id, insertChannel);
+            offlineMixerInsertInputGains.set(insert.id, inputGain);
         }
 
         // Preload audio clips
@@ -2500,20 +2694,32 @@ class AudioEngine {
                 const loadPromise = new Promise((resolve) => {
                     let player;
                     if (audioClip.audioBuffer) {
-                        player = new Tone.Player(audioClip.audioBuffer).toDestination();
-                        player.volume.value = -6;
+                        player = new Tone.Player(audioClip.audioBuffer);
+                        const clipVol = audioClip.vol !== undefined ? audioClip.vol : 100;
+                        if (clipVol === 0) {
+                            player.mute = true;
+                        } else {
+                            player.mute = false;
+                            player.volume.value = toDbFromVolPercent(clipVol, 100);
+                        }
                         offlineAudioPlayers.set(audioClip.id, player);
                         resolve();
                     } else {
                         player = new Tone.Player({
                             url: audioClip.url,
                             onload: () => {
-                                player.volume.value = -6;
+                                const clipVol = audioClip.vol !== undefined ? audioClip.vol : 100;
+                                if (clipVol === 0) {
+                                    player.mute = true;
+                                } else {
+                                    player.mute = false;
+                                    player.volume.value = toDbFromVolPercent(clipVol, 100);
+                                }
                                 offlineAudioPlayers.set(audioClip.id, player);
                                 resolve();
                             },
                             onerror: () => resolve() // Continue even if load fails
-                        }).toDestination();
+                        });
                     }
                 });
                 audioPlayerPromises.push(loadPromise);
@@ -2568,16 +2774,39 @@ class AudioEngine {
                         const clipStartTime = this._beatsToSeconds(clip.offset);
                         const clipDuration = this._beatsToSeconds(clip.length);
                         const startOffset = clip.startOffset ? this._beatsToSeconds(clip.startOffset) : 0;
+                        const sourceAudioClip = audioClips.find((ac) => ac.id === clip.audioClipId);
 
                         // Create a per-instance player so multiple clips sharing
                         // the same audioClipId each get their own audio graph.
                         const instancePlayer = new Tone.Player(templatePlayer.buffer);
-                        instancePlayer.volume.value = -6;
+                        const clipVol = sourceAudioClip?.vol !== undefined ? sourceAudioClip.vol : 100;
+                        if (clipVol === 0) {
+                            instancePlayer.mute = true;
+                        } else {
+                            instancePlayer.mute = false;
+                            instancePlayer.volume.value = Tone.gainToDb((clipVol / 100) * 1.2);
+                        }
 
                         // Use Tone.Gain (not raw createGain) to stay in the
                         // correct AudioContext during Tone.Offline rendering.
-                        const autoGain = new Tone.Gain(1.0).toDestination();
+                        const autoGain = new Tone.Gain(1.0);
+                        const clipPan = sourceAudioClip?.pan !== undefined ? sourceAudioClip.pan : 50;
+                        const panVal = Math.max(-1, Math.min(1, (clipPan - 50) / 50));
+                        const panner = new Tone.Panner(panVal);
+
                         instancePlayer.connect(autoGain);
+                        autoGain.connect(panner);
+
+                        const ownerInsert = (mixerInserts || []).find((ins) =>
+                            ins.clipIds && ins.clipIds.includes(clip.audioClipId)
+                        );
+
+                        const insertInput = ownerInsert ? offlineMixerInsertInputGains.get(ownerInsert.id) : null;
+                        if (insertInput) {
+                            panner.connect(insertInput);
+                        } else {
+                            panner.connect(offlineMaster);
+                        }
 
                         offlineInstancePlayers.set(clip.id, instancePlayer);
                         offlineAutomationGains.set(clip.id, autoGain);

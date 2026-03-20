@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
 import { pickAudioFile, decodeAudioFile, generateWaveform, audioDurationToBeats, pickMidiFile, audioBufferToWav } from '../utils/audioImport';
+import { applyServerEffect } from '../services/EffectsService';
 import * as Tone from 'tone';
 
 const ProjectContext = createContext();
@@ -84,6 +85,9 @@ export const ProjectProvider = ({ children }) => {
     const [bpm, setBpm] = useState(120);
     const [playbackMode, setPlaybackMode] = useState('PAT'); // 'PAT' | 'SONG'
     const [isRecording, setIsRecording] = useState(false);
+    const [recordingNoiseRemovalEnabled, setRecordingNoiseRemovalEnabled] = useState(true);
+    const [recordingVocalEnhanceEnabled, setRecordingVocalEnhanceEnabled] = useState(true);
+    const [isProcessingRecording, setIsProcessingRecording] = useState(false);
     const [playheadPosition, setPlayheadPosition] = useState(0); // Position in beats
     const playheadIntervalRef = useRef(null);
     const [currentProjectPath, setCurrentProjectPath] = useState(null);
@@ -959,6 +963,45 @@ export const ProjectProvider = ({ children }) => {
 
     // --- Audio Recording Logic ---
     useEffect(() => {
+        const processRecordedAudio = async (audioBlob, mimeType) => {
+            const shouldDenoise = recordingNoiseRemovalEnabled;
+            const shouldEnhance = recordingVocalEnhanceEnabled;
+
+            if (!shouldDenoise && !shouldEnhance) {
+                return audioBlob;
+            }
+
+            let processedBlob = audioBlob;
+            setIsProcessingRecording(true);
+
+            try {
+                if (shouldDenoise) {
+                    const denoiseInput = new File([processedBlob], `recording_denoise_input.wav`, { type: mimeType || 'audio/webm' });
+                    processedBlob = await applyServerEffect(denoiseInput, 'denoise', {
+                        strength: 0.72,
+                        reduction_db: 20
+                    });
+                }
+
+                if (shouldEnhance) {
+                    const vocalInput = new File([processedBlob], `recording_vocal_input.wav`, { type: 'audio/wav' });
+                    processedBlob = await applyServerEffect(vocalInput, 'vocal_enhance', {
+                        presence_db: 4.2,
+                        air_db: 2.2,
+                        de_ess_strength: 0.45,
+                        compression_amount: 0.68
+                    });
+                }
+
+                return processedBlob;
+            } catch (processError) {
+                console.error('Post-record processing failed, using raw recording:', processError);
+                return audioBlob;
+            } finally {
+                setIsProcessingRecording(false);
+            }
+        };
+
         const startRecording = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -975,9 +1018,14 @@ export const ProjectProvider = ({ children }) => {
 
                 mediaRecorder.onstop = async () => {
                     const mimeType = mediaRecorder.mimeType || 'audio/webm';
-                    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-                    const extension = mimeType.includes('wav') ? 'wav' : (mimeType.includes('mp4') ? 'm4a' : 'webm');
-                    const file = new File([audioBlob], `Recording_${Date.now()}.${extension}`, { type: mimeType });
+                    const rawAudioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                    const processedBlob = await processRecordedAudio(rawAudioBlob, mimeType);
+
+                    const isWavOutput = (processedBlob.type || '').includes('wav');
+                    const extension = isWavOutput
+                        ? 'wav'
+                        : (mimeType.includes('wav') ? 'wav' : (mimeType.includes('mp4') ? 'm4a' : 'webm'));
+                    const file = new File([processedBlob], `Recording_${Date.now()}.${extension}`, { type: processedBlob.type || mimeType });
 
                     try {
                         const audioBuffer = await decodeAudioFile(file);
@@ -1044,7 +1092,7 @@ export const ProjectProvider = ({ children }) => {
             mediaRecorderRef.current.stop();
             console.log("Recording stopped.");
         }
-    }, [isRecording]);
+    }, [isRecording, bpm, playheadPosition, playlistTracks, recordingNoiseRemovalEnabled, recordingVocalEnhanceEnabled]);
 
     const updateBpm = useCallback((newBpm) => {
         setBpm(newBpm);
@@ -2056,6 +2104,11 @@ export const ProjectProvider = ({ children }) => {
         setPlaybackMode,
         isRecording,
         setIsRecording,
+        recordingNoiseRemovalEnabled,
+        setRecordingNoiseRemovalEnabled,
+        recordingVocalEnhanceEnabled,
+        setRecordingVocalEnhanceEnabled,
+        isProcessingRecording,
         playheadPosition,
         setPlayheadPosition,
         seek,
