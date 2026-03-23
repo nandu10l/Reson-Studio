@@ -837,8 +837,22 @@ export const ProjectProvider = ({ children }) => {
         });
     }, [audioClips]);
 
-    // Optimization: Track if scheduling is needed
-    // (needsScheduling ref moved to top)
+    // Add a new empty mixer insert track
+    const addMixerInsert = useCallback(() => {
+        const insertNum = mixerInserts.length + 1;
+        const newInsert = {
+            id: `mixer-insert-new-${Date.now()}`,
+            name: `Insert ${insertNum}`,
+            type: 'empty',
+            clipIds: [],
+            clipNames: [],
+            vol: 80,
+            pan: 0,
+            effects: []
+        };
+        setMixerInserts(prev => [...prev, newInsert]);
+        audioEngine.createMixerInsertChannel(newInsert.id, 80, 0);
+    }, [mixerInserts.length]);
 
     // Mark scheduling needed when data changes
     useEffect(() => {
@@ -2117,7 +2131,7 @@ export const ProjectProvider = ({ children }) => {
         selectedChannelIds, selectChannel,
 
         // Mixer Inserts
-        mixerInserts, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
+        mixerInserts, addMixerInsert, addAudioClipsToMixerAsGroup, addAudioClipsToMixerSeparately,
         updateMixerInsertVolume, updateMixerInsertPan,
 
         // Audio Clips

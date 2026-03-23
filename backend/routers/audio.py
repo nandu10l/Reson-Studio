@@ -50,6 +50,45 @@ def load_audio_flexible(audio_data: bytes, filename: str = "") -> AudioSegment:
         raise ValueError(f"Could not load audio file. Format not recognized. Filename: {filename}, Error: {str(e)}")
 
 
+def _apply_to_region(audio: AudioSegment, start_ms: int, end_ms: int, process_fn):
+    """
+    Apply a processing function to a region of audio, splicing the result back.
+    If start_ms/end_ms don't define a valid region, applies to the whole audio.
+    
+    Args:
+        audio: Full AudioSegment
+        start_ms: Start of region (-1 means whole audio)
+        end_ms: End of region (-1 means whole audio)
+        process_fn: Callable that takes an AudioSegment and returns an AudioSegment
+    
+    Returns:
+        Processed AudioSegment
+    """
+    has_selection = (start_ms >= 0 and end_ms >= 0 and end_ms > start_ms)
+    
+    if not has_selection:
+        return process_fn(audio)
+    
+    total_ms = len(audio)
+    sel_start = max(0, min(start_ms, total_ms))
+    sel_end = max(sel_start, min(end_ms, total_ms))
+    
+    before = audio[:sel_start] if sel_start > 0 else AudioSegment.empty()
+    selected = audio[sel_start:sel_end]
+    after = audio[sel_end:] if sel_end < total_ms else AudioSegment.empty()
+    
+    processed = process_fn(selected)
+    
+    result = AudioSegment.empty()
+    if len(before) > 0:
+        result = before
+    result = result + processed
+    if len(after) > 0:
+        result = result + after
+    
+    return result
+
+
 @router.post("/convert-to-mp3")
 async def convert_wav_to_mp3(
     file: UploadFile = File(...),
@@ -484,21 +523,27 @@ async def fade_audio(
 
 
 @router.post("/reverse")
-async def reverse_audio(file: UploadFile = File(...)):
+async def reverse_audio(
+    file: UploadFile = File(...),
+    start_ms: int = -1,
+    end_ms: int = -1
+):
     """
-    Reverse the audio.
+    Reverse the audio (or a selected region).
     
     Args:
         file: Audio file (WAV/MP3)
+        start_ms: Start of region to reverse in ms (-1 = whole audio)
+        end_ms: End of region to reverse in ms (-1 = whole audio)
     
     Returns:
-        Reversed audio as WAV
+        Audio with region reversed as WAV
     """
     try:
         audio_data = await file.read()
         audio = load_audio_flexible(audio_data, file.filename)
         
-        result = audio.reverse()
+        result = _apply_to_region(audio, start_ms, end_ms, lambda seg: seg.reverse())
         
         wav_buffer = io.BytesIO()
         result.export(wav_buffer, format="wav")
@@ -517,14 +562,18 @@ async def reverse_audio(file: UploadFile = File(...)):
 @router.post("/time-stretch")
 async def time_stretch_audio(
     file: UploadFile = File(...),
-    factor: float = 1.0
+    factor: float = 1.0,
+    start_ms: int = -1,
+    end_ms: int = -1
 ):
     """
-    Time-stretch audio without changing pitch.
+    Time-stretch audio without changing pitch (or a selected region).
     
     Args:
         file: Audio file (WAV/MP3)
         factor: Stretch factor (0.5 = half speed/double length, 2.0 = double speed/half length)
+        start_ms: Start of region in ms (-1 = whole audio)
+        end_ms: End of region in ms (-1 = whole audio)
     
     Returns:
         Time-stretched audio as WAV
@@ -540,46 +589,38 @@ async def time_stretch_audio(
         audio_data = await file.read()
         audio = load_audio_flexible(audio_data, file.filename)
         
-        # Convert pydub AudioSegment to numpy array for librosa
-        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
-        sample_rate = audio.frame_rate
+        def _do_time_stretch(seg):
+            samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+            sample_rate = seg.frame_rate
+            
+            if seg.channels == 2:
+                left = samples[::2] / 32768.0
+                right = samples[1::2] / 32768.0
+                left_stretched = librosa.effects.time_stretch(left, rate=factor)
+                right_stretched = librosa.effects.time_stretch(right, rate=factor)
+                min_len = min(len(left_stretched), len(right_stretched))
+                left_stretched = left_stretched[:min_len]
+                right_stretched = right_stretched[:min_len]
+                stretched = np.empty(min_len * 2, dtype=np.float32)
+                stretched[::2] = left_stretched
+                stretched[1::2] = right_stretched
+            else:
+                samples_float = samples / 32768.0
+                stretched = librosa.effects.time_stretch(samples_float, rate=factor)
+            
+            buf = io.BytesIO()
+            if seg.channels == 2:
+                stereo_data = np.column_stack([stretched[::2], stretched[1::2]])
+                sf.write(buf, stereo_data, sample_rate, format='WAV')
+            else:
+                sf.write(buf, stretched, sample_rate, format='WAV')
+            buf.seek(0)
+            return AudioSegment.from_file(buf, format='wav')
         
-        # Handle stereo
-        if audio.channels == 2:
-            # Deinterleave stereo
-            left = samples[::2] / 32768.0
-            right = samples[1::2] / 32768.0
-            
-            # Time stretch each channel
-            left_stretched = librosa.effects.time_stretch(left, rate=factor)
-            right_stretched = librosa.effects.time_stretch(right, rate=factor)
-            
-            # Make same length
-            min_len = min(len(left_stretched), len(right_stretched))
-            left_stretched = left_stretched[:min_len]
-            right_stretched = right_stretched[:min_len]
-            
-            # Interleave back to stereo
-            stretched = np.empty(min_len * 2, dtype=np.float32)
-            stretched[::2] = left_stretched
-            stretched[1::2] = right_stretched
-        else:
-            samples_float = samples / 32768.0
-            stretched_mono = librosa.effects.time_stretch(samples_float, rate=factor)
-            stretched = stretched_mono
+        result = _apply_to_region(audio, start_ms, end_ms, _do_time_stretch)
         
-        # Write to WAV using soundfile
         wav_buffer = io.BytesIO()
-        if audio.channels == 2:
-            # Reshape for stereo
-            stereo_data = np.column_stack([
-                stretched[::2],
-                stretched[1::2]
-            ])
-            sf.write(wav_buffer, stereo_data, sample_rate, format='WAV')
-        else:
-            sf.write(wav_buffer, stretched, sample_rate, format='WAV')
-        
+        result.export(wav_buffer, format="wav")
         wav_buffer.seek(0)
         
         return Response(
@@ -595,16 +636,20 @@ async def time_stretch_audio(
 @router.post("/pitch-shift")
 async def pitch_shift_audio(
     file: UploadFile = File(...),
-    semitones: float = 0.0
+    semitones: float = 0.0,
+    start_ms: int = -1,
+    end_ms: int = -1
 ):
     """
-    Pitch-shift audio without changing tempo.
+    Pitch-shift audio without changing tempo (or a selected region).
     
     Args:
         file: Audio file (WAV/MP3)
         semitones: Number of semitones to shift (-12 to +12).
                    Positive = higher pitch, negative = lower pitch.
                    Fractional values allowed (e.g. 0.5 for quarter tone).
+        start_ms: Start of region in ms (-1 = whole audio)
+        end_ms: End of region in ms (-1 = whole audio)
     
     Returns:
         Pitch-shifted audio as WAV
@@ -613,7 +658,6 @@ async def pitch_shift_audio(
         raise HTTPException(status_code=400, detail="Semitones must be between -24 and 24")
     
     if semitones == 0.0:
-        # No change needed, return original
         audio_data = await file.read()
         return Response(
             content=audio_data,
@@ -629,30 +673,34 @@ async def pitch_shift_audio(
         audio_data = await file.read()
         audio = load_audio_flexible(audio_data, file.filename)
         
-        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
-        sample_rate = audio.frame_rate
+        def _do_pitch_shift(seg):
+            samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+            sample_rate = seg.frame_rate
+            
+            if seg.channels == 2:
+                left = samples[::2] / 32768.0
+                right = samples[1::2] / 32768.0
+                left_shifted = librosa.effects.pitch_shift(left, sr=sample_rate, n_steps=semitones)
+                right_shifted = librosa.effects.pitch_shift(right, sr=sample_rate, n_steps=semitones)
+                min_len = min(len(left_shifted), len(right_shifted))
+                left_shifted = left_shifted[:min_len]
+                right_shifted = right_shifted[:min_len]
+                buf = io.BytesIO()
+                stereo_data = np.column_stack([left_shifted, right_shifted])
+                sf.write(buf, stereo_data, sample_rate, format='WAV')
+            else:
+                samples_float = samples / 32768.0
+                shifted_mono = librosa.effects.pitch_shift(samples_float, sr=sample_rate, n_steps=semitones)
+                buf = io.BytesIO()
+                sf.write(buf, shifted_mono, sample_rate, format='WAV')
+            
+            buf.seek(0)
+            return AudioSegment.from_file(buf, format='wav')
         
-        if audio.channels == 2:
-            left = samples[::2] / 32768.0
-            right = samples[1::2] / 32768.0
-            
-            left_shifted = librosa.effects.pitch_shift(left, sr=sample_rate, n_steps=semitones)
-            right_shifted = librosa.effects.pitch_shift(right, sr=sample_rate, n_steps=semitones)
-            
-            min_len = min(len(left_shifted), len(right_shifted))
-            left_shifted = left_shifted[:min_len]
-            right_shifted = right_shifted[:min_len]
-            
-            wav_buffer = io.BytesIO()
-            stereo_data = np.column_stack([left_shifted, right_shifted])
-            sf.write(wav_buffer, stereo_data, sample_rate, format='WAV')
-        else:
-            samples_float = samples / 32768.0
-            shifted_mono = librosa.effects.pitch_shift(samples_float, sr=sample_rate, n_steps=semitones)
-            
-            wav_buffer = io.BytesIO()
-            sf.write(wav_buffer, shifted_mono, sample_rate, format='WAV')
+        result = _apply_to_region(audio, start_ms, end_ms, _do_pitch_shift)
         
+        wav_buffer = io.BytesIO()
+        result.export(wav_buffer, format="wav")
         wav_buffer.seek(0)
         
         return Response(
@@ -668,14 +716,18 @@ async def pitch_shift_audio(
 @router.post("/denoise")
 async def denoise_audio(
     file: UploadFile = File(...),
-    strength: float = 1.0
+    strength: float = 1.0,
+    start_ms: int = -1,
+    end_ms: int = -1
 ):
     """
-    Reduce noise from audio using spectral gating.
+    Reduce noise from audio using spectral gating (or a selected region).
     
     Args:
         file: Audio file (WAV/MP3)
         strength: Noise reduction strength (0.5 = subtle, 1.0 = normal, 2.0 = aggressive)
+        start_ms: Start of region in ms (-1 = whole audio)
+        end_ms: End of region in ms (-1 = whole audio)
     
     Returns:
         Denoised audio as WAV
@@ -687,69 +739,51 @@ async def denoise_audio(
         audio_data = await file.read()
         audio = load_audio_flexible(audio_data, file.filename)
         
-        samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
-        sample_rate = audio.frame_rate
+        def _do_denoise(seg):
+            samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+            sample_rate = seg.frame_rate
+            
+            def spectral_gate(signal_data, sr, threshold_factor=1.0):
+                n_fft = 2048
+                hop_length = 512
+                f, t, Zxx = scipy_signal.stft(signal_data, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
+                magnitude = np.abs(Zxx)
+                phase = np.angle(Zxx)
+                frame_power = np.mean(magnitude ** 2, axis=0)
+                noise_frame_count = max(1, int(len(frame_power) * 0.1))
+                noise_frames = np.argsort(frame_power)[:noise_frame_count]
+                noise_profile = np.mean(magnitude[:, noise_frames], axis=1, keepdims=True)
+                threshold = noise_profile * (1.0 + threshold_factor)
+                mask = np.maximum(0, 1 - (threshold / (magnitude + 1e-10)))
+                for i in range(mask.shape[1]):
+                    mask[:, i] = np.convolve(mask[:, i], np.ones(3)/3, mode='same')
+                cleaned_magnitude = magnitude * mask
+                cleaned_Zxx = cleaned_magnitude * np.exp(1j * phase)
+                _, cleaned = scipy_signal.istft(cleaned_Zxx, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
+                if len(cleaned) > len(signal_data):
+                    cleaned = cleaned[:len(signal_data)]
+                elif len(cleaned) < len(signal_data):
+                    cleaned = np.pad(cleaned, (0, len(signal_data) - len(cleaned)))
+                return cleaned
+            
+            if seg.channels == 2:
+                left = samples[::2]
+                right = samples[1::2]
+                left_clean = spectral_gate(left, sample_rate, strength)
+                right_clean = spectral_gate(right, sample_rate, strength)
+                output = np.empty(len(samples), dtype=np.float32)
+                output[::2] = left_clean
+                output[1::2] = right_clean
+            else:
+                output = spectral_gate(samples, sample_rate, strength)
+            
+            max_val = np.max(np.abs(output))
+            if max_val > 0:
+                output = output / max_val * 0.95
+            output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
+            return seg._spawn(output.tobytes())
         
-        def spectral_gate(signal_data, sr, threshold_factor=1.0):
-            """Apply spectral gating noise reduction."""
-            # STFT parameters
-            n_fft = 2048
-            hop_length = 512
-            
-            # Compute STFT
-            f, t, Zxx = scipy_signal.stft(signal_data, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
-            magnitude = np.abs(Zxx)
-            phase = np.angle(Zxx)
-            
-            # Estimate noise floor from the quietest 10% of frames
-            frame_power = np.mean(magnitude ** 2, axis=0)
-            noise_frame_count = max(1, int(len(frame_power) * 0.1))
-            noise_frames = np.argsort(frame_power)[:noise_frame_count]
-            noise_profile = np.mean(magnitude[:, noise_frames], axis=1, keepdims=True)
-            
-            # Apply spectral gate
-            threshold = noise_profile * (1.0 + threshold_factor)
-            mask = np.maximum(0, 1 - (threshold / (magnitude + 1e-10)))
-            
-            # Smooth mask to avoid artifacts
-            for i in range(mask.shape[1]):
-                mask[:, i] = np.convolve(mask[:, i], np.ones(3)/3, mode='same')
-            
-            # Apply mask and reconstruct
-            cleaned_magnitude = magnitude * mask
-            cleaned_Zxx = cleaned_magnitude * np.exp(1j * phase)
-            
-            _, cleaned = scipy_signal.istft(cleaned_Zxx, fs=sr, nperseg=n_fft, noverlap=n_fft - hop_length)
-            
-            # Match original length
-            if len(cleaned) > len(signal_data):
-                cleaned = cleaned[:len(signal_data)]
-            elif len(cleaned) < len(signal_data):
-                cleaned = np.pad(cleaned, (0, len(signal_data) - len(cleaned)))
-            
-            return cleaned
-        
-        # Process each channel
-        if audio.channels == 2:
-            left = samples[::2]
-            right = samples[1::2]
-            
-            left_clean = spectral_gate(left, sample_rate, strength)
-            right_clean = spectral_gate(right, sample_rate, strength)
-            
-            output = np.empty(len(samples), dtype=np.float32)
-            output[::2] = left_clean
-            output[1::2] = right_clean
-        else:
-            output = spectral_gate(samples, sample_rate, strength)
-        
-        # Normalize to prevent clipping
-        max_val = np.max(np.abs(output))
-        if max_val > 0:
-            output = output / max_val * 0.95
-        output = np.clip(output * 32767, -32768, 32767).astype(np.int16)
-        
-        result = audio._spawn(output.tobytes())
+        result = _apply_to_region(audio, start_ms, end_ms, _do_denoise)
         
         wav_buffer = io.BytesIO()
         result.export(wav_buffer, format="wav")

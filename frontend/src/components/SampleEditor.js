@@ -591,7 +591,14 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         }
     };
 
-    const handleNormalize = () => applyEffect('normalize', { headroom_db: 0.1 });
+    const handleNormalize = () => {
+        const hasSelection = selection.start !== selection.end;
+        const selectionRegion = hasSelection ? {
+            startMs: Math.round(Math.min(selection.start, selection.end) * duration * 1000),
+            endMs: Math.round(Math.max(selection.start, selection.end) * duration * 1000)
+        } : null;
+        applyEffect('normalize', { headroom_db: 0.1 }, selectionRegion);
+    };
 
     const handleReverse = async () => {
         if (!audioBuffer) {
@@ -607,7 +614,11 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const formData = new FormData();
             formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch('http://localhost:8000/audio/reverse', {
+            const hasSelection = selection.start !== selection.end;
+            const startMs = hasSelection ? Math.round(Math.min(selection.start, selection.end) * duration * 1000) : -1;
+            const endMs = hasSelection ? Math.round(Math.max(selection.start, selection.end) * duration * 1000) : -1;
+
+            const response = await fetch(`http://localhost:8000/audio/reverse?start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -774,13 +785,20 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
     };
 
     // EQ effect
-    const handleEQ = () => applyEffect('eq', {
-        low_gain: 0,
-        mid_gain: 0,
-        high_gain: 0,
-        low_freq: 200,
-        high_freq: 3000
-    });
+    const handleEQ = () => {
+        const hasSelection = selection.start !== selection.end;
+        const selectionRegion = hasSelection ? {
+            startMs: Math.round(Math.min(selection.start, selection.end) * duration * 1000),
+            endMs: Math.round(Math.max(selection.start, selection.end) * duration * 1000)
+        } : null;
+        applyEffect('eq', {
+            low_gain: 0,
+            mid_gain: 0,
+            high_gain: 0,
+            low_freq: 200,
+            high_freq: 3000
+        }, selectionRegion);
+    };
 
     // Denoise - calls backend spectral gating
     const handleDenoise = async () => {
@@ -797,7 +815,11 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const formData = new FormData();
             formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch('http://localhost:8000/audio/denoise?strength=1.0', {
+            const hasSelection = selection.start !== selection.end;
+            const startMs = hasSelection ? Math.round(Math.min(selection.start, selection.end) * duration * 1000) : -1;
+            const endMs = hasSelection ? Math.round(Math.max(selection.start, selection.end) * duration * 1000) : -1;
+
+            const response = await fetch(`http://localhost:8000/audio/denoise?strength=1.0&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -844,7 +866,11 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const formData = new FormData();
             formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}`, {
+            const hasSelection = selection.start !== selection.end;
+            const startMs = hasSelection ? Math.round(Math.min(selection.start, selection.end) * duration * 1000) : -1;
+            const endMs = hasSelection ? Math.round(Math.max(selection.start, selection.end) * duration * 1000) : -1;
+
+            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -873,7 +899,7 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
         if (!audioBuffer || pitch === 0) return;
 
         setIsProcessing(true);
-        const semitones = pitch / 100; // Convert cents to semitones
+        const semitones = pitch / 100;
         setProcessingMessage(`Pitch shifting (${semitones > 0 ? '+' : ''}${semitones.toFixed(1)} st)...`);
 
         try {
@@ -881,7 +907,11 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const formData = new FormData();
             formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch(`http://localhost:8000/audio/pitch-shift?semitones=${semitones}`, {
+            const hasSelection = selection.start !== selection.end;
+            const startMs = hasSelection ? Math.round(Math.min(selection.start, selection.end) * duration * 1000) : -1;
+            const endMs = hasSelection ? Math.round(Math.max(selection.start, selection.end) * duration * 1000) : -1;
+
+            const response = await fetch(`http://localhost:8000/audio/pitch-shift?semitones=${semitones}&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -896,7 +926,7 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
             updateAudioBuffer(buffer);
-            setPitch(0); // Reset knob after applying
+            setPitch(0);
         } catch (error) {
             console.error('Pitch shift failed:', error);
             alert(`Pitch shift failed: ${error.message}`);
@@ -908,12 +938,10 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
 
     // Apply time stretch from TIME/MUL knobs via backend
     const handleApplyTimeStretchKnob = async () => {
-        // MUL = speed multiplier (100 = normal, 50 = half speed, 200 = double speed)
-        // TIME = additional fine-tune (-50 to 50, negative = slower, positive = faster)
-        const mulFactor = mul / 100;  // 100% -> 1.0
-        const timeFactor = 1.0 + (time / 100); // -50 → 0.5x, 0 → 1.0x, 50 → 1.5x
+        const mulFactor = mul / 100;
+        const timeFactor = 1.0 + (time / 100);
         const rawFactor = mulFactor * timeFactor;
-        const factor = Math.max(0.1, Math.min(10.0, rawFactor)); // Clamp to valid range
+        const factor = Math.max(0.1, Math.min(10.0, rawFactor));
 
         if (!audioBuffer || Math.abs(factor - 1.0) < 0.01) return;
 
@@ -925,7 +953,11 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const formData = new FormData();
             formData.append('file', wavBlob, 'audio.wav');
 
-            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}`, {
+            const hasSelection = selection.start !== selection.end;
+            const startMs = hasSelection ? Math.round(Math.min(selection.start, selection.end) * duration * 1000) : -1;
+            const endMs = hasSelection ? Math.round(Math.max(selection.start, selection.end) * duration * 1000) : -1;
+
+            const response = await fetch(`http://localhost:8000/audio/time-stretch?factor=${factor}&start_ms=${startMs}&end_ms=${endMs}`, {
                 method: 'POST',
                 body: formData
             });
@@ -940,7 +972,7 @@ export default function SampleEditor({ audioClip, onClose, onSave, onApplyChange
             const buffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
 
             updateAudioBuffer(buffer);
-            setMul(100); // Reset knobs
+            setMul(100);
             setTime(0);
         } catch (error) {
             console.error('Time stretch failed:', error);

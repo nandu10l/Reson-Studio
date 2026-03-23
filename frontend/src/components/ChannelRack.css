@@ -427,6 +427,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
 .add-channel-btn {
@@ -448,6 +449,131 @@
     color: #d0d0d0;
 }
 
+.add-channel-btn.active {
+    background: rgba(96, 165, 250, 0.2);
+    color: #60a5fa;
+}
+
+/* Add Channel Popup */
+.add-channel-popup {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    max-height: 320px;
+    background: #2a2a2a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popupSlideUp 0.15s ease;
+}
+
+@keyframes popupSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.add-channel-popup-header {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #d0d0d0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.add-channel-popup-search {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.add-channel-popup-search input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    color: #d0d0d0;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 5px 8px;
+    outline: none;
+    transition: border-color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.add-channel-popup-search input:focus {
+    border-color: rgba(96, 165, 250, 0.4);
+}
+
+.add-channel-popup-list {
+    overflow-y: auto;
+    flex: 1;
+    max-height: 240px;
+}
+
+.add-channel-popup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    font-size: 11px;
+    color: #b3b3b3;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.add-channel-popup-item:hover {
+    background: rgba(96, 165, 250, 0.15);
+    color: #fff;
+}
+
+.popup-item-name {
+    font-weight: 500;
+}
+
+.popup-item-type {
+    font-size: 10px;
+    color: #6b7280;
+    text-transform: capitalize;
+}
+
+.add-channel-popup-empty {
+    padding: 16px 12px;
+    text-align: center;
+    font-size: 11px;
+    color: #6b7280;
+    font-style: italic;
+}
+
+.add-channel-popup-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.add-channel-popup-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.add-channel-popup-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.add-channel-popup-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 /* Scrollbar Styling */
 .rack-content::-webkit-scrollbar {
     width: 8px;
@@ -465,4 +591,85 @@
 
 .rack-content::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.15);
+}
+
+/* Add Channel Instrument Dropdown */
+.add-channel-dropdown {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 240px;
+    max-height: 360px;
+    background: #2a2a2a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow-y: auto;
+    animation: popupSlideUp 0.15s ease;
+}
+
+.add-channel-dropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+.add-channel-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.add-channel-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+}
+
+.add-channel-dropdown::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.add-channel-group {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.add-channel-group:last-child {
+    border-bottom: none;
+}
+
+.add-channel-group-label {
+    padding: 6px 12px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    position: sticky;
+    top: 0;
+    background: #2a2a2a;
+    z-index: 1;
+}
+
+.add-channel-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px 6px 20px;
+    font-size: 11px;
+    color: #b3b3b3;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.add-channel-item:hover {
+    background: rgba(96, 165, 250, 0.15);
+    color: #fff;
+}
+
+.add-channel-item-name {
+    font-weight: 500;
+}
+
+.add-channel-item-type {
+    font-size: 10px;
+    color: #4b5563;
+    text-transform: capitalize;
 }

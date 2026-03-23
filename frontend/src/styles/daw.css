@@ -1228,7 +1228,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.resize-handle {
+.track-clip > .resize-handle {
   position: absolute;
   right: 0;
   top: 0;
@@ -1240,7 +1240,7 @@
   transition: opacity 0.2s;
 }
 
-.track-clip:hover .resize-handle {
+.track-clip:hover > .resize-handle {
   opacity: 1;
 }
 
@@ -1607,7 +1607,7 @@
     0 0 0 1px rgba(168, 85, 247, 0.06);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .window-header {
@@ -1696,82 +1696,83 @@
   background-color: #1e1e1e !important;
 }
 
-/* Resize Handles */
+/* Resize Handles for DraggableWindow */
 .draggable-window {
   position: relative;
 }
 
-.resize-handle {
+.draggable-window > .resize-handle {
   position: absolute;
   background: transparent;
   z-index: 10;
+  opacity: 1;
 }
 
-.resize-handle-n,
-.resize-handle-s {
-  left: 4px;
-  right: 4px;
-  height: 4px;
+.draggable-window > .resize-handle-n,
+.draggable-window > .resize-handle-s {
+  left: 6px;
+  right: 6px;
+  height: 6px;
   cursor: ns-resize;
 }
 
-.resize-handle-n {
-  top: 0;
+.draggable-window > .resize-handle-n {
+  top: -2px;
 }
 
-.resize-handle-s {
-  bottom: 0;
+.draggable-window > .resize-handle-s {
+  bottom: -2px;
 }
 
-.resize-handle-e,
-.resize-handle-w {
-  top: 4px;
-  bottom: 4px;
-  width: 4px;
+.draggable-window > .resize-handle-e,
+.draggable-window > .resize-handle-w {
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
   cursor: ew-resize;
 }
 
-.resize-handle-e {
-  right: 0;
+.draggable-window > .resize-handle-e {
+  right: -2px;
 }
 
-.resize-handle-w {
-  left: 0;
+.draggable-window > .resize-handle-w {
+  left: -2px;
 }
 
-.resize-handle-ne,
-.resize-handle-nw,
-.resize-handle-se,
-.resize-handle-sw {
-  width: 8px;
-  height: 8px;
+.draggable-window > .resize-handle-ne,
+.draggable-window > .resize-handle-nw,
+.draggable-window > .resize-handle-se,
+.draggable-window > .resize-handle-sw {
+  width: 12px;
+  height: 12px;
 }
 
-.resize-handle-ne {
-  top: 0;
-  right: 0;
+.draggable-window > .resize-handle-ne {
+  top: -2px;
+  right: -2px;
   cursor: nesw-resize;
 }
 
-.resize-handle-nw {
-  top: 0;
-  left: 0;
+.draggable-window > .resize-handle-nw {
+  top: -2px;
+  left: -2px;
   cursor: nwse-resize;
 }
 
-.resize-handle-se {
-  bottom: 0;
-  right: 0;
+.draggable-window > .resize-handle-se {
+  bottom: -2px;
+  right: -2px;
   cursor: nwse-resize;
 }
 
-.resize-handle-sw {
-  bottom: 0;
-  left: 0;
+.draggable-window > .resize-handle-sw {
+  bottom: -2px;
+  left: -2px;
   cursor: nesw-resize;
 }
 
-.resize-handle:hover {
+.draggable-window > .resize-handle:hover {
   background: rgba(74, 222, 128, 0.3);
 }
 
