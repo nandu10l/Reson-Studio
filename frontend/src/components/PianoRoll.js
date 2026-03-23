@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import './PianoRoll.css';
 import * as Tone from 'tone';
 import { Pencil, Eraser, Magnet, ZoomIn, ZoomOut, Music, MousePointer2, Target, Link2, AlignCenter, Volume2, VolumeX, Sliders, Edit, Brush, Scissors } from './icons/BlenderIcons';
-import Playhead from './Playhead';
 import ChordProgressionGenerator from './ChordProgressionGenerator';
 import '../styles/blender-icons.css';
 import { useProject } from '../contexts/ProjectContext';
@@ -16,7 +15,7 @@ const PianoRoll = () => {
         isPlaying, playheadPosition, setPlayheadPosition, updateNote, setActiveTool, activeTool, bpm,
         previewPianoNote, deleteNotes, togglePlayback, channels, addNotesToActivePattern,
         pushNotesHistory, undoNotes, redoNotes, selectedChannelIds, selectChannel,
-        clipboard, setClipboard // Added clipboard/setClipboard
+        clipboard, setClipboard, seek // Added clipboard/setClipboard
     } = useProject();
 
     // Local State
@@ -53,6 +52,7 @@ const PianoRoll = () => {
     const totalBars = 256;
     const stepsPerBar = 16;
     const keyHeight = 16; // compact row — shows 3x more notes at once
+    const rulerHeight = 20;
 
     const scrollContainerRef = useRef(null);
     const pianoKeysRef = useRef(null);
@@ -209,14 +209,47 @@ const PianoRoll = () => {
         // y is content offset in container
         // Since we are using a unified container, y is just scrollTop + clientY relative to container top?
         // handleMouseDown will pass the correct Y relative to content top
-        const index = Math.floor(y / keyHeight);
+        const adjustedY = y - rulerHeight;
+        if (adjustedY < 0) return null;
+        const index = Math.floor(adjustedY / keyHeight);
         if (index < 0 || index >= allKeys.length) return null;
         return allKeys[index] ? allKeys[index].fullName : null;
     };
 
     const getYFromKey = (noteName) => {
         const index = allKeys.findIndex(k => k.fullName === noteName);
-        return index * keyHeight;
+        return (index * keyHeight) + rulerHeight;
+    };
+
+    const seekToClientX = useCallback((clientX) => {
+        if (!scrollContainerRef.current) return;
+
+        const scrollContainer = scrollContainerRef.current;
+        const scrollRect = scrollContainer.getBoundingClientRect();
+        const borderLeft = parseFloat(window.getComputedStyle(scrollContainer).borderLeftWidth) || 0;
+        const viewportX = clientX - scrollRect.left - borderLeft;
+        const currentKeysWidth = pianoKeysRef.current ? pianoKeysRef.current.offsetWidth : KEYS_WIDTH;
+
+        const globalX = viewportX + scrollContainer.scrollLeft;
+        const gridX = globalX - currentKeysWidth;
+        const maxSteps = totalBars * stepsPerBar;
+        const clampedStep = Math.max(0, Math.min(maxSteps, gridX / pixelsPerStep));
+        const nextBeat = clampedStep / 4;
+
+        if (seek) {
+            seek(nextBeat);
+        } else {
+            setPlayheadPosition(nextBeat);
+        }
+    }, [pixelsPerStep, seek, setPlayheadPosition, stepsPerBar, totalBars]);
+
+    const handleRulerMouseDown = (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        seekToClientX(e.clientX);
+        setDragState({ type: 'SEEK' });
     };
 
     // --- Event Handlers ---
@@ -436,15 +469,19 @@ const PianoRoll = () => {
 
         // Calculate step and key from grid position
         const step = Math.max(0, Math.floor(gridX / pixelsPerStep));
-        const keyIndex = Math.floor(globalY / keyHeight);
-        const keyName = allKeys[keyIndex]?.fullName || null;
+        const keyName = getKeyFromY(globalY);
 
         // Update the ref (no re-render needed)
         mouseGridPositionRef.current = { step, key: keyName };
-    }, [pixelsPerStep, keyHeight, allKeys]);
+    }, [getKeyFromY, pixelsPerStep]);
 
     const handleMouseMove = (e) => {
         if (!dragState) return;
+
+        if (dragState.type === 'SEEK') {
+            seekToClientX(e.clientX);
+            return;
+        }
 
         if (dragState.type === 'MOVE') {
             const dxPixels = e.clientX - dragState.startX;
@@ -1276,6 +1313,7 @@ const PianoRoll = () => {
             >
                 {/* Piano Keys Column - Fixed via sticky */}
                 <div className="piano-keys-column" ref={pianoKeysRef}>
+                    <div className="piano-ruler-spacer" style={{ height: `${rulerHeight}px` }} />
                     {allKeys.map((k) => {
                         const keyNotes = getNotesForKey(k.fullName);
                         const hasNotes = keyNotes.length > 0;
@@ -1301,6 +1339,21 @@ const PianoRoll = () => {
                 {/* Grid Area - Flows naturally now */}
                 <div className="piano-grid-area" ref={gridAreaRef}>
                     <div style={{ position: 'relative' }}>
+                        <div
+                            className="piano-grid-ruler"
+                            onMouseDown={handleRulerMouseDown}
+                            style={{ width: `${totalBars * stepsPerBar * pixelsPerStep}px`, height: `${rulerHeight}px` }}
+                        >
+                            {Array.from({ length: totalBars }).map((_, barIndex) => (
+                                <div
+                                    key={barIndex}
+                                    className="piano-grid-ruler-marker"
+                                    style={{ left: `${barIndex * stepsPerBar * pixelsPerStep}px` }}
+                                >
+                                    {barIndex + 1}
+                                </div>
+                            ))}
+                        </div>
                         {/* Playhead for piano roll - Local High-Perf Render */}
                         <div
                             ref={playheadRef}
@@ -1366,7 +1419,7 @@ const PianoRoll = () => {
                             top: 0,
                             left: 0, // No offset needed, grid area starts at 0
                             width: `${totalBars * stepsPerBar * pixelsPerStep}px`,
-                            height: `${allKeys.length * keyHeight}px`,
+                            height: `${(allKeys.length * keyHeight) + rulerHeight}px`,
                             pointerEvents: 'none' // Let clicks pass through to rows unless on a note
                         }}>
                             {activePattern.data.notes

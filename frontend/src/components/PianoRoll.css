@@ -411,6 +411,32 @@
     background-color: #0f1215;
 }
 
+.piano-ruler-spacer {
+    width: 100%;
+    background: linear-gradient(to bottom, #273039, #1b232b);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.piano-grid-ruler {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    background: linear-gradient(to bottom, #273039, #1b232b);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+    cursor: ew-resize;
+}
+
+.piano-grid-ruler-marker {
+    position: absolute;
+    top: 2px;
+    transform: translateX(4px);
+    font-size: 10px;
+    font-weight: 600;
+    color: #9fb3c8;
+    pointer-events: none;
+    letter-spacing: 0.01em;
+}
+
 
 
 /* Notes */
