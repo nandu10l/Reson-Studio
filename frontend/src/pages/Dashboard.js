@@ -205,6 +205,25 @@ function Dashboard() {
   const [zoom, setZoom] = useState(1);
   const [pixelsPerBeat, setPixelsPerBeat] = useState(40);
   const trackAreaRef = useRef(null);
+
+  // Dynamically compute how many measures the timeline needs based on clip content
+  const BEATS_PER_BAR = 4;
+  const MIN_MEASURES = 32;
+  const LOOKAHEAD_MEASURES = 16; // always keep some empty space ahead
+  const dynamicMeasures = (() => {
+    let maxEndBeat = 0;
+    if (playlistTracks && playlistTracks.length > 0) {
+      for (const track of playlistTracks) {
+        if (!track.clips) continue;
+        for (const clip of track.clips) {
+          const endBeat = (clip.offset || 0) + (clip.length || 0);
+          if (endBeat > maxEndBeat) maxEndBeat = endBeat;
+        }
+      }
+    }
+    const measuresNeeded = Math.ceil(maxEndBeat / BEATS_PER_BAR) + LOOKAHEAD_MEASURES;
+    return Math.max(MIN_MEASURES, measuresNeeded);
+  })();
   const [playheadHeight, setPlayheadHeight] = useState('100%');
 
   // Update playhead height to span all content
@@ -456,7 +475,7 @@ function Dashboard() {
                     style={{ height: playheadHeight }}
                   />
                   <Timeline
-                    measures={64}
+                    measures={dynamicMeasures}
                     zoom={zoom}
                     onZoomChange={setZoom}
                     pixelsPerBeat={pixelsPerBeat}
@@ -467,7 +486,7 @@ function Dashboard() {
                     onSeek={seek}
                   />
                   <TrackList
-                    measures={64}
+                    measures={dynamicMeasures}
                     onSelectClip={(c) => setSelectedClip(c)}
                     pixelsPerBeat={pixelsPerBeat}
                     playheadPosition={playheadPosition}
