@@ -23,7 +23,9 @@ const INITIAL_CHANNELS = [
     { id: 5, name: 'FLEX Bass', vol: 78, pan: 50, effects: [] },
 ];
 
-const createEmptySteps = (length = 16) => {
+const DEFAULT_PATTERN_LENGTH = 64;
+
+const createEmptySteps = (length = DEFAULT_PATTERN_LENGTH) => {
     const steps = {};
     INITIAL_CHANNELS.forEach(ch => {
         steps[ch.id] = Array(length).fill(false);
@@ -40,9 +42,9 @@ export const ProjectProvider = ({ children }) => {
             id: 1,
             name: 'Pattern 1',
             color: '#8b5cf6',
-            length: 16,
+            length: DEFAULT_PATTERN_LENGTH,
             data: {
-                steps: createEmptySteps(16),
+                steps: createEmptySteps(DEFAULT_PATTERN_LENGTH),
                 notes: []
             }
         }
@@ -108,6 +110,9 @@ export const ProjectProvider = ({ children }) => {
 
     // Track Clipboard (for Cut/Copy/Paste of track clips)
     const [trackClipboard, setTrackClipboard] = useState(null); // { clips: [...], isCut: bool }
+
+    // Note Clipboard (for Cut/Copy/Paste of notes in piano roll)
+    const [clipboard, setClipboard] = useState(null); // Array of notes with relative positions
 
     // Selected clips in the track area (lifted from TrackList for global access)
     const [selectedTrackClips, setSelectedTrackClips] = useState([]); // Array of { trackId, clipIndex }
@@ -327,9 +332,9 @@ export const ProjectProvider = ({ children }) => {
                 id: nextId,
                 name: `Pattern ${nextId}`,
                 color,
-                length: 16,
+                length: DEFAULT_PATTERN_LENGTH,
                 data: {
-                    steps: createEmptySteps(16),
+                    steps: createEmptySteps(DEFAULT_PATTERN_LENGTH),
                     notes: []
                 }
             };
@@ -1627,16 +1632,18 @@ export const ProjectProvider = ({ children }) => {
             });
 
             // Update Patterns
+            let patternLength = DEFAULT_PATTERN_LENGTH;
             setPatterns(prev => {
                 const nextPatId = Math.max(...prev.map(p => p.id)) + 1;
 
                 const maxStep = Math.max(...newPatternNotes.map(n => n.startStep + n.length), 64);
                 const length = Math.ceil(maxStep / 16) * 16;
+                patternLength = length;
 
                 // Create steps for ALL channels
-                // NOTE: We don't have the updated 'channels' here, so we must manually ensure 
+                // NOTE: We don't have the updated 'channels' here, so we must manually ensure
                 // we rely on what we know about new channels + existing pattern structure or just empty.
-                // Ideally createEmptySteps needs dynamic channel info. 
+                // Ideally createEmptySteps needs dynamic channel info.
                 // For now, we'll manually patch the new channel steps.
 
                 const newSteps = createEmptySteps(length);
@@ -1666,16 +1673,17 @@ export const ProjectProvider = ({ children }) => {
                     // We need to guess the next pattern ID again or use a safer way.
                     // Since we do it in the same event loop tick, it *should* match the calculation above.
                     const patIds = patterns.map(p => p.id); // Closure 'patterns'
-                    // This might be slightly risky if 'patterns' is old. 
+                    // This might be slightly risky if 'patterns' is old.
                     // But 'patterns' is a dependency of useCallback, so it should be fresh.
                     const nextPatId = Math.max(...patIds, 0) + 1;
+                    const lengthBeats = patternLength / 4;
 
                     const newClip = {
                         id: Date.now(),
                         type: 'pattern',
                         patternId: nextPatId,
                         offset: playheadPosition,
-                        length: 16 // Should match pattern length ideally, but clips can be shorter/looped
+                        length: lengthBeats
                     };
 
                     return prev.map(t =>
@@ -1984,9 +1992,9 @@ export const ProjectProvider = ({ children }) => {
                     id: 1,
                     name: 'Pattern 1',
                     color: '#4C8DB0',
-                    length: 16,
+                    length: DEFAULT_PATTERN_LENGTH,
                     data: {
-                        steps: createEmptySteps(16),
+                        steps: createEmptySteps(DEFAULT_PATTERN_LENGTH),
                         notes: []
                     }
                 }
@@ -2095,6 +2103,10 @@ export const ProjectProvider = ({ children }) => {
         copyTrackClips,
         pasteTrackClips,
         trackClipboard,
+
+        // Note Clipboard (for piano roll copy/paste)
+        clipboard,
+        setClipboard,
 
         // Track Selection (lifted for global access)
         selectedTrackClips, setSelectedTrackClips,
