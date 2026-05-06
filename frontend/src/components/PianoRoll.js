@@ -58,6 +58,7 @@ const PianoRoll = () => {
     const pianoKeysRef = useRef(null);
     const gridAreaRef = useRef(null);
     const playheadRef = useRef(null); // Added
+    const velocityLaneRef = useRef(null); // Velocity lane scroll sync
 
     const KEYS_WIDTH = 90; // narrower piano key column
 
@@ -98,6 +99,41 @@ const PianoRoll = () => {
             }
         }
     }, [allKeys, keyHeight]);
+
+    // Sync velocity lane horizontal scroll with main grid
+    useEffect(() => {
+        const scrollContainer = scrollContainerRef.current;
+        const velocityLane = velocityLaneRef.current;
+        if (!scrollContainer || !velocityLane) return;
+
+        let isSyncing = false;
+
+        const syncVelocityFromMain = () => {
+            if (isSyncing) return;
+            isSyncing = true;
+            // Account for the piano keys width that's sticky in the main area
+            velocityLane.scrollLeft = scrollContainer.scrollLeft;
+            isSyncing = false;
+        };
+
+        const syncMainFromVelocity = () => {
+            if (isSyncing) return;
+            isSyncing = true;
+            scrollContainer.scrollLeft = velocityLane.scrollLeft;
+            isSyncing = false;
+        };
+
+        scrollContainer.addEventListener('scroll', syncVelocityFromMain);
+        velocityLane.addEventListener('scroll', syncMainFromVelocity);
+
+        // Initial sync
+        syncVelocityFromMain();
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', syncVelocityFromMain);
+            velocityLane.removeEventListener('scroll', syncMainFromVelocity);
+        };
+    }, [velocityLaneCollapsed]);
 
     // Auto-scroll to keep playhead visible
     // Auto-scroll to keep playhead visible - 60FPS Smooth Version
@@ -1538,12 +1574,16 @@ const PianoRoll = () => {
                             <span style={{ marginLeft: '8px', color: '#aaa' }}>Velocity</span>
                         </div>
                         {/* Velocity Bars Area - FL Studio Style */}
-                        <div style={{
+                        <div
+                            ref={velocityLaneRef}
+                            style={{
                             flex: 1,
                             position: 'relative',
-                            overflowX: 'hidden',
+                            overflowX: 'auto',
                             overflowY: 'hidden',
-                            marginLeft: `${KEYS_WIDTH}px`
+                            marginLeft: `${KEYS_WIDTH}px`,
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none'
                         }}>
                             {/* Grid background */}
                             <div style={{

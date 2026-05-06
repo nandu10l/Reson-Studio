@@ -23,18 +23,47 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "electron-dev": "npm run start",
-    "electron-pack": "npm run build && npm run copy-electron && electron-builder -c.extraMetadata.main=build/electron/main.js",
+    "dist": "npm run build && npm run copy-electron && electron-builder --win --config",
     "preelectron-pack": "npm run build",
     "copy-electron": "node ./scripts/copy-electron.js"
   },
   "build": {
     "appId": "com.reson.studio",
+    "productName": "Reson Studio",
     "files": [
       "build/**/*",
       "node_modules/**/*"
     ],
     "directories": {
-      "buildResources": "assets"
+      "buildResources": "assets",
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "assets/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Reson Studio",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
     }
   },
   "browserslist": {

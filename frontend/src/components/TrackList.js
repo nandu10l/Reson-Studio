@@ -771,8 +771,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                 letterSpacing: '0.01em',
                 opacity: isClipSelected ? 1 : 0.9
               }}>
-                <div className="clip-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '4px' }}>{clipName}</span>
+                <div className="clip-header-row" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
                   <button
                     className="clip-menu-btn"
                     onPointerDown={(e) => {
@@ -808,6 +807,7 @@ const Track = React.memo(({ track, onSelect, onToggleMute, onToggleSolo, onAddCl
                   >
                     <ChevronDown size={10} color="#fff" className="blender-icon" />
                   </button>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{clipName}</span>
                 </div>
               </div>
 

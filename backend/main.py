@@ -29,9 +29,9 @@ app.include_router(lyria_music.router)
 try:
     from routers import midi_llm
     app.include_router(midi_llm.router)
-    print("✓ MIDI-LLM router registered")
+    print("[OK] MIDI-LLM router registered")
 except ImportError as e:
-    print(f"⚠ MIDI-LLM router not available: {e}")
+    print(f"[WARN] MIDI-LLM router not available: {e}")
 
 @app.get("/")
 async def root():

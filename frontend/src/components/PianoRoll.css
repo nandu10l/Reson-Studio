@@ -580,3 +580,8 @@
     align-items: center;
     border-bottom: 1px solid #444;
 }
+
+/* Hide scrollbar on velocity lane sync container */
+.velocity-lane div::-webkit-scrollbar {
+    display: none;
+}
